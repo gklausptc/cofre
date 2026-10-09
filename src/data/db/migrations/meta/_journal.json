@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1790531786652,
+      "tag": "0000_huge_vapor",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790625861658,
+      "tag": "0001_same_salo",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790629784966,
+      "tag": "0002_thankful_moira_mactaggert",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1790636873447,
+      "tag": "0003_heavy_mongu",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1790795476227,
+      "tag": "0004_blushing_sprite",
+      "breakpoints": true
+    }
+  ]
+}

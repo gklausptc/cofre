@@ -1,0 +1,1 @@
+ALTER TABLE `movimentacoes` ADD `reservar_proximo_mes` integer DEFAULT false;
