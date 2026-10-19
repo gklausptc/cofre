@@ -2,6 +2,7 @@ import { subDays } from 'date-fns';
 import { formatarMoeda } from '@/core/utils/currency';
 import type { Cartao, CompraParcelada, ContaFixa, Parcela } from '@/domain/types/entities';
 import { mesAtualIso } from '@/core/utils/date';
+import { mesVencimentoDaFatura } from '@/domain/usecases/mesDaFatura';
 
 export type ItemNotificacao = {
   identificador: string;
@@ -43,7 +44,8 @@ export function calcularNotificacoesVencimento(
       if (!compra) continue;
       const cartao = cartoes.find((c) => c.id === compra.cartaoId);
       if (!cartao) continue;
-      const vencimento = dataDoVencimento(parcela.mesReferencia, cartao.diaVencimento);
+      // mesReferencia da parcela é o mês de fechamento; a fatura pode vencer no mês seguinte
+      const vencimento = dataDoVencimento(mesVencimentoDaFatura(parcela.mesReferencia, cartao), cartao.diaVencimento);
       itens.push({
         identificador: `parcela-cartao-${parcela.id}`,
         titulo: `Fatura do ${cartao.nome} vence amanhã`,
