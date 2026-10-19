@@ -22,6 +22,7 @@ const ITENS: ItemMenu[] = [
   { icon: 'shield', titulo: 'Reserva de emergência', href: '/reserva-emergencia' },
   { icon: 'bar-chart-2', titulo: 'Relatórios', href: '/relatorios' },
   { icon: 'users', titulo: 'Membros da família', href: '/membro' },
+  { icon: 'save', titulo: 'Backup e restauração', href: '/backup' },
   { icon: 'settings', titulo: 'Configurações', href: '/configuracoes' },
 ];
 

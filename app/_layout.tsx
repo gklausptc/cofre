@@ -12,9 +12,7 @@ import {
   Manrope_600SemiBold,
   Manrope_700Bold,
 } from '@expo-google-fonts/manrope';
-import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { db } from '@/data/db/client';
-import migrations from '@/data/db/migrations/migrations';
 import { seedCategoriasPadrao } from '@/data/db/seed';
 import { ThemeProvider, useAppTheme } from '@/core/theme/ThemeProvider';
 import { listarContasFixas } from '@/data/repositories/contasFixasRepository';
@@ -29,6 +27,9 @@ import { configurarNotificacoes, agendarNotificacoesVencimento } from '@/core/no
 import { usePreferenciasStore } from '@/store/preferenciasStore';
 import { useBloqueioStore } from '@/store/bloqueioStore';
 import { AppLockScreen } from '@/components/AppLockScreen';
+import { inicializarRepositorios, prepararBanco } from '@/core/inicializacao';
+
+inicializarRepositorios();
 
 async function rodarRecorrenciaDoDia() {
   const [contasFixas, parcelasExistentes] = await Promise.all([listarContasFixas(), listarParcelas()]);
@@ -57,10 +58,17 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function RootNavigator() {
   const { colors, scheme } = useAppTheme();
-  const { success: migrationsOk, error: migrationsError } = useMigrations(db, migrations);
+  const [migrationsOk, setMigrationsOk] = useState(false);
+  const [migrationsError, setMigrationsError] = useState<Error | null>(null);
   const [inicializado, setInicializado] = useState(false);
   const { preferencias, carregar: carregarPreferencias } = usePreferenciasStore();
   const desbloqueado = useBloqueioStore((s) => s.desbloqueado);
+
+  useEffect(() => {
+    prepararBanco()
+      .then(() => setMigrationsOk(true))
+      .catch((erro: unknown) => setMigrationsError(erro instanceof Error ? erro : new Error(String(erro))));
+  }, []);
 
   useEffect(() => {
     if (!migrationsOk) return;
@@ -143,6 +151,7 @@ function RootNavigator() {
         <Stack.Screen name="importar-extrato/index" options={{ headerShown: true, title: 'Importar extrato' }} />
         <Stack.Screen name="exportar-extrato/index" options={{ headerShown: true, title: 'Exportar extrato' }} />
         <Stack.Screen name="configuracoes/index" options={{ headerShown: true, title: 'Configurações' }} />
+        <Stack.Screen name="backup/index" options={{ headerShown: true, title: 'Backup e restauração' }} />
       </Stack>
     </>
   );

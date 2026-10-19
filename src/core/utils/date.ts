@@ -5,6 +5,12 @@ export function formatarData(dataIso: string, padrao = 'dd/MM/yyyy'): string {
   return format(parseISO(dataIso), padrao, { locale: ptBR });
 }
 
+/** "16/10/2026 às 14:32" — aceita ISO com hora ou um Date. */
+export function formatarDataHora(data: string | Date): string {
+  const valor = typeof data === 'string' ? parseISO(data) : data;
+  return format(valor, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+}
+
 export function formatarMesReferencia(mesReferencia: string): string {
   // mesReferencia no formato 'YYYY-MM'
   return format(parseISO(`${mesReferencia}-01`), "MMMM 'de' yyyy", { locale: ptBR });

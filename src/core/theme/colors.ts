@@ -27,6 +27,8 @@ export type ThemeColors = {
   accent: string;
   danger: string;
   success: string;
+  /** Âmbar: só para "precisa de atenção" (lembretes, perguntas pendentes, alertas). */
+  warning: string;
 };
 
 export const lightTheme: ThemeColors = {
@@ -43,6 +45,7 @@ export const lightTheme: ThemeColors = {
   accent: palette.accent,
   danger: palette.danger,
   success: palette.accent,
+  warning: '#B45309',
 };
 
 export const darkTheme: ThemeColors = {
@@ -57,4 +60,5 @@ export const darkTheme: ThemeColors = {
   accent: palette.accentLight,
   danger: palette.danger,
   success: palette.accentLight,
+  warning: '#F59E0B',
 };

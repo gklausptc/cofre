@@ -179,4 +179,6 @@ export const preferencias = sqliteTable('preferencias', {
   bloqueioAtivo: integer('bloqueio_ativo', { mode: 'boolean' }).notNull().default(false),
   biometriaAtiva: integer('biometria_ativa', { mode: 'boolean' }).notNull().default(false),
   tutorialConcluido: integer('tutorial_concluido', { mode: 'boolean' }).notNull().default(false),
+  // quando o último backup foi compartilhado para fora do app (ISO com hora); null = nunca
+  ultimoBackupEm: text('ultimo_backup_em'),
 });

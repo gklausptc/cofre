@@ -196,6 +196,18 @@ export default function ConfiguracoesScreen() {
 
           <Card>
             <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15, marginBottom: 4 }}>
+              Seus dados
+            </Text>
+            <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginBottom: 16 }}>
+              Faça backup de tudo num arquivo para guardar fora do app, ou restaure um backup anterior.
+            </Text>
+            <Button titulo="Backup e restauração" variante="secundaria" onPress={() => router.push('/backup')} />
+          </Card>
+
+          <View style={{ height: 16 }} />
+
+          <Card>
+            <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15, marginBottom: 4 }}>
               Zona de perigo
             </Text>
             <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginBottom: 16 }}>

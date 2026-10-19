@@ -8,6 +8,7 @@ const PADRAO: Omit<Preferencias, 'id'> = {
   bloqueioAtivo: false,
   biometriaAtiva: false,
   tutorialConcluido: false,
+  ultimoBackupEm: null,
 };
 
 export async function buscarPreferencias(): Promise<Preferencias> {

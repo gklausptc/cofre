@@ -1,0 +1,1 @@
+ALTER TABLE `preferencias` ADD `ultimo_backup_em` text;

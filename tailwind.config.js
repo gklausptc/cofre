@@ -17,6 +17,10 @@ module.exports = {
           light: '#22D3EE',
         },
         danger: '#E5484D',
+        warning: {
+          DEFAULT: '#B45309',
+          light: '#F59E0B',
+        },
         surface: {
           light: '#F2F4F8',
           dark: '#0A0D14',
