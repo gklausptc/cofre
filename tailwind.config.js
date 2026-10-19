@@ -1,6 +1,12 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ['./app/**/*.{js,jsx,ts,tsx}', './src/**/*.{js,jsx,ts,tsx}'],
+  // testes ficam de fora: textos como "[-3:BRT]" (fuso do OFX) viram classes arbitrárias e quebram o CSS
+  content: [
+    './app/**/*.{js,jsx,ts,tsx}',
+    './src/**/*.{js,jsx,ts,tsx}',
+    '!./src/**/__tests__/**',
+    '!./src/test/**',
+  ],
   presets: [require('nativewind/preset')],
   darkMode: 'class',
   theme: {
