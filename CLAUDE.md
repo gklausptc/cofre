@@ -321,7 +321,10 @@ npx expo start                                              # inicia o dev serve
 npx expo start --tunnel                                     # acesso fora da rede local
 npx drizzle-kit generate                                    # gera migrations a partir do schema
 npm run lint                                                # lint (configurar ESLint + Prettier no setup)
+npm test                                                    # testes (Jest + jest-expo) dos usecases e parsers
 ```
+
+Testes ficam em `__tests__/` ao lado do código (ex.: `src/domain/usecases/__tests__/`), importam `describe/it/expect` de `@jest/globals` (o TypeScript 6 não carrega tipos globais por padrão) e usam as fábricas e cenários de `src/test/`.
 
 ## 13. Identidade visual — Cofre
 

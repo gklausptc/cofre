@@ -1,0 +1,198 @@
+import { describe, expect, it } from '@jest/globals';
+import {
+  backupsAutomaticosParaApagar,
+  descreverIdadeBackup,
+  interpretarNomeBackupAutomatico,
+  montarBackup,
+  nomeArquivoBackup,
+  nomeBackupAutomatico,
+  ordenarBackupsAutomaticos,
+  prepararTabelasParaRestaurar,
+  resumirBackup,
+  textoResumoBackup,
+  validarBackup,
+  type LinhaBackup,
+  type TabelasBackup,
+} from '@/domain/usecases/backup';
+
+const agora = new Date(2026, 9, 16, 14, 32, 5);
+
+function comoArquivo(valor: unknown): unknown {
+  return JSON.parse(JSON.stringify(valor));
+}
+
+const tabelasValidas: TabelasBackup = {
+  categorias: [{ id: 1, nome: 'Mercado', tipo: 'despesa', is_padrao: 1 }],
+  movimentacoes: [{ id: 1, valor: 10.5, descricao: null }],
+};
+
+describe('montarBackup e nomeArquivoBackup', () => {
+  it('monta o arquivo com formato, versões e data', () => {
+    expect(montarBackup(tabelasValidas, 5, agora)).toEqual({
+      formato: 'cofre-backup',
+      versaoFormato: 1,
+      versaoSchema: 5,
+      criadoEm: agora.toISOString(),
+      tabelas: tabelasValidas,
+    });
+  });
+
+  it('nome do arquivo com a data', () => {
+    expect(nomeArquivoBackup(agora)).toBe('cofre-backup-2026-10-16.json');
+  });
+});
+
+describe('validarBackup', () => {
+  it('aceita um backup da mesma versão, sem alterar os dados', () => {
+    const resultado = validarBackup(comoArquivo(montarBackup(tabelasValidas, 5, agora)), 5);
+    expect(resultado).toEqual({ ok: true, backup: montarBackup(tabelasValidas, 5, agora) });
+  });
+
+  it('aceita backup de versão anterior e o traz para a versão atual', () => {
+    const resultado = validarBackup(comoArquivo(montarBackup(tabelasValidas, 3, agora)), 5);
+    expect(resultado.ok && resultado.backup.versaoSchema).toBe(5);
+  });
+
+  it('recusa backup de uma versão mais nova do app', () => {
+    const resultado = validarBackup(comoArquivo(montarBackup(tabelasValidas, 6, agora)), 5);
+    expect(resultado).toEqual({ ok: false, erro: expect.stringContaining('mais nova') });
+  });
+
+  it('recusa o que não é backup do Cofre', () => {
+    const naoEBackup = { ok: false, erro: 'Esse arquivo não é um backup do Cofre.' };
+    expect(validarBackup(null, 5)).toEqual(naoEBackup);
+    expect(validarBackup([], 5)).toEqual(naoEBackup);
+    expect(validarBackup('texto', 5)).toEqual(naoEBackup);
+    expect(validarBackup({ ...montarBackup(tabelasValidas, 5, agora), formato: 'outro' }, 5)).toEqual(naoEBackup);
+    expect(validarBackup({ ...montarBackup({ movimentacoes: [] }, 5, agora) }, 5)).toEqual(naoEBackup);
+    expect(validarBackup({ ...montarBackup(tabelasValidas, 5, agora), criadoEm: 'ontem' }, 5)).toEqual(naoEBackup);
+  });
+
+  it('recusa formato de backup desconhecido', () => {
+    const resultado = validarBackup({ ...montarBackup(tabelasValidas, 5, agora), versaoFormato: 2 }, 5);
+    expect(resultado).toEqual({ ok: false, erro: expect.stringContaining('formato') });
+  });
+
+  it('recusa células que não são texto, número ou vazio', () => {
+    const comObjeto = { ...montarBackup(tabelasValidas, 5, agora), tabelas: { categorias: [{ id: { a: 1 } }] } };
+    const comBooleano = { ...montarBackup(tabelasValidas, 5, agora), tabelas: { categorias: [{ ativo: true }] } };
+    expect(validarBackup(comObjeto, 5).ok).toBe(false);
+    expect(validarBackup(comBooleano, 5).ok).toBe(false);
+  });
+});
+
+describe('resumirBackup', () => {
+  it('conta lançamentos (movimentações + gastos), contas e cartões ativos', () => {
+    const resumo = resumirBackup({
+      tabelas: {
+        categorias: [{ id: 1 }],
+        movimentacoes: [{ id: 1 }, { id: 2 }],
+        gastos_rapidos: [{ id: 1 }],
+        contas_bancarias: [
+          { id: 1, ativo: 1 },
+          { id: 2, ativo: 0 },
+        ],
+        cartoes: [
+          { id: 1, ativo: 1 },
+          { id: 2, ativo: 1 },
+        ],
+        cofrinhos: [],
+      },
+    });
+
+    expect(resumo).toEqual([
+      { rotulo: 'lançamentos', quantidade: 3 },
+      { rotulo: 'conta bancária', quantidade: 1 },
+      { rotulo: 'cartões', quantidade: 2 },
+    ]);
+    expect(textoResumoBackup(resumo)).toBe('3 lançamentos · 1 conta bancária · 2 cartões');
+  });
+
+  it('backup vazio', () => {
+    expect(textoResumoBackup(resumirBackup({ tabelas: { categorias: [] } }))).toBe(
+      'Nenhum lançamento, conta ou cartão cadastrado.'
+    );
+  });
+});
+
+describe('prepararTabelasParaRestaurar', () => {
+  const doBackup: LinhaBackup = {
+    id: 1,
+    tema: 'escuro',
+    bloqueio_ativo: 0,
+    biometria_ativa: 0,
+    tutorial_concluido: 1,
+    ultimo_backup_em: null,
+  };
+  const doAparelho: LinhaBackup = {
+    id: 1,
+    tema: 'claro',
+    bloqueio_ativo: 1,
+    biometria_ativa: 1,
+    tutorial_concluido: 0,
+    ultimo_backup_em: '2026-10-01T12:00:00.000Z',
+  };
+
+  it('traz as preferências do backup, mas mantém bloqueio, biometria e último backup do aparelho', () => {
+    const tabelas = prepararTabelasParaRestaurar({ tabelas: { ...tabelasValidas, preferencias: [doBackup] } }, doAparelho);
+
+    expect(tabelas.preferencias).toEqual([
+      {
+        id: 1,
+        tema: 'escuro',
+        tutorial_concluido: 1,
+        bloqueio_ativo: 1,
+        biometria_ativa: 1,
+        ultimo_backup_em: '2026-10-01T12:00:00.000Z',
+      },
+    ]);
+    expect(tabelas.movimentacoes).toEqual(tabelasValidas.movimentacoes);
+  });
+
+  it('backup sem preferências mantém as do aparelho', () => {
+    expect(prepararTabelasParaRestaurar({ tabelas: tabelasValidas }, doAparelho).preferencias).toEqual([doAparelho]);
+  });
+
+  it('não altera o backup original', () => {
+    const backup = { tabelas: { ...tabelasValidas, preferencias: [doBackup] } };
+    prepararTabelasParaRestaurar(backup, doAparelho);
+    expect(backup.tabelas.preferencias).toEqual([doBackup]);
+  });
+});
+
+describe('cópias automáticas', () => {
+  it('nome com data, hora e motivo, e leitura de volta', () => {
+    const nome = nomeBackupAutomatico(agora, 'antes-de-restaurar');
+    expect(nome).toBe('cofre-auto-2026-10-16-143205-antes-de-restaurar.json');
+    expect(interpretarNomeBackupAutomatico(nome)).toEqual({ nome, criadoEm: agora, motivo: 'antes-de-restaurar' });
+    expect(interpretarNomeBackupAutomatico('cofre-backup-2026-10-16.json')).toBeNull();
+  });
+
+  it('ordena da mais nova para a mais antiga e mantém só as 5 mais recentes', () => {
+    const nomes = [1, 2, 3, 4, 5, 6, 7].map((dia) => nomeBackupAutomatico(new Date(2026, 9, dia, 9), 'antes-da-atualizacao'));
+    const embaralhados = [nomes[3], nomes[0], nomes[6], 'outro-arquivo.json', nomes[1], nomes[5], nomes[2], nomes[4]];
+
+    expect(ordenarBackupsAutomaticos(embaralhados).map((info) => info.criadoEm.getDate())).toEqual([7, 6, 5, 4, 3, 2, 1]);
+    expect(backupsAutomaticosParaApagar(embaralhados).sort()).toEqual([nomes[0], nomes[1]].sort());
+  });
+});
+
+describe('descreverIdadeBackup', () => {
+  const hoje = new Date(2026, 9, 19, 10, 0, 0);
+  const diasAtras = (dias: number) => new Date(2026, 9, 19 - dias, 8, 0, 0).toISOString();
+
+  it('nunca fez backup: lembra', () => {
+    expect(descreverIdadeBackup(null, hoje)).toEqual({ texto: 'Você ainda não fez nenhum backup.', precisaLembrar: true });
+  });
+
+  it('descreve hoje, ontem e há N dias', () => {
+    expect(descreverIdadeBackup(diasAtras(0), hoje).texto).toBe('Último backup: hoje.');
+    expect(descreverIdadeBackup(diasAtras(1), hoje).texto).toBe('Último backup: ontem.');
+    expect(descreverIdadeBackup(diasAtras(3), hoje).texto).toBe('Último backup: há 3 dias.');
+  });
+
+  it('lembra só depois de 7 dias', () => {
+    expect(descreverIdadeBackup(diasAtras(7), hoje).precisaLembrar).toBe(false);
+    expect(descreverIdadeBackup(diasAtras(8), hoje).precisaLembrar).toBe(true);
+  });
+});
