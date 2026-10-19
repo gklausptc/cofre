@@ -10,7 +10,7 @@ import { Button } from '@/components/Button';
 import { PinPad } from '@/components/PinPad';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { usePreferenciasStore } from '@/store/preferenciasStore';
-import { definirPin, removerPin } from '@/core/auth/appLock';
+import { definirPin, removerPin, verificarPin } from '@/core/auth/appLock';
 import { biometriaDisponivel } from '@/core/auth/biometria';
 import { limparTodosOsDados } from '@/data/db/resetDatabase';
 import type { Preferencias } from '@/domain/types/entities';
@@ -21,7 +21,9 @@ const OPCOES_TEMA: { valor: Preferencias['tema']; rotulo: string }[] = [
   { valor: 'escuro', rotulo: 'Escuro' },
 ];
 
-type EtapaPin = 'inativo' | 'primeiro' | 'confirmar';
+type EtapaPin = 'inativo' | 'atual' | 'primeiro' | 'confirmar';
+/** O que fazer depois que o PIN atual for confirmado. */
+type AcaoComPinAtual = 'alterar' | 'desativar';
 
 export default function ConfiguracoesScreen() {
   const { colors } = useAppTheme();
@@ -33,6 +35,7 @@ export default function ConfiguracoesScreen() {
   const [pinDigitado, setPinDigitado] = useState('');
   const [primeiroPin, setPrimeiroPin] = useState('');
   const [erroPin, setErroPin] = useState(false);
+  const [acaoComPinAtual, setAcaoComPinAtual] = useState<AcaoComPinAtual>('alterar');
   const [limpando, setLimpando] = useState(false);
 
   useFocusEffect(
@@ -56,6 +59,14 @@ export default function ConfiguracoesScreen() {
     setEtapaPin('primeiro');
   }
 
+  /** Alterar o PIN ou desativar o bloqueio exige o PIN atual. */
+  function pedirPinAtual(acao: AcaoComPinAtual) {
+    setPinDigitado('');
+    setErroPin(false);
+    setAcaoComPinAtual(acao);
+    setEtapaPin('atual');
+  }
+
   function cancelarDefinicaoPin() {
     setEtapaPin('inativo');
     setPinDigitado('');
@@ -66,6 +77,27 @@ export default function ConfiguracoesScreen() {
   function handleAlterarPin(novoValor: string) {
     setPinDigitado(novoValor);
     if (novoValor.length < 4) return;
+
+    if (etapaPin === 'atual') {
+      verificarPin(novoValor).then((correto) => {
+        if (!correto) {
+          setErroPin(true);
+          setTimeout(() => {
+            setPinDigitado('');
+            setErroPin(false);
+          }, 500);
+          return;
+        }
+        if (acaoComPinAtual === 'desativar') {
+          cancelarDefinicaoPin();
+          handleDesativarBloqueio();
+        } else {
+          setPinDigitado('');
+          setEtapaPin('primeiro');
+        }
+      });
+      return;
+    }
 
     if (etapaPin === 'primeiro') {
       setPrimeiroPin(novoValor);
@@ -157,11 +189,15 @@ export default function ConfiguracoesScreen() {
             {etapaPin !== 'inativo' ? (
               <View style={{ alignItems: 'center', paddingVertical: 8 }}>
                 <Text className="font-body-medium" style={{ color: colors.text, fontSize: 13, marginBottom: 16 }}>
-                  {erroPin
-                    ? 'Os PINs não coincidem, tente de novo'
-                    : etapaPin === 'primeiro'
-                      ? 'Digite o novo PIN'
-                      : 'Confirme o novo PIN'}
+                  {etapaPin === 'atual'
+                    ? erroPin
+                      ? 'PIN incorreto, tente de novo'
+                      : 'Digite o PIN atual'
+                    : erroPin
+                      ? 'Os PINs não coincidem, tente de novo'
+                      : etapaPin === 'primeiro'
+                        ? 'Digite o novo PIN'
+                        : 'Confirme o novo PIN'}
                 </Text>
                 <PinPad valor={pinDigitado} onAlterar={handleAlterarPin} erro={erroPin} />
                 <View style={{ marginTop: 16 }}>
@@ -184,8 +220,8 @@ export default function ConfiguracoesScreen() {
                     onAlterar={(valor) => atualizar({ biometriaAtiva: valor })}
                   />
                 )}
-                <Button titulo="Alterar PIN" variante="secundaria" onPress={iniciarDefinicaoPin} />
-                <Button titulo="Desativar bloqueio" variante="perigo" onPress={handleDesativarBloqueio} />
+                <Button titulo="Alterar PIN" variante="secundaria" onPress={() => pedirPinAtual('alterar')} />
+                <Button titulo="Desativar bloqueio" variante="perigo" onPress={() => pedirPinAtual('desativar')} />
               </View>
             ) : (
               <Button titulo="Ativar bloqueio por PIN" onPress={iniciarDefinicaoPin} />
