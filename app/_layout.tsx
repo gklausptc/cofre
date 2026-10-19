@@ -27,6 +27,7 @@ import { configurarNotificacoes, agendarNotificacoesVencimento } from '@/core/no
 import { usePreferenciasStore } from '@/store/preferenciasStore';
 import { useBloqueioStore } from '@/store/bloqueioStore';
 import { AppLockScreen } from '@/components/AppLockScreen';
+import { Button } from '@/components/Button';
 import { inicializarRepositorios, prepararBanco } from '@/core/inicializacao';
 
 inicializarRepositorios();
@@ -56,47 +57,92 @@ async function agendarLembretesDoDia() {
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
+function mensagemDeErro(erro: unknown): string {
+  return erro instanceof Error ? erro.message : String(erro);
+}
+
+function TelaDeErro({ titulo, mensagem, onTentarDeNovo }: { titulo: string; mensagem: string; onTentarDeNovo: () => void }) {
+  const { colors } = useAppTheme();
+  return (
+    <View
+      style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, padding: 24 }}
+    >
+      <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 17, textAlign: 'center', marginBottom: 8 }}>
+        {titulo}
+      </Text>
+      <Text className="font-body" style={{ color: colors.textMuted, fontSize: 13, textAlign: 'center', marginBottom: 24 }}>
+        {mensagem}
+      </Text>
+      <Button titulo="Tentar de novo" onPress={onTentarDeNovo} style={{ alignSelf: 'stretch' }} />
+    </View>
+  );
+}
+
 function RootNavigator() {
   const { colors, scheme } = useAppTheme();
   const [migrationsOk, setMigrationsOk] = useState(false);
-  const [migrationsError, setMigrationsError] = useState<Error | null>(null);
+  const [migrationsError, setMigrationsError] = useState<string | null>(null);
   const [inicializado, setInicializado] = useState(false);
+  const [erroInicializacao, setErroInicializacao] = useState<string | null>(null);
+  // incrementado pelo botão "Tentar de novo" das telas de erro
+  const [tentativa, setTentativa] = useState(0);
   const { preferencias, carregar: carregarPreferencias } = usePreferenciasStore();
   const desbloqueado = useBloqueioStore((s) => s.desbloqueado);
+
+  function tentarDeNovo() {
+    setMigrationsError(null);
+    setErroInicializacao(null);
+    setTentativa((n) => n + 1);
+  }
 
   useEffect(() => {
     prepararBanco()
       .then(() => setMigrationsOk(true))
-      .catch((erro: unknown) => setMigrationsError(erro instanceof Error ? erro : new Error(String(erro))));
-  }, []);
+      .catch((erro: unknown) => setMigrationsError(mensagemDeErro(erro)));
+  }, [tentativa]);
 
   useEffect(() => {
     if (!migrationsOk) return;
     seedCategoriasPadrao(db)
       .then(() => rodarRecorrenciaDoDia())
       .then(() => carregarPreferencias())
-      .then(() => setInicializado(true))
-      .then(() => agendarLembretesDoDia())
-      .catch((err) => console.error('Falha ao inicializar o app', err));
-  }, [migrationsOk, carregarPreferencias]);
+      .then(() => {
+        setInicializado(true);
+        // lembretes não impedem o app de abrir
+        agendarLembretesDoDia().catch((erro: unknown) => console.warn('Falha ao agendar lembretes', erro));
+      })
+      .catch((erro: unknown) => {
+        console.error('Falha ao inicializar o app', erro);
+        setErroInicializacao(mensagemDeErro(erro));
+      });
+  }, [migrationsOk, carregarPreferencias, tentativa]);
 
   const pronto = migrationsOk && inicializado;
+  const temErro = migrationsError !== null || erroInicializacao !== null;
 
   useEffect(() => {
-    if (pronto || migrationsError) {
+    if (pronto || temErro) {
       SplashScreen.hideAsync().catch(() => {});
     }
-  }, [pronto, migrationsError]);
+  }, [pronto, temErro]);
 
-  if (migrationsError) {
+  if (migrationsError !== null) {
     return (
-      <View
-        style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, padding: 24 }}
-      >
-        <Text style={{ color: colors.danger, textAlign: 'center' }}>
-          Erro ao preparar o banco de dados local: {migrationsError.message}
-        </Text>
-      </View>
+      <TelaDeErro
+        titulo="Não consegui preparar o banco de dados"
+        mensagem={`${migrationsError}\n\nNenhuma alteração foi feita nos seus dados.`}
+        onTentarDeNovo={tentarDeNovo}
+      />
+    );
+  }
+
+  if (erroInicializacao !== null) {
+    return (
+      <TelaDeErro
+        titulo="Não consegui abrir o Cofre"
+        mensagem={`Algo deu errado ao carregar seus dados: ${erroInicializacao}`}
+        onTentarDeNovo={tentarDeNovo}
+      />
     );
   }
 
