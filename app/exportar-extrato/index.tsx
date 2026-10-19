@@ -98,7 +98,13 @@ export default function ExportarExtratoScreen() {
       const mesEscolhido = periodo === 'mes' ? mes : null;
       return {
         nome: `extrato-${nomeDeArquivoSeguro(conta.nomeConta)}-${mesEscolhido ?? 'tudo'}.csv`,
-        conteudo: gerarExtratoContaCSV(conta, movimentacoes, categoriasPorId, mesEscolhido),
+        conteudo: gerarExtratoContaCSV(conta, movimentacoes, categoriasPorId, mesEscolhido, {
+          gastos,
+          parcelas,
+          contasFixas,
+          faturas,
+          cartoes,
+        }),
       };
     }
     if (tipoOrigem === 'cartao' && cartao) {
