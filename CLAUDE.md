@@ -327,9 +327,13 @@ npm run lint                                                # lint (configurar E
 
 Marca definida para o app: **Cofre**.
 
-- **Paleta**: verde profundo `#2D6A4F` (primária), fundo claro off-white `#FAF8F3`, fundo escuro grafite `#1C201D`, acento terracota `#D97706`, alerta/despesa vermelho-tijolo `#C1443C`.
+- **Paleta** (fonte da verdade: `src/core/theme/colors.ts`, espelhada à mão em `tailwind.config.js`): azul elétrico + ciano, alto contraste.
+  - Marca: brand `#2A5CE0` (no escuro `#5B8CFF`), brandDark `#1A3FA8`; acento ciano `#06B6D4` (no escuro `#22D3EE`), também usado como "sucesso"; perigo/despesa `#D32F2F`.
+  - Tema claro: fundo `#F2F4F8`, cards `#FFFFFF`, borda `#CBD2E0`, texto `#0F1320`, texto secundário `#666E7E`.
+  - Tema escuro: fundo `#0A0D14`, cards `#141926`, borda `#242B3D`, texto `#EEF1F8`, texto secundário `#8891A6`.
+  - Âmbar `#B45309` (no escuro `#F59E0B`) só para "precisa de atenção" (perguntas pendentes, alertas) — entra no Cofre 2.0.
 - **Tipografia**: Manrope (headings e valores monetários, tabular figures), fonte do sistema para texto corrido.
-- **Estilo**: cards com borda 1px (sem sombras pesadas), cantos 12–16px, ícones de linha simples, sem gradientes/glassmorphism.
+- **Estilo**: cards com borda 1px (sem sombras pesadas), cantos 12–16px, ícones de linha simples, sem gradientes/glassmorphism. Alvo de toque ≥ 44px e contraste ≥ 4,5:1.
 - Tokens implementados em `src/core/theme/`.
 
 ## 14. Distribuição e identidade no Expo Go (lições de outubro/2026)
