@@ -49,7 +49,7 @@ export default function DetalheContaFixaScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const contaId = Number(id);
 
-  const { contas, atualizar, remover } = useContasFixasStore();
+  const { contas, carregar: carregarContasFixas, atualizar, remover } = useContasFixasStore();
   const { contas: contasBancarias, carregar: carregarContasBancarias } = useContasBancariasStore();
   const { categorias, carregar: carregarCategorias } = useCategoriasStore();
   const { membros, carregar: carregarMembros } = useMembrosFamiliaStore();
@@ -72,12 +72,13 @@ export default function DetalheContaFixaScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      carregarContasFixas();
       carregarContasBancarias();
       carregarCategorias();
       carregarMembros();
       carregarParcelas();
       carregarCartoes();
-    }, [carregarContasBancarias, carregarCategorias, carregarMembros, carregarParcelas, carregarCartoes])
+    }, [carregarContasFixas, carregarContasBancarias, carregarCategorias, carregarMembros, carregarParcelas, carregarCartoes])
   );
 
   if (conta && carregadoParaId !== contaId) {
@@ -134,6 +135,7 @@ export default function DetalheContaFixaScreen() {
         recorrencia,
         categoriaId,
         contaBancariaId: formaPagamento !== 'cartao' ? contaBancariaId : null,
+        cartaoId: formaPagamento === 'cartao' ? (cartaoId ?? cartoes[0]?.id ?? null) : null,
         membroId,
         dataFim: calcularDataFim(dataInicioConta, numParcelas, recorrencia),
       });
