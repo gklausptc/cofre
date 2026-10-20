@@ -9,6 +9,7 @@ import { db } from '@/data/db/client';
 import { faturas, gastosRapidos, importacoes, movimentacoes, parcelas, regrasCategorizacao } from '@/data/db/schema';
 import { emTransacao } from '@/data/db/transacao';
 import { registrarPagamentoFatura } from './faturasRepository';
+import { gravarPerguntasDaImportacao } from './perguntasRepository';
 
 export async function listarImportacoes() {
   return db.select().from(importacoes).orderBy(desc(importacoes.criadaEm));
@@ -120,7 +121,12 @@ export async function registrarImportacao(registro: RegistroDeImportacao): Promi
         .where(inArray(regrasCategorizacao.id, registro.regrasUsadas));
     }
 
-    await db.update(importacoes).set({ efeitos: JSON.stringify(efeitos) }).where(eq(importacoes.id, importacao.id));
+    await gravarPerguntasDaImportacao(importacao.id, registro.perguntas, registro.importacao.criadaEm);
+
+    await db
+      .update(importacoes)
+      .set({ efeitos: JSON.stringify(efeitos), pendentes: registro.perguntas.length })
+      .where(eq(importacoes.id, importacao.id));
     return importacao.id;
   });
 }

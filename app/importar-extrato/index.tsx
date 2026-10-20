@@ -36,6 +36,7 @@ import {
   type ItemDaAnalise,
 } from '@/domain/usecases/importacao/analisarImportacao';
 import { historicoDeCategorias, prepararCategorizador, textoParaRegra } from '@/domain/usecases/importacao/categorizar';
+import { montarFilaDePerguntas } from '@/domain/usecases/importacao/montarFilaDePerguntas';
 import type { DadosRegraCategorizacao } from '@/domain/repositories/importacoesRepository';
 import { LinhaDaPrevia } from '@/components/importacao/LinhaDaPrevia';
 import { COMO_EXPORTAR } from '@/domain/dados/comoExportar';
@@ -361,6 +362,26 @@ export default function ImportarExtratoScreen() {
         fatura,
         regrasNovas,
       });
+      const existentes = existentesDoDestino(destino, movimentacoes, gastos);
+      registro.perguntas = montarFilaDePerguntas({
+        extrato,
+        destino,
+        itens: analise?.itens ?? [],
+        registro,
+        cartao: cartaoEscolhido,
+        mesDaFatura: tipoDestino === 'cartao' ? mesFatura : null,
+        categorizar,
+        movimentacoes,
+        gastos,
+        contasFixas,
+        compras,
+        parcelas,
+        regras,
+        descricaoDoExistente: (id) => {
+          const existente = existentes.find((e) => e.id === id);
+          return existente ? { descricao: existente.descricao, data: existente.data, valor: Math.abs(existente.valor) } : null;
+        },
+      });
       await importar(registro);
       await Promise.all([
         carregarMovimentacoes(),
@@ -378,9 +399,20 @@ export default function ImportarExtratoScreen() {
           ? `${registro.pagamentosDeFatura.length} ${registro.pagamentosDeFatura.length === 1 ? 'fatura paga' : 'faturas pagas'}`
           : null,
         regrasNovas.length > 0 ? `${regrasNovas.length} ${regrasNovas.length === 1 ? 'regra nova' : 'regras novas'}` : null,
-        (registro.importacao.pendentes ?? 0) > 0 ? `${registro.importacao.pendentes} sem categoria` : null,
       ].filter(Boolean);
-      Alert.alert('Extrato importado', `${partes.join(' · ')}.`, [{ text: 'OK', onPress: () => router.back() }]);
+      const perguntas = registro.perguntas.length;
+      if (perguntas > 0) {
+        Alert.alert(
+          'Extrato importado',
+          `${partes.join(' · ')}. ${perguntas} ${perguntas === 1 ? 'pergunta ficou' : 'perguntas ficaram'} para você responder.`,
+          [
+            { text: 'Depois', style: 'cancel', onPress: () => router.back() },
+            { text: 'Responder agora', onPress: () => router.replace('/revisao') },
+          ]
+        );
+      } else {
+        Alert.alert('Extrato importado', `${partes.join(' · ')}.`, [{ text: 'OK', onPress: () => router.back() }]);
+      }
     } catch {
       setErro('Não consegui importar. Nada foi gravado; tente de novo.');
     } finally {

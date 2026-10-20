@@ -47,6 +47,8 @@ export type NovaImportacao = InferInsertModel<typeof schema.importacoes>;
 export type RegraCategorizacao = InferSelectModel<typeof schema.regrasCategorizacao>;
 export type NovaRegraCategorizacao = InferInsertModel<typeof schema.regrasCategorizacao>;
 
+export type PerguntaPendente = InferSelectModel<typeof schema.perguntasPendentes>;
+
 export type ContatoPix = InferSelectModel<typeof schema.contatosPix>;
 export type NovoContatoPix = InferInsertModel<typeof schema.contatosPix>;
 

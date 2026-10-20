@@ -256,6 +256,25 @@ export const regrasCategorizacao = sqliteTable('regras_categorizacao', {
   vezesUsada: integer('vezes_usada').notNull().default(0),
 });
 
+// Perguntas que sobraram de uma importação, para responder depois (tela Revisão). `chave`
+// junta perguntas iguais entre importações (5 PIX para a mesma pessoa = 1 pergunta);
+// `dados` é o JSON de DadosDaPergunta (src/domain/types/perguntas.ts), com as linhas afetadas.
+export const perguntasPendentes = sqliteTable('perguntas_pendentes', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  importacaoId: integer('importacao_id'),
+  tipo: text('tipo', { enum: ['categoria', 'pix_pessoa', 'parcelamento', 'recorrencia', 'duplicidade'] }).notNull(),
+  chave: text('chave').notNull(),
+  titulo: text('titulo').notNull(),
+  pista: text('pista').notNull(),
+  // impacto em centavos (soma das linhas), para ordenar a fila
+  valor: integer('valor').notNull().default(0),
+  quantidade: integer('quantidade').notNull().default(1),
+  dados: text('dados').notNull(),
+  status: text('status', { enum: ['pendente', 'respondida'] }).notNull().default('pendente'),
+  criadaEm: text('criada_em').notNull(),
+  respondidaEm: text('respondida_em'),
+});
+
 // Quem é quem nos PIX: o nome como vem no extrato (normalizado) e o que ele representa.
 export const contatosPix = sqliteTable('contatos_pix', {
   id: integer('id').primaryKey({ autoIncrement: true }),

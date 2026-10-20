@@ -5,6 +5,8 @@ import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card } from '@/components/Card';
+import { AvisoPendencias } from '@/components/AvisoPendencias';
+import { usePerguntasStore } from '@/store/perguntasStore';
 import { EmptyState } from '@/components/EmptyState';
 import { FabButton } from '@/components/FabButton';
 import { TourTarget } from '@/components/TourTarget';
@@ -72,6 +74,7 @@ export default function DashboardScreen() {
   const { cartoes, carregar: carregarCartoes } = useCartoesStore();
   const { faturas, carregar: carregarFaturas } = useFaturasStore();
   const { compras, carregar: carregarCompras } = useComprasParceladasStore();
+  const { perguntas, carregar: carregarPerguntas } = usePerguntasStore();
 
   const [membroSelecionadoId, setMembroSelecionadoId] = useState<number | null>(null);
 
@@ -90,6 +93,7 @@ export default function DashboardScreen() {
       carregarCartoes();
       carregarCompras();
       carregarFaturas();
+      carregarPerguntas();
     }, [
       carregarContas,
       carregarMovimentacoes,
@@ -104,6 +108,7 @@ export default function DashboardScreen() {
       carregarCartoes,
       carregarCompras,
       carregarFaturas,
+      carregarPerguntas,
     ])
   );
 
@@ -336,6 +341,8 @@ export default function DashboardScreen() {
             ))}
           </ScrollView>
         </TourTarget>
+
+        <AvisoPendencias quantidade={perguntas.length} />
 
         <TourTarget id="saldo">
           <Pressable onPress={() => router.push('/conta-bancaria')} style={{ marginHorizontal: 20 }}>

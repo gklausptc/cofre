@@ -2,6 +2,7 @@ import type { Fatura, Importacao, NovaImportacao, NovaRegraCategorizacao, Parcel
 import type { PagamentoFatura } from './faturasRepository';
 import type { DadosGastoRapido } from './gastosRapidosRepository';
 import type { DadosMovimentacao } from './movimentacoesRepository';
+import type { PerguntaNova } from '@/domain/types/perguntas';
 
 export type DadosImportacao = Omit<NovaImportacao, 'id' | 'efeitos'>;
 export type DadosRegraCategorizacao = Omit<NovaRegraCategorizacao, 'id'>;
@@ -21,6 +22,8 @@ export type RegistroDeImportacao = {
   regrasNovas: DadosRegraCategorizacao[];
   /** Regras que categorizaram alguma linha (soma em vezesUsada). */
   regrasUsadas: number[];
+  /** O que sobrou para você responder depois (tela Revisão). */
+  perguntas: PerguntaNova[];
 };
 
 /**
@@ -33,6 +36,9 @@ export type EfeitosDaImportacao = {
   faturas: { id: number; antes: Pick<Fatura, 'status' | 'contaBancariaId' | 'valorPago' | 'dataPagamento'> | null }[];
   movimentacoes: { id: number; antes: Partial<DadosMovimentacao> }[];
   regrasCriadas: number[];
+  /** Criadas ao responder perguntas desta importação (desfazer apaga). */
+  comprasCriadas?: number[];
+  contasFixasCriadas?: number[];
 };
 
 export interface ImportacoesRepository {

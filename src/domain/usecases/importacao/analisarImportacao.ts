@@ -363,6 +363,7 @@ export function montarRegistroDeImportacao(params: {
     alteracoes: [],
     regrasNovas: params.regrasNovas ?? [],
     regrasUsadas: [...new Set(linhas.map((l) => l.regraId).filter((id): id is number => id != null))],
+    perguntas: [],
   };
 
   if (destino.tipo === 'cartao') {

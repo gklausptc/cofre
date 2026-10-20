@@ -167,6 +167,7 @@ function RootNavigator() {
         <Stack.Screen name="relatorios/index" options={{ headerShown: true, title: 'Relatórios' }} />
         <Stack.Screen name="importar-extrato/index" options={{ headerShown: true, title: 'Importar extrato' }} />
         <Stack.Screen name="regras/index" options={{ headerShown: true, title: 'Regras aprendidas' }} />
+        <Stack.Screen name="revisao/index" options={{ headerShown: true, title: 'Revisão' }} />
         <Stack.Screen name="exportar-extrato/index" options={{ headerShown: true, title: 'Exportar extrato' }} />
         <Stack.Screen name="configuracoes/index" options={{ headerShown: true, title: 'Configurações' }} />
         <Stack.Screen name="backup/index" options={{ headerShown: true, title: 'Backup e restauração' }} />
