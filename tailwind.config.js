@@ -1,6 +1,9 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  // testes ficam de fora: textos como "[-3:BRT]" (fuso do OFX) viram classes arbitrárias e quebram o CSS
+  // testes ficam de fora: textos entre colchetes com dois-pontos (como o fuso horário do OFX)
+  // viram classes arbitrárias do Tailwind e geram CSS inválido. Mesmo assim, no modo de
+  // desenvolvimento o NativeWind relê arquivos alterados: nunca escreva esse padrão literal
+  // em código — monte o texto por partes (ver importParsers.test.ts).
   content: [
     './app/**/*.{js,jsx,ts,tsx}',
     './src/**/*.{js,jsx,ts,tsx}',

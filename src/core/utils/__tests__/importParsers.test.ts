@@ -57,13 +57,16 @@ describe('parseDataExtrato', () => {
   });
 });
 
+/** Fuso no formato do OFX, montado por partes para o Tailwind não ler como classe (ver tailwind.config.js). */
+const FUSO_BRASILIA = '[' + '-3:BRT' + ']';
+
 describe('parseOFX', () => {
   const ofx = [
     'OFXHEADER:100',
     '<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><BANKTRANLIST>',
     '<STMTTRN>',
     '<TRNTYPE>DEBIT',
-    '<DTPOSTED>20260305120000[-3:BRT]',
+    `<DTPOSTED>20260305120000${FUSO_BRASILIA}`,
     '<TRNAMT>-50.00',
     '<FITID>123',
     '<MEMO>PADARIA DO ZE',
