@@ -80,6 +80,8 @@ src/
 
 Regra de arquitetura: `presentation` (app/, components/, store/) nunca acessa `data/` diretamente — sempre passa por `domain/usecases` ou `domain/repositories`. Isso garante que trocar o mecanismo de storage no futuro não exija tocar nas telas.
 
+Como isso está implementado: cada repositório tem uma interface em `src/domain/repositories/` e uma implementação SQLite em `src/data/repositories/`; as implementações são registradas uma única vez em `src/core/inicializacao/` (raiz de composição, chamada pelo `app/_layout.tsx`). Telas e stores usam `repositorios().<nome>` (ex.: `repositorios().cartoes.listarCartoes()`). O ESLint barra import de `@/data` em `app/`, `src/store/` e `src/components/`, e de `@/data`/React em `src/domain/usecases/`. Gravações que mexem em mais de uma tabela vão dentro de `repositorios().manutencao.emTransacao(...)`. Visão geral em `docs/arquitetura.md`.
+
 ## 5. Suporte familiar (baixo impacto)
 
 O app continua local, em um único aparelho — não há sincronização entre celulares de pessoas diferentes (exigiria backend). O jeito correto de cobrir uso familiar aqui é: adicionar uma entidade `membros_familia` (nome, cor, ícone) e um campo opcional `membro_id` em `movimentacoes`, `gastos_rapidos`, `contas_fixas` e `compras_parceladas`. O dashboard deve permitir filtrar/agrupar por membro. Implementar isso desde o MVP (é simples e evita retrabalho de migration depois).
