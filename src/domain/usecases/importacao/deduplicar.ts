@@ -103,6 +103,8 @@ export type SituacaoDuplicidade =
   | { tipo: 'duvida'; existenteId: string; semelhanca: number };
 
 export const DIAS_DE_TOLERANCIA = 2;
+/** O outro lado de uma transferência entre contas suas pode cair até 4 dias depois (fim de semana, feriado). */
+export const DIAS_DE_TOLERANCIA_TRANSFERENCIA = 4;
 export const SEMELHANCA_MINIMA = 0.6;
 export const SEMELHANCA_CERTEZA = 0.85;
 
@@ -136,10 +138,11 @@ export function deduplicar(transacoes: TransacaoLida[], existentes: LancamentoEx
       const marcaExistente = normalizarDescricao(existente.descricao).parcela;
       if (marca && marcaExistente && (marca.numero !== marcaExistente.numero || marca.total !== marcaExistente.total)) continue;
       const dias = Math.abs(differenceInCalendarDays(parseISO(existente.data), parseISO(t.data)));
-      if (dias > DIAS_DE_TOLERANCIA) continue;
+      // transferência entre contas suas: um banco lança no dia útil seguinte (sexta → segunda)
+      if (dias > (existente.transferencia ? DIAS_DE_TOLERANCIA_TRANSFERENCIA : DIAS_DE_TOLERANCIA)) continue;
       // o outro lado de uma transferência entre contas suas tem outro texto em cada banco
       // ("Transferido da poupança" × "Transferência para conta corrente"): valor e data bastam
-      const nota = existente.transferencia && dias <= 1 ? 1 : semelhanca(existente.descricao, t.descricao);
+      const nota = existente.transferencia ? 1 : semelhanca(existente.descricao, t.descricao);
       if (!melhor || nota > melhor.nota) melhor = { existente, nota, mesmoDia: dias === 0 };
     }
 

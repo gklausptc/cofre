@@ -141,3 +141,64 @@ describe('prepararImportacaoAutomatica', () => {
     expect(daPoupanca.registro.movimentacoes.map((m) => [m.idExterno, m.tipo, m.valor])).toEqual([['p2', 'entrada', 35]]);
   });
 });
+
+describe('poupança importada depois da corrente', () => {
+  const contaCorrente = umaConta({ id: 1, banco: 'Banco do Brasil', nomeConta: 'BB corrente' });
+  const poupanca = umaConta({ id: 2, banco: 'Banco do Brasil', nomeConta: 'BB Poupança' });
+  const base = (movimentacoes: BaseDaImportacao['movimentacoes'], contas = [contaCorrente, poupanca]): BaseDaImportacao => ({
+    categorias: [],
+    regras: [],
+    contatos: [],
+    contas,
+    cartoes: [],
+    contasFixas: [],
+    parcelas: [],
+    compras: [],
+    gastos: [],
+    faturas: [],
+    movimentacoes,
+    importacoes: [],
+    nomesProprios: ['MARIA S OLIVEIRA'],
+  });
+  const agora = new Date(Date.UTC(2026, 9, 20));
+
+  it('a corrente lança na segunda o que saiu da poupança na sexta: entra uma vez só', () => {
+    // a corrente foi importada antes de existir a poupança no app: ficou entrada interna
+    const daPoupancaNaCorrente = umaMovimentacao({
+      id: 500,
+      contaBancariaId: 1,
+      tipo: 'entrada',
+      origem: 'interna',
+      valor: 39798,
+      data: '2026-10-13',
+      descricao: 'Transferido da poupança 10/10 00:37 MARIA S OLIVEIRA',
+    });
+    const r = prepararImportacaoAutomatica({
+      arquivo: 'poupanca.pdf',
+      extrato: extrato({
+        conta: { agencia: null, numero: null, tipo: 'poupanca' },
+        transacoes: [transacao({ idExterno: 'p1', data: '2026-10-10', valor: -39798, descricao: 'Transferido para conta corrente' })],
+      }),
+      destino: { tipo: 'conta', contaBancariaId: 2 },
+      base: base([daPoupancaNaCorrente]),
+      agora,
+    });
+    expect(r.registro.movimentacoes).toEqual([]);
+    expect(r.registro.alteracoes).toEqual([
+      expect.objectContaining({ movimentacaoId: 500, mudancas: expect.objectContaining({ tipo: 'transferencia', contaBancariaId: 2, contaDestinoId: 1 }) }),
+    ]);
+  });
+
+  it('com a poupança já no app quando a corrente entrou: o lado da poupança é reconhecido como já lançado', () => {
+    const transferencia = umaMovimentacao({ id: 501, contaBancariaId: 2, contaDestinoId: 1, tipo: 'transferencia', valor: 39798, data: '2026-10-13', descricao: 'Transferido da poupança' });
+    const r = prepararImportacaoAutomatica({
+      arquivo: 'poupanca.pdf',
+      extrato: extrato({ transacoes: [transacao({ idExterno: 'p2', data: '2026-10-10', valor: -39798, descricao: 'Transferido para conta corrente' })] }),
+      destino: { tipo: 'conta', contaBancariaId: 2 },
+      base: base([transferencia]),
+      agora,
+    });
+    expect(r.registro.movimentacoes).toEqual([]);
+    expect(r.registro.alteracoes).toEqual([]);
+  });
+});

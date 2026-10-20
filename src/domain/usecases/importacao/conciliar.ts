@@ -189,7 +189,8 @@ export function compromissosDosMeses(dados: DadosParaConciliar, meses: string[])
 export const PAGAMENTO_DE_FATURA =
   /\bFATURA\b|\b(PAG(TO|AMENTO)?|PGTO)\.? (DE )?(FAT|CARTAO|CART CRED|CARTAO DE CREDITO|CARTAO CREDITO)\b|\bCARTAO DE CREDITO\b/;
 /** Transferência entre contas do mesmo titular. */
-const MESMA_TITULARIDADE = /MESMA TITULARIDADE|MESMO TITULAR|ENTRE CONTAS|CONTA PROPRIA|CONTAS PROPRIAS/;
+const MESMA_TITULARIDADE =
+  /MESMA TITULARIDADE|MESMO TITULAR|ENTRE CONTAS|CONTA PROPRIA|CONTAS PROPRIAS|\b(PARA|DA|DE|P|PRA) (A |SUA |MINHA )?(CONTA CORRENTE|CONTA POUPANCA)\b/;
 /** Dinheiro que vai para (ou volta de) aplicação no próprio banco. */
 const APLICACAO =
   /\b(APLICACAO|APLIC|RESGATE|RESG|CDB|RDB|LCI|LCA|CAIXINHA|CAIXINHAS|COFRINHO|COFRINHOS|PORQUINHO|INVESTIMENTO|TESOURO DIRETO|POUPANCA|POUP|RENDE FACIL|DINHEIRO GUARDADO|DINHEIRO RESGATADO|GUARDADO NO|RESGATADO DO)\b/;
@@ -318,8 +319,12 @@ export function conciliarExtrato(
 
     // --- transferência própria com o outro lado já no app
     const contraparte = dados.movimentacoes.find((m) => {
-      if (usados.has(`mov-${m.id}`) || m.contaBancariaId === contaId || m.valor !== valor || dias(m.data, t.data) > 1) return false;
+      if (usados.has(`mov-${m.id}`) || m.contaBancariaId === contaId || m.valor !== valor) return false;
       if (m.faturaId !== null || m.parcelaId !== null) return false;
+      // até 1 dia; até 4 quando um dos lados já é conhecido como seu (o BB lança na segunda o
+      // que saiu da poupança na sexta)
+      const ladoConhecido = m.origem === 'interna' || m.tipo === 'transferencia' || proprioAqui || ehProprio(semAcentos(m.descricao ?? ''));
+      if (dias(m.data, t.data) > (ladoConhecido ? 4 : 1)) return false;
       // os dois lados com cara de transferência (ou uma regra dizendo que é), e, se os dois
       // trazem nome de pessoa, o mesmo nome (o seu) — senão é coincidência de valor
       const textoDoOutroLado = semAcentos(m.descricao ?? '');
