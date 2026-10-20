@@ -1,5 +1,6 @@
 import { calcularProgressoCofrinho, type ProgressoCofrinho } from '@/domain/usecases/calcularProgressoCofrinho';
-import type { AporteCofrinho, Cofrinho, ReservaEmergencia } from '@/domain/types/entities';
+import type { AporteCofrinho, Cofrinho } from '@/domain/types/entities';
+import type { ReservaComSaldo } from '@/domain/usecases/saldoReserva';
 
 export type ProgressoReserva = {
   valorAtual: number;
@@ -25,7 +26,7 @@ export type ResumoMetasFinanceiras = {
  * de cada um e o total guardado.
  */
 export function resumirMetasFinanceiras(
-  reserva: Pick<ReservaEmergencia, 'valorAtual' | 'valorMeta' | 'mesesCoberturaDesejados'> | null,
+  reserva: Pick<ReservaComSaldo, 'valorAtual' | 'valorMeta' | 'mesesCoberturaDesejados'> | null,
   cofrinhos: Cofrinho[],
   aportes: AporteCofrinho[]
 ): ResumoMetasFinanceiras {

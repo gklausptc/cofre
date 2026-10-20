@@ -73,6 +73,8 @@ export default function ReservaEmergenciaScreen() {
     try {
       await retirar(valorMovimento, justificativa.trim());
       cancelarModo();
+    } catch (erro) {
+      Alert.alert('Não foi possível retirar', erro instanceof Error ? erro.message : 'Tente novamente.');
     } finally {
       setSalvando(false);
     }

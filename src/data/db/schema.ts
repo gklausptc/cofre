@@ -160,7 +160,7 @@ export const aportesCofrinho = sqliteTable('aportes_cofrinho', {
 export const reservaEmergencia = sqliteTable('reserva_emergencia', {
   id: integer('id').primaryKey({ autoIncrement: true }), // singleton, sempre id=1
   valorMeta: integer('valor_meta').notNull(),
-  valorAtual: integer('valor_atual').notNull().default(0),
+  // valor_atual NÃO é coluna — calculado pelo histórico de movimentacoes_reserva (saldoReserva.ts)
   mesesCoberturaDesejados: integer('meses_cobertura_desejados'),
 });
 

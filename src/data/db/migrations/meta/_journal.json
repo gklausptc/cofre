@@ -57,6 +57,13 @@
       "when": 1792462634323,
       "tag": "0007_happy_surge",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1792463658152,
+      "tag": "0008_smiling_mojo",
+      "breakpoints": true
     }
   ]
 }

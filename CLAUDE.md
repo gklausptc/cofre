@@ -103,7 +103,7 @@ A fonte da verdade é `src/data/db/schema.ts`; toda mudança é uma migration no
 | `contas_fixas` | recorrência mensal/quinzenal/semanal/anual/única, débito/pix/cartão/boleto |
 | `gastos_rapidos` | gasto em dinheiro/débito/pix/cartão sem passar por movimentação |
 | `cofrinhos` + `aportes_cofrinho` | metas de economia; valor atual = soma dos aportes |
-| `reserva_emergencia` (singleton) + `movimentacoes_reserva` | reserva com histórico de aportes/retiradas |
+| `reserva_emergencia` (singleton) + `movimentacoes_reserva` | reserva com histórico de aportes/retiradas; o valor guardado é **calculado** (aportes − retiradas, `saldoReserva.ts`) e não dá para retirar mais do que ele |
 | `metas_financeiras` | metas financeiras (nome, valor da meta, valor atual, data e categoria) — mantida; a tela Metas financeiras reúne reserva, cofrinhos e metas |
 | `preferencias` (singleton) | tema, bloqueio/biometria, tutorial, `ultimo_backup_em` |
 
@@ -111,7 +111,7 @@ A fonte da verdade é `src/data/db/schema.ts`; toda mudança é uma migration no
 
 **Backup**: antes de qualquer migration pendente o app grava uma cópia automática em `documentDirectory/backups` (`src/data/db/prepararBanco.ts`); a tela `app/backup` exporta/restaura o JSON completo.
 
-**Regra importante de design:** `saldo_atual` de conta bancária, `valor_total` de fatura, e `valor_atual` de cofrinho **nunca são colunas gravadas diretamente** — são sempre calculados a partir das tabelas de movimento (`movimentacoes`, `parcelas`, `aportes_cofrinho`). Implemente como funções/queries derivadas, não como campos que o usuário edita.
+**Regra importante de design:** `saldo_atual` de conta bancária, `valor_total` de fatura, `valor_atual` de cofrinho e o valor guardado na reserva de emergência **nunca são colunas gravadas diretamente** — são sempre calculados a partir das tabelas de movimento (`movimentacoes`, `parcelas`, `aportes_cofrinho`). Implemente como funções/queries derivadas, não como campos que o usuário edita.
 
 ## 7. Regras de negócio a implementar em `domain/usecases/`
 

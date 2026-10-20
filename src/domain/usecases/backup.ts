@@ -1,4 +1,5 @@
 import { differenceInCalendarDays, format, isValid, parseISO } from 'date-fns';
+import { ajusteDoSaldoReserva, JUSTIFICATIVA_AJUSTE_RESERVA } from '@/domain/usecases/saldoReserva';
 
 /**
  * Backup completo do Cofre em JSON. O formato guarda as tabelas como estão no SQLite
@@ -118,13 +119,49 @@ function converterPagamentosEmSaidas(tabelas: TabelasBackup): TabelasBackup {
 }
 
 /**
+ * Backup feito antes da 0008: a reserva tinha a coluna valor_atual, que podia divergir do
+ * histórico. Mesma regra da migration: um lançamento de ajuste faz o histórico bater.
+ */
+function converterSaldoDaReservaEmHistorico(tabelas: TabelasBackup, contexto: ContextoConversao): TabelasBackup {
+  const reserva = (tabelas.reserva_emergencia ?? []).find((linha) => linha.id === 1);
+  const valorGravado = reserva ? numero(reserva.valor_atual) : null;
+  if (valorGravado === null) return tabelas;
+
+  const historico = (tabelas.movimentacoes_reserva ?? []).map((linha) => ({
+    tipo: linha.tipo === 'aporte' ? ('aporte' as const) : ('retirada' as const),
+    valor: numero(linha.valor) ?? 0,
+  }));
+  const ajuste = ajusteDoSaldoReserva(valorGravado, historico);
+  if (!ajuste) return tabelas;
+
+  const linhas = tabelas.movimentacoes_reserva ?? [];
+  const proximoId = linhas.reduce((maior, linha) => Math.max(maior, numero(linha.id) ?? 0), 0) + 1;
+  return {
+    ...tabelas,
+    movimentacoes_reserva: [
+      ...linhas,
+      {
+        id: proximoId,
+        tipo: ajuste.tipo,
+        valor: ajuste.valor,
+        data: contexto.criadoEm.slice(0, 10),
+        justificativa: JUSTIFICATIVA_AJUSTE_RESERVA,
+      },
+    ],
+  };
+}
+
+/**
  * Conversores de backups antigos: a chave é a versão do schema que o conversor produz.
  * Só migrations que mudam o significado dos dados precisam de um (ex.: reais → centavos);
  * coluna nova não precisa, porque na restauração ela recebe o valor padrão.
  */
-const CONVERSORES: Record<number, (tabelas: TabelasBackup) => TabelasBackup> = {
+type ContextoConversao = { criadoEm: string };
+
+const CONVERSORES: Record<number, (tabelas: TabelasBackup, contexto: ContextoConversao) => TabelasBackup> = {
   6: converterReaisParaCentavos,
   7: converterPagamentosEmSaidas,
+  8: converterSaldoDaReservaEmHistorico,
 };
 
 /** Colunas de dinheiro que a migration 0006 passou de reais para centavos inteiros. */
@@ -227,7 +264,7 @@ export function validarBackup(conteudo: unknown, versaoSchemaAtual: number): Res
 
   for (let versao = versaoSchema + 1; versao <= versaoSchemaAtual; versao++) {
     const converter = CONVERSORES[versao];
-    if (converter) tabelas = converter(tabelas);
+    if (converter) tabelas = converter(tabelas, { criadoEm });
   }
 
   return {

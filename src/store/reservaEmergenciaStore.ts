@@ -1,12 +1,14 @@
 import { create } from 'zustand';
 import { repositorios } from '@/domain/repositories';
-import type { MovimentacaoReserva, ReservaEmergencia } from '@/domain/types/entities';
+import type { MovimentacaoReserva } from '@/domain/types/entities';
+import { comSaldo, type ReservaComSaldo } from '@/domain/usecases/saldoReserva';
 
 const repo = () => repositorios().reservaEmergencia;
 const historicoRepo = () => repositorios().movimentacoesReserva;
 
 type ReservaEmergenciaState = {
-  reserva: ReservaEmergencia | null;
+  /** Com o valor guardado já calculado pelo histórico. */
+  reserva: ReservaComSaldo | null;
   historico: MovimentacaoReserva[];
   carregando: boolean;
   carregar: () => Promise<void>;
@@ -27,7 +29,7 @@ export const useReservaEmergenciaStore = create<ReservaEmergenciaState>((set, ge
       repo().buscarReservaEmergencia(),
       historicoRepo().listarMovimentacoesReserva(),
     ]);
-    set({ reserva, historico, carregando: false });
+    set({ reserva: comSaldo(reserva, historico), historico, carregando: false });
   },
 
   definirMeta: async (valorMeta, mesesCoberturaDesejados) => {
