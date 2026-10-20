@@ -1,3 +1,4 @@
+import type { PreferenciasRepository } from '@/domain/repositories/preferenciasRepository';
 import { eq } from 'drizzle-orm';
 import { db } from '@/data/db/client';
 import { preferencias } from '@/data/db/schema';
@@ -23,3 +24,8 @@ export async function atualizarPreferencias(dados: PreferenciasAtualizaveis): Pr
   const [atualizado] = await db.update(preferencias).set(dados).where(eq(preferencias.id, 1)).returning();
   return atualizado;
 }
+
+export const preferenciasRepositorySqlite: PreferenciasRepository = {
+  buscarPreferencias,
+  atualizarPreferencias,
+};

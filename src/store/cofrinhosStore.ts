@@ -1,6 +1,8 @@
 import { create } from 'zustand';
-import * as repo from '@/data/repositories/cofrinhosRepository';
+import { repositorios } from '@/domain/repositories';
 import type { Cofrinho, NovoCofrinho } from '@/domain/types/entities';
+
+const repo = () => repositorios().cofrinhos;
 
 type CofrinhosState = {
   cofrinhos: Cofrinho[];
@@ -17,22 +19,22 @@ export const useCofrinhosStore = create<CofrinhosState>((set, get) => ({
 
   carregar: async () => {
     set({ carregando: true });
-    const cofrinhos = await repo.listarCofrinhos();
+    const cofrinhos = await repo().listarCofrinhos();
     set({ cofrinhos, carregando: false });
   },
 
   criar: async (dados) => {
-    await repo.criarCofrinho(dados);
+    await repo().criarCofrinho(dados);
     await get().carregar();
   },
 
   atualizar: async (id, dados) => {
-    await repo.atualizarCofrinho(id, dados);
+    await repo().atualizarCofrinho(id, dados);
     await get().carregar();
   },
 
   remover: async (id) => {
-    await repo.removerCofrinho(id);
+    await repo().removerCofrinho(id);
     await get().carregar();
   },
 }));

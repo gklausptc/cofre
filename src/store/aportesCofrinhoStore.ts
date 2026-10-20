@@ -1,9 +1,11 @@
 import { create } from 'zustand';
-import * as repo from '@/data/repositories/aportesCofrinhoRepository';
-import { buscarCofrinho, marcarCofrinhoConcluido } from '@/data/repositories/cofrinhosRepository';
+import { repositorios } from '@/domain/repositories';
 import { notificarImediatamente } from '@/core/notifications/notificationService';
 import type { AporteCofrinho } from '@/domain/types/entities';
 import { hojeIso } from '@/core/utils/date';
+import { cofrinhoAtingiuMeta } from '@/domain/usecases/calcularProgressoCofrinho';
+
+const repo = () => repositorios().aportesCofrinho;
 
 type AportesCofrinhoState = {
   aportes: AporteCofrinho[];
@@ -18,21 +20,18 @@ export const useAportesCofrinhoStore = create<AportesCofrinhoState>((set, get) =
 
   carregar: async () => {
     set({ carregando: true });
-    const aportes = await repo.listarAportes();
+    const aportes = await repo().listarAportes();
     set({ aportes, carregando: false });
   },
 
   criar: async (cofrinhoId, valor) => {
-    await repo.criarAporte(cofrinhoId, valor, hojeIso());
+    await repo().criarAporte(cofrinhoId, valor, hojeIso());
     await get().carregar();
 
-    const cofrinho = await buscarCofrinho(cofrinhoId);
-    if (!cofrinho || cofrinho.status === 'concluido') return;
-    const totalAportado = get()
-      .aportes.filter((a) => a.cofrinhoId === cofrinhoId)
-      .reduce((soma, a) => soma + a.valor, 0);
-    if (totalAportado >= cofrinho.valorMeta) {
-      await marcarCofrinhoConcluido(cofrinhoId);
+    const cofrinho = await repositorios().cofrinhos.buscarCofrinho(cofrinhoId);
+    if (!cofrinho) return;
+    if (cofrinhoAtingiuMeta(cofrinho, get().aportes.filter((a) => a.cofrinhoId === cofrinhoId))) {
+      await repositorios().cofrinhos.marcarCofrinhoConcluido(cofrinhoId);
       await notificarImediatamente('Meta atingida! 🎉', `Você completou o cofrinho "${cofrinho.nome}".`);
     }
   },

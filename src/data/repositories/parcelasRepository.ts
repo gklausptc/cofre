@@ -1,3 +1,4 @@
+import type { ParcelasRepository } from '@/domain/repositories/parcelasRepository';
 import { eq, inArray } from 'drizzle-orm';
 import { db } from '@/data/db/client';
 import { parcelas } from '@/data/db/schema';
@@ -43,3 +44,13 @@ export async function ajustarValorParcela(id: number, novoValor: number, justifi
     })
     .where(eq(parcelas.id, id));
 }
+
+export const parcelasRepositorySqlite: ParcelasRepository = {
+  listarParcelas,
+  listarParcelasPorContaFixa,
+  listarParcelasPorCompra,
+  inserirParcelas,
+  marcarParcelaPaga,
+  marcarParcelasPagas,
+  ajustarValorParcela,
+};

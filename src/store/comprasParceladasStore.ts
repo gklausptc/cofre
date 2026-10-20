@@ -1,13 +1,16 @@
 import { create } from 'zustand';
-import * as repo from '@/data/repositories/comprasParceladasRepository';
+import { repositorios } from '@/domain/repositories';
+import type { DadosEdicaoCompra } from '@/domain/repositories/comprasParceladasRepository';
 import type { CompraParcelada, NovaCompraParcelada } from '@/domain/types/entities';
+
+const repo = () => repositorios().comprasParceladas;
 
 type ComprasParceladasState = {
   compras: CompraParcelada[];
   carregando: boolean;
   carregar: () => Promise<void>;
   criar: (dados: Omit<NovaCompraParcelada, 'id' | 'ativo'>, mesPrimeiraParcela?: string) => Promise<void>;
-  editar: (id: number, dados: repo.DadosEdicaoCompra) => Promise<void>;
+  editar: (id: number, dados: DadosEdicaoCompra) => Promise<void>;
 };
 
 export const useComprasParceladasStore = create<ComprasParceladasState>((set, get) => ({
@@ -16,17 +19,17 @@ export const useComprasParceladasStore = create<ComprasParceladasState>((set, ge
 
   carregar: async () => {
     set({ carregando: true });
-    const compras = await repo.listarComprasParceladas();
+    const compras = await repo().listarComprasParceladas();
     set({ compras, carregando: false });
   },
 
   criar: async (dados, mesPrimeiraParcela) => {
-    await repo.criarCompraParcelada(dados, mesPrimeiraParcela);
+    await repo().criarCompraParcelada(dados, mesPrimeiraParcela);
     await get().carregar();
   },
 
   editar: async (id, dados) => {
-    await repo.editarCompraParcelada(id, dados);
+    await repo().editarCompraParcelada(id, dados);
     await get().carregar();
   },
 }));

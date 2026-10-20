@@ -1,3 +1,4 @@
+import type { ReservaEmergenciaRepository } from '@/domain/repositories/reservaEmergenciaRepository';
 import { eq } from 'drizzle-orm';
 import { db } from '@/data/db/client';
 import { movimentacoesReserva, reservaEmergencia } from '@/data/db/schema';
@@ -49,3 +50,11 @@ export async function removerReservaEmergencia() {
   await db.delete(movimentacoesReserva);
   await db.delete(reservaEmergencia).where(eq(reservaEmergencia.id, 1));
 }
+
+export const reservaEmergenciaRepositorySqlite: ReservaEmergenciaRepository = {
+  buscarReservaEmergencia,
+  definirMetaReserva,
+  aportarReserva,
+  retirarReserva,
+  removerReservaEmergencia,
+};

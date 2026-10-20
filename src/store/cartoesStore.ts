@@ -1,6 +1,8 @@
 import { create } from 'zustand';
-import * as repo from '@/data/repositories/cartoesRepository';
+import { repositorios } from '@/domain/repositories';
 import type { Cartao, NovoCartao } from '@/domain/types/entities';
+
+const repo = () => repositorios().cartoes;
 
 type CartoesState = {
   cartoes: Cartao[];
@@ -17,22 +19,22 @@ export const useCartoesStore = create<CartoesState>((set, get) => ({
 
   carregar: async () => {
     set({ carregando: true });
-    const cartoes = await repo.listarCartoes();
+    const cartoes = await repo().listarCartoes();
     set({ cartoes, carregando: false });
   },
 
   criar: async (dados) => {
-    await repo.criarCartao(dados);
+    await repo().criarCartao(dados);
     await get().carregar();
   },
 
   atualizar: async (id, dados) => {
-    await repo.atualizarCartao(id, dados);
+    await repo().atualizarCartao(id, dados);
     await get().carregar();
   },
 
   remover: async (id) => {
-    await repo.desativarCartao(id);
+    await repo().desativarCartao(id);
     await get().carregar();
   },
 }));

@@ -1,3 +1,4 @@
+import type { ContasBancariasRepository } from '@/domain/repositories/contasBancariasRepository';
 import { eq } from 'drizzle-orm';
 import { db } from '@/data/db/client';
 import { contasBancarias } from '@/data/db/schema';
@@ -29,3 +30,11 @@ export async function atualizarContaBancaria(id: number, dados: Partial<NovaCont
 export async function desativarContaBancaria(id: number) {
   await db.update(contasBancarias).set({ ativo: false }).where(eq(contasBancarias.id, id));
 }
+
+export const contasBancariasRepositorySqlite: ContasBancariasRepository = {
+  listarContasBancarias,
+  buscarContaBancaria,
+  criarContaBancaria,
+  atualizarContaBancaria,
+  desativarContaBancaria,
+};

@@ -1,3 +1,4 @@
+import type { GastosRapidosRepository } from '@/domain/repositories/gastosRapidosRepository';
 import { desc, eq } from 'drizzle-orm';
 import { db } from '@/data/db/client';
 import { gastosRapidos } from '@/data/db/schema';
@@ -39,3 +40,12 @@ export async function ajustarValorGasto(id: number, novoValor: number, justifica
     })
     .where(eq(gastosRapidos.id, id));
 }
+
+export const gastosRapidosRepositorySqlite: GastosRapidosRepository = {
+  listarGastosRapidos,
+  buscarGastoRapido,
+  criarGastoRapido,
+  atualizarGastoRapido,
+  excluirGastoRapido,
+  ajustarValorGasto,
+};

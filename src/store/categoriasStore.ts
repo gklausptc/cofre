@@ -1,6 +1,8 @@
 import { create } from 'zustand';
-import * as repo from '@/data/repositories/categoriasRepository';
+import { repositorios } from '@/domain/repositories';
 import type { Categoria } from '@/domain/types/entities';
+
+const repo = () => repositorios().categorias;
 
 type CategoriasState = {
   categorias: Categoria[];
@@ -14,7 +16,7 @@ export const useCategoriasStore = create<CategoriasState>((set) => ({
 
   carregar: async () => {
     set({ carregando: true });
-    const categorias = await repo.listarCategorias();
+    const categorias = await repo().listarCategorias();
     set({ categorias, carregando: false });
   },
 }));

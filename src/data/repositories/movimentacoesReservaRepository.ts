@@ -1,3 +1,4 @@
+import type { MovimentacoesReservaRepository } from '@/domain/repositories/movimentacoesReservaRepository';
 import { desc } from 'drizzle-orm';
 import { db } from '@/data/db/client';
 import { movimentacoesReserva } from '@/data/db/schema';
@@ -20,3 +21,7 @@ export async function registrarMovimentacaoReserva(
     justificativa,
   });
 }
+
+export const movimentacoesReservaRepositorySqlite: MovimentacoesReservaRepository = {
+  listarMovimentacoesReserva,
+};

@@ -12,7 +12,7 @@ import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { usePreferenciasStore } from '@/store/preferenciasStore';
 import { definirPin, removerPin, verificarPin } from '@/core/auth/appLock';
 import { biometriaDisponivel } from '@/core/auth/biometria';
-import { limparTodosOsDados } from '@/data/db/resetDatabase';
+import { repositorios } from '@/domain/repositories';
 import type { Preferencias } from '@/domain/types/entities';
 
 const OPCOES_TEMA: { valor: Preferencias['tema']; rotulo: string }[] = [
@@ -133,7 +133,7 @@ export default function ConfiguracoesScreen() {
           onPress: async () => {
             setLimpando(true);
             try {
-              await limparTodosOsDados();
+              await repositorios().manutencao.limparTodosOsDados();
               await removerPin();
               await carregar();
               router.replace('/(tabs)/dashboard');

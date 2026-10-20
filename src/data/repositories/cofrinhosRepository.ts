@@ -1,3 +1,4 @@
+import type { CofrinhosRepository } from '@/domain/repositories/cofrinhosRepository';
 import { eq } from 'drizzle-orm';
 import { db } from '@/data/db/client';
 import { aportesCofrinho, cofrinhos } from '@/data/db/schema';
@@ -32,3 +33,12 @@ export async function removerCofrinho(id: number) {
   await db.delete(aportesCofrinho).where(eq(aportesCofrinho.cofrinhoId, id));
   await db.delete(cofrinhos).where(eq(cofrinhos.id, id));
 }
+
+export const cofrinhosRepositorySqlite: CofrinhosRepository = {
+  listarCofrinhos,
+  buscarCofrinho,
+  criarCofrinho,
+  atualizarCofrinho,
+  marcarCofrinhoConcluido,
+  removerCofrinho,
+};

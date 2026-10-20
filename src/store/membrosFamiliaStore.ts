@@ -1,6 +1,8 @@
 import { create } from 'zustand';
-import * as repo from '@/data/repositories/membrosFamiliaRepository';
+import { repositorios } from '@/domain/repositories';
 import type { MembroFamilia } from '@/domain/types/entities';
+
+const repo = () => repositorios().membrosFamilia;
 
 type MembrosFamiliaState = {
   membros: MembroFamilia[];
@@ -16,17 +18,17 @@ export const useMembrosFamiliaStore = create<MembrosFamiliaState>((set, get) => 
 
   carregar: async () => {
     set({ carregando: true });
-    const membros = await repo.listarMembrosFamilia();
+    const membros = await repo().listarMembrosFamilia();
     set({ membros, carregando: false });
   },
 
   criar: async (dados) => {
-    await repo.criarMembroFamilia(dados);
+    await repo().criarMembroFamilia(dados);
     await get().carregar();
   },
 
   remover: async (id) => {
-    await repo.desativarMembroFamilia(id);
+    await repo().desativarMembroFamilia(id);
     await get().carregar();
   },
 }));

@@ -1,3 +1,4 @@
+import type { FaturasRepository, PagamentoFatura } from '@/domain/repositories/faturasRepository';
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/data/db/client';
 import { faturas } from '@/data/db/schema';
@@ -5,16 +6,6 @@ import { faturas } from '@/data/db/schema';
 export async function listarFaturas() {
   return db.select().from(faturas);
 }
-
-type PagamentoFatura = {
-  cartaoId: number;
-  mesReferencia: string;
-  dataFechamento: string;
-  dataVencimento: string;
-  contaBancariaId: number | null;
-  valorPago: number;
-  dataPagamento: string;
-};
 
 /** Registra (ou atualiza) a fatura do cartão/mês como paga. */
 export async function registrarPagamentoFatura(dados: PagamentoFatura) {
@@ -42,3 +33,8 @@ export async function registrarPagamentoFatura(dados: PagamentoFatura) {
     });
   }
 }
+
+export const faturasRepositorySqlite: FaturasRepository = {
+  listarFaturas,
+  registrarPagamentoFatura,
+};

@@ -1,7 +1,9 @@
 import { create } from 'zustand';
-import * as repo from '@/data/repositories/reservaEmergenciaRepository';
-import * as historicoRepo from '@/data/repositories/movimentacoesReservaRepository';
+import { repositorios } from '@/domain/repositories';
 import type { MovimentacaoReserva, ReservaEmergencia } from '@/domain/types/entities';
+
+const repo = () => repositorios().reservaEmergencia;
+const historicoRepo = () => repositorios().movimentacoesReserva;
 
 type ReservaEmergenciaState = {
   reserva: ReservaEmergencia | null;
@@ -22,29 +24,29 @@ export const useReservaEmergenciaStore = create<ReservaEmergenciaState>((set, ge
   carregar: async () => {
     set({ carregando: true });
     const [reserva, historico] = await Promise.all([
-      repo.buscarReservaEmergencia(),
-      historicoRepo.listarMovimentacoesReserva(),
+      repo().buscarReservaEmergencia(),
+      historicoRepo().listarMovimentacoesReserva(),
     ]);
     set({ reserva, historico, carregando: false });
   },
 
   definirMeta: async (valorMeta, mesesCoberturaDesejados) => {
-    await repo.definirMetaReserva(valorMeta, mesesCoberturaDesejados);
+    await repo().definirMetaReserva(valorMeta, mesesCoberturaDesejados);
     await get().carregar();
   },
 
   aportar: async (valor) => {
-    await repo.aportarReserva(valor);
+    await repo().aportarReserva(valor);
     await get().carregar();
   },
 
   retirar: async (valor, justificativa) => {
-    await repo.retirarReserva(valor, justificativa);
+    await repo().retirarReserva(valor, justificativa);
     await get().carregar();
   },
 
   removerReserva: async () => {
-    await repo.removerReservaEmergencia();
+    await repo().removerReservaEmergencia();
     await get().carregar();
   },
 }));

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
-import * as repo from '@/data/repositories/preferenciasRepository';
+import { repositorios } from '@/domain/repositories';
 import type { Preferencias, PreferenciasAtualizaveis } from '@/domain/types/entities';
+
+const repo = () => repositorios().preferencias;
 
 type PreferenciasState = {
   preferencias: Preferencias | null;
@@ -15,12 +17,12 @@ export const usePreferenciasStore = create<PreferenciasState>((set, get) => ({
 
   carregar: async () => {
     set({ carregando: true });
-    const preferencias = await repo.buscarPreferencias();
+    const preferencias = await repo().buscarPreferencias();
     set({ preferencias, carregando: false });
   },
 
   atualizar: async (dados) => {
-    await repo.atualizarPreferencias(dados);
+    await repo().atualizarPreferencias(dados);
     await get().carregar();
   },
 }));

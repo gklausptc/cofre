@@ -12,48 +12,19 @@ import {
   Manrope_600SemiBold,
   Manrope_700Bold,
 } from '@expo-google-fonts/manrope';
-import { db } from '@/data/db/client';
-import { seedCategoriasPadrao } from '@/data/db/seed';
 import { ThemeProvider, useAppTheme } from '@/core/theme/ThemeProvider';
-import { listarContasFixas } from '@/data/repositories/contasFixasRepository';
-import { listarParcelas, inserirParcelas } from '@/data/repositories/parcelasRepository';
-import { listarCartoes } from '@/data/repositories/cartoesRepository';
-import { listarComprasParceladas } from '@/data/repositories/comprasParceladasRepository';
-import { listarMovimentacoes, inserirMovimentacoes } from '@/data/repositories/movimentacoesRepository';
-import { gerarRecorrencia } from '@/domain/usecases/gerarRecorrencia';
-import { gerarReceitasRecorrentes } from '@/domain/usecases/gerarReceitasRecorrentes';
-import { calcularNotificacoesVencimento } from '@/domain/usecases/calcularNotificacoesVencimento';
-import { configurarNotificacoes, agendarNotificacoesVencimento } from '@/core/notifications/notificationService';
 import { usePreferenciasStore } from '@/store/preferenciasStore';
 import { useBloqueioStore } from '@/store/bloqueioStore';
 import { AppLockScreen } from '@/components/AppLockScreen';
 import { Button } from '@/components/Button';
-import { inicializarRepositorios, prepararBanco } from '@/core/inicializacao';
+import {
+  agendarLembretesDoDia,
+  inicializarRepositorios,
+  prepararBanco,
+  prepararDadosDoDia,
+} from '@/core/inicializacao';
 
 inicializarRepositorios();
-
-async function rodarRecorrenciaDoDia() {
-  const [contasFixas, parcelasExistentes] = await Promise.all([listarContasFixas(), listarParcelas()]);
-  const novasParcelas = gerarRecorrencia(contasFixas, parcelasExistentes);
-  await inserirParcelas(novasParcelas);
-
-  const movimentacoesExistentes = await listarMovimentacoes();
-  const novasMovimentacoes = gerarReceitasRecorrentes(movimentacoesExistentes);
-  await inserirMovimentacoes(novasMovimentacoes);
-}
-
-async function agendarLembretesDoDia() {
-  const [contasFixas, cartoes, comprasParceladas, parcelas] = await Promise.all([
-    listarContasFixas(),
-    listarCartoes(),
-    listarComprasParceladas(),
-    listarParcelas(),
-  ]);
-  const parcelasPendentes = parcelas.filter((p) => p.status === 'pendente');
-  const itens = calcularNotificacoesVencimento(contasFixas, cartoes, comprasParceladas, parcelasPendentes);
-  await configurarNotificacoes();
-  await agendarNotificacoesVencimento(itens);
-}
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -103,8 +74,7 @@ function RootNavigator() {
 
   useEffect(() => {
     if (!migrationsOk) return;
-    seedCategoriasPadrao(db)
-      .then(() => rodarRecorrenciaDoDia())
+    prepararDadosDoDia()
       .then(() => carregarPreferencias())
       .then(() => {
         setInicializado(true);

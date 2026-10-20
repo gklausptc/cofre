@@ -1,10 +1,13 @@
+import type { ComprasParceladasRepository, DadosEdicaoCompra } from '@/domain/repositories/comprasParceladasRepository';
 import { eq, inArray } from 'drizzle-orm';
 import { db } from '@/data/db/client';
 import { comprasParceladas, cartoes, parcelas } from '@/data/db/schema';
 import { inserirParcelas, listarParcelasPorCompra } from './parcelasRepository';
 import { gerarParcelas } from '@/domain/usecases/gerarParcelas';
 import { editarParcelamento } from '@/domain/usecases/editarParcelamento';
+
 import type { NovaCompraParcelada } from '@/domain/types/entities';
+import { emTransacao } from '@/data/db/transacao';
 
 export async function listarComprasParceladas() {
   return db.select().from(comprasParceladas).where(eq(comprasParceladas.ativo, true));
@@ -21,21 +24,12 @@ export async function criarCompraParcelada(
   const [cartao] = await db.select().from(cartoes).where(eq(cartoes.id, dados.cartaoId));
   if (!cartao) throw new Error('Cartão não encontrado');
 
-  const [compra] = await db.insert(comprasParceladas).values(dados).returning();
-  await inserirParcelas(gerarParcelas(compra, cartao, mesPrimeiraParcela));
-  return compra;
+  return emTransacao(async () => {
+    const [compra] = await db.insert(comprasParceladas).values(dados).returning();
+    await inserirParcelas(gerarParcelas(compra, cartao, mesPrimeiraParcela));
+    return compra;
+  });
 }
-
-export type DadosEdicaoCompra = {
-  descricao: string;
-  valorTotal: number;
-  numParcelas: number;
-  dataCompra: string;
-  /** Mês de fechamento da fatura da 1ª parcela ('YYYY-MM'). */
-  mesPrimeiraParcela: string;
-  categoriaId: number | null;
-  membroId: number | null;
-};
 
 /**
  * Edita a compra e recalcula só as parcelas pendentes (ver `editarParcelamento`).
@@ -57,13 +51,22 @@ export async function editarCompraParcelada(id: number, dados: DadosEdicaoCompra
 
   const { atualizar, remover, criar } = resultado.plano;
   const { mesPrimeiraParcela: _mes, ...camposDaCompra } = dados;
-  await db.update(comprasParceladas).set(camposDaCompra).where(eq(comprasParceladas.id, id));
-  for (const item of atualizar) {
-    await db
-      .update(parcelas)
-      .set({ numero: item.numero, valor: item.valor, mesReferencia: item.mesReferencia })
-      .where(eq(parcelas.id, item.id));
-  }
-  if (remover.length > 0) await db.delete(parcelas).where(inArray(parcelas.id, remover));
-  await inserirParcelas(criar);
+  await emTransacao(async () => {
+    await db.update(comprasParceladas).set(camposDaCompra).where(eq(comprasParceladas.id, id));
+    for (const item of atualizar) {
+      await db
+        .update(parcelas)
+        .set({ numero: item.numero, valor: item.valor, mesReferencia: item.mesReferencia })
+        .where(eq(parcelas.id, item.id));
+    }
+    if (remover.length > 0) await db.delete(parcelas).where(inArray(parcelas.id, remover));
+    await inserirParcelas(criar);
+  });
 }
+
+export const comprasParceladasRepositorySqlite: ComprasParceladasRepository = {
+  listarComprasParceladas,
+  listarComprasPorCartao,
+  criarCompraParcelada,
+  editarCompraParcelada,
+};

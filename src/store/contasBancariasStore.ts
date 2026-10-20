@@ -1,6 +1,8 @@
 import { create } from 'zustand';
-import * as repo from '@/data/repositories/contasBancariasRepository';
+import { repositorios } from '@/domain/repositories';
 import type { ContaBancaria, NovaContaBancaria } from '@/domain/types/entities';
+
+const repo = () => repositorios().contasBancarias;
 
 type ContasBancariasState = {
   contas: ContaBancaria[];
@@ -17,22 +19,22 @@ export const useContasBancariasStore = create<ContasBancariasState>((set, get) =
 
   carregar: async () => {
     set({ carregando: true });
-    const contas = await repo.listarContasBancarias();
+    const contas = await repo().listarContasBancarias();
     set({ contas, carregando: false });
   },
 
   criar: async (dados) => {
-    await repo.criarContaBancaria(dados);
+    await repo().criarContaBancaria(dados);
     await get().carregar();
   },
 
   atualizar: async (id, dados) => {
-    await repo.atualizarContaBancaria(id, dados);
+    await repo().atualizarContaBancaria(id, dados);
     await get().carregar();
   },
 
   remover: async (id) => {
-    await repo.desativarContaBancaria(id);
+    await repo().desativarContaBancaria(id);
     await get().carregar();
   },
 }));

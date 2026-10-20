@@ -1,6 +1,8 @@
 import { create } from 'zustand';
-import * as repo from '@/data/repositories/gastosRapidosRepository';
+import { repositorios } from '@/domain/repositories';
 import type { GastoRapido, NovoGastoRapido } from '@/domain/types/entities';
+
+const repo = () => repositorios().gastosRapidos;
 
 type GastosRapidosState = {
   gastos: GastoRapido[];
@@ -18,27 +20,27 @@ export const useGastosRapidosStore = create<GastosRapidosState>((set, get) => ({
 
   carregar: async () => {
     set({ carregando: true });
-    const gastos = await repo.listarGastosRapidos();
+    const gastos = await repo().listarGastosRapidos();
     set({ gastos, carregando: false });
   },
 
   criar: async (dados) => {
-    await repo.criarGastoRapido(dados);
+    await repo().criarGastoRapido(dados);
     await get().carregar();
   },
 
   atualizar: async (id, dados) => {
-    await repo.atualizarGastoRapido(id, dados);
+    await repo().atualizarGastoRapido(id, dados);
     await get().carregar();
   },
 
   remover: async (id) => {
-    await repo.excluirGastoRapido(id);
+    await repo().excluirGastoRapido(id);
     await get().carregar();
   },
 
   ajustarValor: async (id, novoValor, justificativa) => {
-    await repo.ajustarValorGasto(id, novoValor, justificativa);
+    await repo().ajustarValorGasto(id, novoValor, justificativa);
     await get().carregar();
   },
 }));

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
-import * as repo from '@/data/repositories/contasFixasRepository';
+import { repositorios } from '@/domain/repositories';
 import type { ContaFixa, NovaContaFixa } from '@/domain/types/entities';
+
+const repo = () => repositorios().contasFixas;
 
 type ContasFixasState = {
   contas: ContaFixa[];
@@ -17,22 +19,22 @@ export const useContasFixasStore = create<ContasFixasState>((set, get) => ({
 
   carregar: async () => {
     set({ carregando: true });
-    const contas = await repo.listarContasFixas();
+    const contas = await repo().listarContasFixas();
     set({ contas, carregando: false });
   },
 
   criar: async (dados) => {
-    await repo.criarContaFixa(dados);
+    await repo().criarContaFixa(dados);
     await get().carregar();
   },
 
   atualizar: async (id, dados) => {
-    await repo.atualizarContaFixa(id, dados);
+    await repo().atualizarContaFixa(id, dados);
     await get().carregar();
   },
 
   remover: async (id) => {
-    await repo.desativarContaFixa(id);
+    await repo().desativarContaFixa(id);
     await get().carregar();
   },
 }));

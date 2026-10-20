@@ -1,6 +1,8 @@
 import { create } from 'zustand';
-import * as repo from '@/data/repositories/movimentacoesRepository';
+import { repositorios } from '@/domain/repositories';
 import type { Movimentacao, NovaMovimentacao } from '@/domain/types/entities';
+
+const repo = () => repositorios().movimentacoes;
 
 type MovimentacoesState = {
   movimentacoes: Movimentacao[];
@@ -17,22 +19,22 @@ export const useMovimentacoesStore = create<MovimentacoesState>((set, get) => ({
 
   carregar: async () => {
     set({ carregando: true });
-    const movimentacoes = await repo.listarMovimentacoes();
+    const movimentacoes = await repo().listarMovimentacoes();
     set({ movimentacoes, carregando: false });
   },
 
   criar: async (dados) => {
-    await repo.criarMovimentacao(dados);
+    await repo().criarMovimentacao(dados);
     await get().carregar();
   },
 
   atualizar: async (id, dados) => {
-    await repo.atualizarMovimentacao(id, dados);
+    await repo().atualizarMovimentacao(id, dados);
     await get().carregar();
   },
 
   remover: async (id) => {
-    await repo.excluirMovimentacao(id);
+    await repo().excluirMovimentacao(id);
     await get().carregar();
   },
 }));

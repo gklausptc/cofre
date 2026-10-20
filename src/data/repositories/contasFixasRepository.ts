@@ -1,3 +1,4 @@
+import type { ContasFixasRepository } from '@/domain/repositories/contasFixasRepository';
 import { eq } from 'drizzle-orm';
 import { db } from '@/data/db/client';
 import { contasFixas } from '@/data/db/schema';
@@ -25,3 +26,11 @@ export async function atualizarContaFixa(id: number, dados: Partial<NovaContaFix
 export async function desativarContaFixa(id: number) {
   await db.update(contasFixas).set({ ativo: false }).where(eq(contasFixas.id, id));
 }
+
+export const contasFixasRepositorySqlite: ContasFixasRepository = {
+  listarContasFixas,
+  buscarContaFixa,
+  criarContaFixa,
+  atualizarContaFixa,
+  desativarContaFixa,
+};

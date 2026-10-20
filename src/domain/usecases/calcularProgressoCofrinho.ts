@@ -12,6 +12,15 @@ export type ProgressoCofrinho = {
  * meta é atingida com base na média de aportes recentes. Sem histórico
  * suficiente (menos de 2 aportes), não mostra previsão.
  */
+/** O cofrinho ativo bateu a meta com estes aportes (e deve ser marcado como concluído). */
+export function cofrinhoAtingiuMeta(
+  cofrinho: Pick<Cofrinho, 'valorMeta' | 'status'>,
+  aportesDoCofrinho: Pick<AporteCofrinho, 'valor'>[]
+): boolean {
+  if (cofrinho.status === 'concluido' || cofrinho.valorMeta <= 0) return false;
+  return aportesDoCofrinho.reduce((soma, a) => soma + a.valor, 0) >= cofrinho.valorMeta;
+}
+
 export function calcularProgressoCofrinho(
   cofrinho: Pick<Cofrinho, 'valorMeta'>,
   aportes: AporteCofrinho[]

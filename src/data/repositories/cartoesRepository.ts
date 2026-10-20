@@ -1,3 +1,4 @@
+import type { CartoesRepository } from '@/domain/repositories/cartoesRepository';
 import { eq } from 'drizzle-orm';
 import { db } from '@/data/db/client';
 import { cartoes } from '@/data/db/schema';
@@ -25,3 +26,11 @@ export async function atualizarCartao(id: number, dados: Partial<Omit<NovoCartao
 export async function desativarCartao(id: number) {
   await db.update(cartoes).set({ ativo: false }).where(eq(cartoes.id, id));
 }
+
+export const cartoesRepositorySqlite: CartoesRepository = {
+  listarCartoes,
+  buscarCartao,
+  criarCartao,
+  atualizarCartao,
+  desativarCartao,
+};

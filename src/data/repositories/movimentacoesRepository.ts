@@ -1,3 +1,4 @@
+import type { MovimentacoesRepository } from '@/domain/repositories/movimentacoesRepository';
 import { desc, eq } from 'drizzle-orm';
 import { db } from '@/data/db/client';
 import { movimentacoes } from '@/data/db/schema';
@@ -38,3 +39,13 @@ export async function atualizarMovimentacao(id: number, dados: Partial<Omit<Nova
 export async function excluirMovimentacao(id: number) {
   await db.delete(movimentacoes).where(eq(movimentacoes.id, id));
 }
+
+export const movimentacoesRepositorySqlite: MovimentacoesRepository = {
+  listarMovimentacoes,
+  listarMovimentacoesPorConta,
+  buscarMovimentacao,
+  criarMovimentacao,
+  inserirMovimentacoes,
+  atualizarMovimentacao,
+  excluirMovimentacao,
+};
