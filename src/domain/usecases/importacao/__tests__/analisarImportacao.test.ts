@@ -3,12 +3,23 @@ import {
   analisarImportacao,
   dataNaFatura,
   existentesDoDestino,
+  linhaDoItem,
   montarRegistroDeImportacao,
   sugerirDestino,
   sugerirMesDaFatura,
 } from '@/domain/usecases/importacao/analisarImportacao';
+import { prepararCategorizador } from '@/domain/usecases/importacao/categorizar';
 import type { ExtratoLido, TransacaoLida } from '@/domain/usecases/importacao/tipos';
-import { umaConta, umaMovimentacao, umCartao, umGasto } from '@/test/fabricas';
+import {
+  umaCategoria,
+  umaConta,
+  umaContaFixa,
+  umaMovimentacao,
+  umaParcela,
+  umaRegra,
+  umCartao,
+  umGasto,
+} from '@/test/fabricas';
 
 function transacao(dados: Partial<TransacaoLida>): TransacaoLida {
   return { data: '2026-10-10', descricao: 'X', valor: -1000, idExterno: 'x', parcela: null, linha: 1, ...dados };
@@ -71,7 +82,7 @@ describe('analisarImportacao', () => {
   });
 
   it('resume a análise', () => {
-    expect(resumo).toEqual({ total: 4, novas: 1, jaImportadas: 1, duplicatas: 0, duvidas: 1, pagamentosOuEstornos: 1 });
+    expect(resumo).toMatchObject({ total: 4, novas: 1, jaImportadas: 1, duplicatas: 0, duvidas: 1, pagamentosOuEstornos: 1 });
   });
 });
 
@@ -97,7 +108,7 @@ describe('montarRegistroDeImportacao', () => {
       arquivo: 'fatura.csv',
       extrato,
       destino: { tipo: 'cartao', cartaoId: 2 },
-      selecionadas: [extrato.transacoes[0]],
+      linhas: [{ transacao: extrato.transacoes[0], categoriaId: 3 }],
       agora: new Date(Date.UTC(2026, 9, 20, 12)),
     });
 
@@ -115,7 +126,7 @@ describe('montarRegistroDeImportacao', () => {
       pendentes: 0,
       criadaEm: '2026-10-20T12:00:00.000Z',
     });
-    expect(registro.gastos.map((g) => [g.valor, g.idExterno, g.cartaoId])).toEqual([[5000, 'a', 2]]);
+    expect(registro.gastos.map((g) => [g.valor, g.idExterno, g.cartaoId, g.categoriaId])).toEqual([[5000, 'a', 2, 3]]);
     expect(registro.movimentacoes).toEqual([]);
   });
 });
@@ -155,7 +166,7 @@ describe('fatura de cartão: em que fatura cada compra entra', () => {
       arquivo: 'Fatura_2026-11-10.csv',
       extrato,
       destino: { tipo: 'cartao', cartaoId: 2 },
-      selecionadas: extrato.transacoes,
+      linhas: extrato.transacoes.map((transacao) => ({ transacao, categoriaId: null })),
       agora: new Date(),
       fatura: { mes: '2026-11', cartao: c6 },
     });
@@ -163,5 +174,158 @@ describe('fatura de cartão: em que fatura cada compra entra', () => {
       ['2026-10-05', 'PADARIA', 'a'],
       ['2026-11-02', 'LOJA (compra em 09/06/2024)', 'c'],
     ]);
+  });
+});
+
+describe('análise completa (categorização + conciliação) e o que gravar', () => {
+  const categorias = [
+    umaCategoria({ id: 1, nome: 'Alimentação' }),
+    umaCategoria({ id: 3, nome: 'Moradia' }),
+    umaCategoria({ id: 8, nome: 'Assinaturas' }),
+    umaCategoria({ id: 10, nome: 'Salário', tipo: 'receita' }),
+  ];
+  const bb = umaConta({ id: 1, banco: 'Banco do Brasil', nomeConta: 'BB' });
+  const c6 = umaConta({ id: 2, banco: 'C6 Bank', nomeConta: 'C6' });
+  const cartao = umCartao({ id: 10, nome: 'C6 Carbon', diaFechamento: 3, diaVencimento: 10 });
+  const luz = umaContaFixa({ id: 30, nome: 'Conta de luz', valor: 18240, diaVencimento: 12, contaBancariaId: 1, categoriaId: 3 });
+  const ocorrencia = umaParcela({ id: 300, contaFixaId: 30, valor: 18240, mesReferencia: '2026-10' });
+  const gastoNoCartao = umGasto({ valor: 50000, data: '2026-09-20', formaPagamento: 'cartao', cartaoId: 10 });
+  const entradaNoC6 = umaMovimentacao({
+    id: 700,
+    contaBancariaId: 2,
+    tipo: 'entrada',
+    valor: 20000,
+    data: '2026-10-15',
+    descricao: 'PIX RECEBIDO GREGORY KLAUS',
+  });
+
+  const dados = {
+    contas: [bb, c6],
+    cartoes: [cartao],
+    contasFixas: [luz],
+    parcelas: [ocorrencia],
+    compras: [],
+    gastos: [gastoNoCartao],
+    faturas: [],
+    movimentacoes: [entradaNoC6],
+  };
+  const extrato = extratoCom(
+    [
+      transacao({ idExterno: 'luz', data: '2026-10-12', valor: -18990, descricao: 'DEB AUTOMATICO CONTA DE LUZ' }),
+      transacao({ idExterno: 'fatura', data: '2026-10-09', valor: -50000, descricao: 'PAGTO FATURA C6' }),
+      transacao({ idExterno: 'transf', data: '2026-10-15', valor: -20000, descricao: 'PIX ENVIADO GREGORY KLAUS' }),
+      transacao({ idExterno: 'netflix', data: '2026-10-16', valor: -5590, descricao: 'NETFLIX.COM' }),
+      transacao({ idExterno: 'salario', data: '2026-10-05', valor: 500000, descricao: 'CRED SALARIO ACME' }),
+      transacao({ idExterno: 'misterio', data: '2026-10-20', valor: -3000, descricao: 'XPTO 123 COMERCIAL' }),
+    ],
+    { banco: 'bb', origem: 'conta' }
+  );
+  const destino = { tipo: 'conta' as const, contaBancariaId: 1 };
+  const inteligencia = {
+    categorizar: prepararCategorizador({ categorias, regras: [], contatos: [], historico: [] }),
+    dados,
+    categorias,
+  };
+  const existentes = existentesDoDestino(destino, dados.movimentacoes, dados.gastos);
+  const { itens, resumo } = analisarImportacao(extrato, destino, existentes, inteligencia);
+
+  it('reconhece cada linha', () => {
+    expect(itens.map((i) => [i.transacao.idExterno, i.conciliacao?.tipo ?? null, i.categoriaSugerida, i.precisaDeVoce])).toEqual([
+      ['luz', 'conta_fixa', 3, false],
+      ['fatura', 'fatura', null, false],
+      ['transf', 'transferencia_propria', null, false],
+      ['netflix', null, 8, false],
+      ['salario', 'salario', 10, false],
+      ['misterio', null, null, true],
+    ]);
+    expect(resumo).toMatchObject({
+      categorizadosSozinhos: 5,
+      contasFixas: 1,
+      pagamentosDeFatura: 1,
+      transferencias: 1,
+      precisamDeVoce: 1,
+    });
+  });
+
+  it('monta o que gravar: baixa na conta fixa e na fatura, transferência no outro lado', () => {
+    const registro = montarRegistroDeImportacao({
+      arquivo: 'extrato.csv',
+      extrato,
+      destino,
+      linhas: itens.filter((i) => i.incluirPorPadrao).map((i) => linhaDoItem(i)),
+      agora: new Date(Date.UTC(2026, 9, 20)),
+    });
+    expect(registro.pagamentosDeContaFixa).toEqual([{ parcelaId: 300, dataPagamento: '2026-10-12', valor: 18990 }]);
+    expect(registro.pagamentosDeFatura).toHaveLength(1);
+    expect(registro.pagamentosDeFatura[0].pagamento).toMatchObject({
+      cartaoId: 10,
+      mesReferencia: '2026-10',
+      valorPago: 50000,
+      contaBancariaId: 1,
+    });
+    expect(registro.pagamentosDeFatura[0].saida).toMatchObject({ origem: 'fatura', idExterno: 'fatura', tipo: 'saida' });
+    expect(registro.alteracoes).toEqual([
+      {
+        movimentacaoId: 700,
+        motivo: 'transferencia',
+        mudancas: { tipo: 'transferencia', contaBancariaId: 1, contaDestinoId: 2, categoriaId: null },
+      },
+    ]);
+    expect(registro.movimentacoes.map((m) => [m.idExterno, m.tipo, m.origem, m.categoriaId, m.parcelaId])).toEqual([
+      ['luz', 'saida', 'conta_fixa', 3, 300],
+      ['netflix', 'saida', 'manual', 8, null],
+      ['salario', 'entrada', 'manual', 10, null],
+      ['misterio', 'saida', 'manual', null, null],
+    ]);
+    expect(registro.importacao.importadas).toBe(6);
+  });
+
+  it('transferência sem o outro lado vira transferência sem destino; receita prevista é confirmada', () => {
+    const prevista = umaMovimentacao({
+      id: 800,
+      contaBancariaId: 1,
+      tipo: 'entrada',
+      valor: 490000,
+      data: '2026-10-05',
+      recorrenteOrigemId: 1,
+    });
+    const outro = extratoCom(
+      [
+        transacao({ idExterno: 'apl', valor: -100000, descricao: 'APLICACAO CDB' }),
+        transacao({ idExterno: 'sal', data: '2026-10-06', valor: 500000, descricao: 'CRED SALARIO ACME' }),
+      ],
+      { banco: 'bb', origem: 'conta' }
+    );
+    const analise = analisarImportacao(outro, destino, [], { ...inteligencia, dados: { ...dados, movimentacoes: [prevista] } });
+    const registro = montarRegistroDeImportacao({
+      arquivo: 'x.csv',
+      extrato: outro,
+      destino,
+      linhas: analise.itens.map((i) => linhaDoItem(i)),
+      agora: new Date(),
+    });
+    expect(registro.movimentacoes.map((m) => [m.tipo, m.contaDestinoId, m.categoriaId])).toEqual([['transferencia', null, null]]);
+    expect(registro.alteracoes).toEqual([
+      { movimentacaoId: 800, motivo: 'receita_prevista', mudancas: { valor: 500000, data: '2026-10-06', idExterno: 'sal' } },
+    ]);
+  });
+
+  it('regra que manda ignorar desmarca a linha e conta o uso das regras', () => {
+    const regras = [
+      umaRegra({ id: 61, padrao: 'XPTO 123 COMERCIAL', acao: 'ignorar' }),
+      umaRegra({ id: 62, padrao: 'NETFLIX', categoriaId: 8 }),
+    ];
+    const comRegras = { ...inteligencia, categorizar: prepararCategorizador({ categorias, regras, contatos: [], historico: [] }) };
+    const analise = analisarImportacao(extrato, destino, [], comRegras);
+    const misterio = analise.itens.find((i) => i.transacao.idExterno === 'misterio');
+    expect(misterio).toMatchObject({ incluirPorPadrao: false, precisaDeVoce: false });
+    const registro = montarRegistroDeImportacao({
+      arquivo: 'x.csv',
+      extrato,
+      destino,
+      linhas: analise.itens.filter((i) => i.incluirPorPadrao).map((i) => linhaDoItem(i)),
+      agora: new Date(),
+    });
+    expect(registro.regrasUsadas).toEqual([62]);
   });
 });

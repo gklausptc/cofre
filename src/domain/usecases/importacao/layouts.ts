@@ -22,6 +22,7 @@ type Layout = {
     tipo?: string;
     parcela?: string;
     identificador?: string;
+    categoria?: string;
   };
   /** Compra vem negativa no arquivo (o app usa compra positiva). */
   inverterSinal?: boolean;
@@ -49,14 +50,20 @@ export const LAYOUTS: Layout[] = [
     banco: 'nubank',
     origem: 'cartao',
     exige: ['date', 'title', 'amount'],
-    colunas: { data: 'date', descricao: ['title'], valor: 'amount' },
+    colunas: { data: 'date', descricao: ['title'], valor: 'amount', categoria: 'category' },
   },
   {
     id: 'c6-cartao',
     banco: 'c6',
     origem: 'cartao',
     exige: ['data de compra', 'final do cartao', 'descricao', 'parcela', 'valor em r$'],
-    colunas: { data: 'data de compra', descricao: ['descricao'], valor: 'valor em r$', parcela: 'parcela' },
+    colunas: {
+      data: 'data de compra',
+      descricao: ['descricao'],
+      valor: 'valor em r$',
+      parcela: 'parcela',
+      categoria: 'categoria',
+    },
   },
   {
     id: 'c6-conta',
@@ -157,6 +164,7 @@ export function reconhecerLayout(cabecalhoNormalizado: string[]): LayoutReconhec
         tipo: indice(layout.colunas.tipo),
         parcela: indice(layout.colunas.parcela),
         identificador: indice(layout.colunas.identificador),
+        categoria: indice(layout.colunas.categoria),
       };
     },
   };

@@ -16,22 +16,32 @@ import { useCartoesStore } from '@/store/cartoesStore';
 import { useMovimentacoesStore } from '@/store/movimentacoesStore';
 import { useGastosRapidosStore } from '@/store/gastosRapidosStore';
 import { useImportacoesStore } from '@/store/importacoesStore';
+import { useCategoriasStore } from '@/store/categoriasStore';
+import { useContasFixasStore } from '@/store/contasFixasStore';
+import { useParcelasStore } from '@/store/parcelasStore';
+import { useComprasParceladasStore } from '@/store/comprasParceladasStore';
+import { useFaturasStore } from '@/store/faturasStore';
+import { useRegrasStore } from '@/store/regrasStore';
 import { decodificarLatin1, removerBOM, temCaracteresInvalidos } from '@/core/utils/importParsers';
 import { lerCsvComMapeamento, lerExtrato, type TabelaCsv } from '@/domain/usecases/importacao/lerExtrato';
 import {
   analisarImportacao,
   dataNaFatura,
   existentesDoDestino,
+  linhaDoItem,
   montarRegistroDeImportacao,
+  naturezaDaLinha,
   sugerirDestino,
   sugerirMesDaFatura,
+  type ItemDaAnalise,
 } from '@/domain/usecases/importacao/analisarImportacao';
+import { historicoDeCategorias, prepararCategorizador, textoParaRegra } from '@/domain/usecases/importacao/categorizar';
+import type { DadosRegraCategorizacao } from '@/domain/repositories/importacoesRepository';
+import { LinhaDaPrevia } from '@/components/importacao/LinhaDaPrevia';
 import { COMO_EXPORTAR } from '@/domain/dados/comoExportar';
-import { normalizarDescricao } from '@/domain/usecases/importacao/normalizarDescricao';
 import { NOMES_DOS_BANCOS } from '@/domain/usecases/importacao/bancos';
 import type { BancoId, ExtratoLido, OrigemExtrato } from '@/domain/usecases/importacao/tipos';
 import type { DestinoImportacao } from '@/domain/usecases/prepararImportacaoExtrato';
-import { formatarMoeda } from '@/core/utils/currency';
 import { formatarData, formatarMesReferencia, mesAnterior, mesSeguinte } from '@/core/utils/date';
 
 type Etapa = 'arquivo' | 'mapear' | 'destino' | 'preview';
@@ -114,6 +124,12 @@ export default function ImportarExtratoScreen() {
   const { movimentacoes, carregar: carregarMovimentacoes } = useMovimentacoesStore();
   const { gastos, carregar: carregarGastos } = useGastosRapidosStore();
   const importar = useImportacoesStore((s) => s.importar);
+  const { categorias, carregar: carregarCategorias } = useCategoriasStore();
+  const { contas: contasFixas, carregar: carregarContasFixas } = useContasFixasStore();
+  const { parcelas, carregar: carregarParcelas } = useParcelasStore();
+  const { compras, carregar: carregarCompras } = useComprasParceladasStore();
+  const { faturas, carregar: carregarFaturas } = useFaturasStore();
+  const { regras, contatos, carregar: carregarRegras } = useRegrasStore();
 
   useFocusEffect(
     useCallback(() => {
@@ -121,7 +137,24 @@ export default function ImportarExtratoScreen() {
       carregarCartoes();
       carregarMovimentacoes();
       carregarGastos();
-    }, [carregarContas, carregarCartoes, carregarMovimentacoes, carregarGastos])
+      carregarCategorias();
+      carregarContasFixas();
+      carregarParcelas();
+      carregarCompras();
+      carregarFaturas();
+      carregarRegras();
+    }, [
+      carregarContas,
+      carregarCartoes,
+      carregarMovimentacoes,
+      carregarGastos,
+      carregarCategorias,
+      carregarContasFixas,
+      carregarParcelas,
+      carregarCompras,
+      carregarFaturas,
+      carregarRegras,
+    ])
   );
 
   const [etapa, setEtapa] = useState<Etapa>('arquivo');
@@ -142,6 +175,10 @@ export default function ImportarExtratoScreen() {
   // fatura que vence neste mês ('YYYY-MM'): tudo do arquivo entra nela
   const [mesFatura, setMesFatura] = useState<string | null>(null);
   const [marcadas, setMarcadas] = useState<Set<string>>(new Set());
+  // categoria escolhida na prévia, por descrição (vale para todas as linhas iguais)
+  const [escolhas, setEscolhas] = useState<Map<string, { categoriaId: number; sempre: boolean }>>(new Map());
+  const [aberta, setAberta] = useState<string | null>(null);
+  const [soPendentes, setSoPendentes] = useState(false);
 
   const cartoesAtivos = useMemo(() => cartoes.filter((c) => c.ativo !== false), [cartoes]);
 
@@ -162,9 +199,34 @@ export default function ImportarExtratoScreen() {
     setMesFatura(cartao && lido ? sugerirMesDaFatura(lido, cartao) : null);
   }
 
-  const analise = useMemo(
-    () => (extrato && destino ? analisarImportacao(extrato, destino, existentesDoDestino(destino, movimentacoes, gastos)) : null),
-    [extrato, destino, movimentacoes, gastos]
+  const categorizar = useMemo(
+    () =>
+      prepararCategorizador({
+        categorias,
+        regras,
+        contatos,
+        historico: historicoDeCategorias(movimentacoes, gastos),
+      }),
+    [categorias, regras, contatos, movimentacoes, gastos]
+  );
+
+  const analise = useMemo(() => {
+    if (!extrato || !destino) return null;
+    return analisarImportacao(extrato, destino, existentesDoDestino(destino, movimentacoes, gastos), {
+      categorizar,
+      categorias,
+      mesDaFatura: mesFatura,
+      dados: { contas, cartoes, contasFixas, parcelas, compras, gastos, faturas, movimentacoes },
+    });
+  }, [extrato, destino, movimentacoes, gastos, categorizar, categorias, mesFatura, contas, cartoes, contasFixas, parcelas, compras, faturas]);
+
+  const chaveDaEscolha = useCallback(
+    (item: ItemDaAnalise) => (destino ? `${naturezaDaLinha(item.transacao, destino)}|${textoParaRegra(item.transacao.descricao)}` : ''),
+    [destino]
+  );
+  const categoriaDoItem = useCallback(
+    (item: ItemDaAnalise) => escolhas.get(chaveDaEscolha(item))?.categoriaId ?? item.categoriaSugerida,
+    [escolhas, chaveDaEscolha]
   );
 
   function irParaDestino(lido: ExtratoLido) {
@@ -227,7 +289,28 @@ export default function ImportarExtratoScreen() {
   function handleVerPrevia() {
     if (!analise) return;
     setMarcadas(new Set(analise.itens.filter((i) => i.incluirPorPadrao).map((i) => i.transacao.idExterno)));
+    setEscolhas(new Map());
+    setAberta(null);
+    setSoPendentes(false);
     setEtapa('preview');
+  }
+
+  function escolherCategoria(item: ItemDaAnalise, categoriaId: number) {
+    setEscolhas((atual) => {
+      const nova = new Map(atual);
+      nova.set(chaveDaEscolha(item), { categoriaId, sempre: atual.get(chaveDaEscolha(item))?.sempre ?? true });
+      return nova;
+    });
+  }
+
+  function alternarSempre(item: ItemDaAnalise, sempre: boolean) {
+    setEscolhas((atual) => {
+      const escolha = atual.get(chaveDaEscolha(item));
+      if (!escolha) return atual;
+      const nova = new Map(atual);
+      nova.set(chaveDaEscolha(item), { ...escolha, sempre });
+      return nova;
+    });
   }
 
   function alternar(idExterno: string) {
@@ -240,21 +323,64 @@ export default function ImportarExtratoScreen() {
   }
 
   const selecionadas = useMemo(
-    () => (analise ? analise.itens.filter((i) => i.podeIncluir && marcadas.has(i.transacao.idExterno)).map((i) => i.transacao) : []),
+    () => (analise ? analise.itens.filter((i) => i.podeIncluir && marcadas.has(i.transacao.idExterno)) : []),
     [analise, marcadas]
+  );
+  const pendentesAgora = useMemo(
+    () => selecionadas.filter((i) => i.precisaDeVoce && (i.situacao.tipo === 'duvida' || categoriaDoItem(i) === null)).length,
+    [selecionadas, categoriaDoItem]
   );
 
   async function handleImportar() {
     if (!extrato || !destino || selecionadas.length === 0) return;
     setSalvando(true);
     try {
-      await importar(montarRegistroDeImportacao({ arquivo: nomeArquivo, extrato, destino, selecionadas, agora: new Date(), fatura }));
-      await Promise.all([carregarMovimentacoes(), carregarGastos()]);
-      Alert.alert(
-        'Extrato importado',
-        `${selecionadas.length} ${selecionadas.length === 1 ? 'lançamento importado' : 'lançamentos importados'}.`,
-        [{ text: 'OK', onPress: () => router.back() }]
-      );
+      const agora = new Date();
+      const regrasNovas: DadosRegraCategorizacao[] = [];
+      for (const [chave, escolha] of escolhas) {
+        const [natureza, padrao] = chave.split('|');
+        if (!escolha.sempre || padrao === '' || (natureza !== 'despesa' && natureza !== 'receita')) continue;
+        regrasNovas.push({
+          padrao,
+          tipoCorrespondencia: 'contem',
+          natureza,
+          categoriaId: escolha.categoriaId,
+          membroId: null,
+          acao: 'categorizar',
+          contaFixaId: null,
+          criadaEm: agora.toISOString(),
+          vezesUsada: 0,
+        });
+      }
+      const registro = montarRegistroDeImportacao({
+        arquivo: nomeArquivo,
+        extrato,
+        destino,
+        linhas: selecionadas.map((i) => linhaDoItem(i, categoriaDoItem(i))),
+        agora,
+        fatura,
+        regrasNovas,
+      });
+      await importar(registro);
+      await Promise.all([
+        carregarMovimentacoes(),
+        carregarGastos(),
+        carregarParcelas(),
+        carregarFaturas(),
+        carregarRegras(),
+      ]);
+      const partes = [
+        `${selecionadas.length} ${selecionadas.length === 1 ? 'lançamento importado' : 'lançamentos importados'}`,
+        registro.pagamentosDeContaFixa.length > 0
+          ? `${registro.pagamentosDeContaFixa.length} ${registro.pagamentosDeContaFixa.length === 1 ? 'conta fixa paga' : 'contas fixas pagas'}`
+          : null,
+        registro.pagamentosDeFatura.length > 0
+          ? `${registro.pagamentosDeFatura.length} ${registro.pagamentosDeFatura.length === 1 ? 'fatura paga' : 'faturas pagas'}`
+          : null,
+        regrasNovas.length > 0 ? `${regrasNovas.length} ${regrasNovas.length === 1 ? 'regra nova' : 'regras novas'}` : null,
+        (registro.importacao.pendentes ?? 0) > 0 ? `${registro.importacao.pendentes} sem categoria` : null,
+      ].filter(Boolean);
+      Alert.alert('Extrato importado', `${partes.join(' · ')}.`, [{ text: 'OK', onPress: () => router.back() }]);
     } catch {
       setErro('Não consegui importar. Nada foi gravado; tente de novo.');
     } finally {
@@ -377,19 +503,27 @@ export default function ImportarExtratoScreen() {
           </>
         )}
 
-        {etapa === 'preview' && analise && (
+        {etapa === 'preview' && analise && destino && (
           <>
             <Voltar onPress={() => setEtapa('destino')} />
-            <Card style={{ marginBottom: 16 }}>
+            <Card style={{ marginBottom: 12 }}>
               <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15 }}>
                 {selecionadas.length} de {analise.resumo.total} serão importados
               </Text>
               <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>
                 {[
-                  `${analise.resumo.novas} ${analise.resumo.novas === 1 ? 'novo' : 'novos'}`,
-                  analise.resumo.jaImportadas > 0 ? `${analise.resumo.jaImportadas} já importados antes` : null,
-                  analise.resumo.duplicatas + analise.resumo.duvidas > 0
-                    ? `${analise.resumo.duplicatas + analise.resumo.duvidas} parecem já lançados à mão`
+                  analise.resumo.categorizadosSozinhos > 0 ? `${analise.resumo.categorizadosSozinhos} categorizados sozinhos` : null,
+                  analise.resumo.jaImportadas + analise.resumo.duplicatas + analise.resumo.jaNoApp > 0
+                    ? `${analise.resumo.jaImportadas + analise.resumo.duplicatas + analise.resumo.jaNoApp} já existiam`
+                    : null,
+                  analise.resumo.contasFixas > 0
+                    ? `${analise.resumo.contasFixas} ${analise.resumo.contasFixas === 1 ? 'conta fixa reconhecida' : 'contas fixas reconhecidas'}`
+                    : null,
+                  analise.resumo.pagamentosDeFatura > 0
+                    ? `${analise.resumo.pagamentosDeFatura} ${analise.resumo.pagamentosDeFatura === 1 ? 'pagamento de fatura' : 'pagamentos de fatura'}`
+                    : null,
+                  analise.resumo.transferencias > 0
+                    ? `${analise.resumo.transferencias} ${analise.resumo.transferencias === 1 ? 'transferência entre contas suas' : 'transferências entre contas suas'}`
                     : null,
                   analise.resumo.pagamentosOuEstornos > 0
                     ? `${analise.resumo.pagamentosOuEstornos} ${analise.resumo.pagamentosOuEstornos === 1 ? 'pagamento ou estorno' : 'pagamentos ou estornos'}`
@@ -398,6 +532,12 @@ export default function ImportarExtratoScreen() {
                   .filter(Boolean)
                   .join(' · ')}
               </Text>
+              {pendentesAgora > 0 && (
+                <Text className="font-body-medium" style={{ color: colors.warning, fontSize: 12, marginTop: 6 }}>
+                  {pendentesAgora} {pendentesAgora === 1 ? 'precisa' : 'precisam'} de você: escolha a categoria (ou importe assim e
+                  categorize depois).
+                </Text>
+              )}
               {fatura && (
                 <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>
                   Tudo entra na fatura que vence em {formatarMesReferencia(fatura.mes)}.
@@ -405,54 +545,39 @@ export default function ImportarExtratoScreen() {
               )}
             </Card>
 
+            {analise.resumo.precisamDeVoce > 0 && (
+              <ChipSelect<'todos' | 'pendentes'>
+                label="Mostrar"
+                opcoes={[
+                  { valor: 'todos', rotulo: `Todos (${analise.resumo.total})` },
+                  { valor: 'pendentes', rotulo: `Precisam de você (${analise.resumo.precisamDeVoce})` },
+                ]}
+                valor={soPendentes ? 'pendentes' : 'todos'}
+                onSelecionar={(v) => setSoPendentes(v === 'pendentes')}
+              />
+            )}
+
             <View style={{ gap: 8, marginBottom: 20 }}>
-              {analise.itens.map((item) => {
-                const t = item.transacao;
-                const marcada = item.podeIncluir && marcadas.has(t.idExterno);
-                const parcela = t.parcela ?? normalizarDescricao(t.descricao).parcela;
-                const antiga = fatura ? dataNaFatura(t.data, fatura.mes, fatura.cartao).ajustada : false;
-                const aviso =
-                  item.situacao.tipo === 'ja_importada'
-                    ? 'já importado antes'
-                    : item.pagamentoOuEstorno
-                      ? 'pagamento ou estorno'
-                      : item.situacao.tipo === 'duplicata'
-                        ? 'igual a um lançamento que você já fez'
-                        : item.situacao.tipo === 'duvida'
-                          ? 'pode ser um lançamento que você já fez'
-                          : null;
-                return (
-                  <Pressable key={t.idExterno} onPress={() => alternar(t.idExterno)} disabled={!item.podeIncluir}>
-                    <Card style={{ flexDirection: 'row', alignItems: 'center', opacity: marcada ? 1 : 0.5 }}>
-                      <Feather
-                        name={marcada ? 'check-square' : 'square'}
-                        size={18}
-                        color={item.podeIncluir ? colors.brand : colors.textMuted}
-                        style={{ marginRight: 10 }}
-                      />
-                      <View style={{ flex: 1 }}>
-                        <Text className="font-body-medium" style={{ color: colors.text, fontSize: 13 }} numberOfLines={1}>
-                          {t.descricao}
-                        </Text>
-                        <Text className="font-body" style={{ color: aviso && item.podeIncluir ? colors.warning : colors.textMuted, fontSize: 11 }}>
-                          {antiga ? `compra em ${formatarData(t.data)}` : formatarData(t.data)}
-                          {parcela ? ` · parcela ${parcela.numero}/${parcela.total}` : ''}
-                          {aviso ? ` · ${aviso}` : ''}
-                        </Text>
-                      </View>
-                      <Text
-                        className="font-heading-medium"
-                        style={{
-                          color: tipoDestino === 'cartao' ? (t.valor < 0 ? colors.textMuted : colors.text) : t.valor < 0 ? colors.danger : colors.success,
-                          fontSize: 13,
-                        }}
-                      >
-                        {formatarMoeda(t.valor)}
-                      </Text>
-                    </Card>
-                  </Pressable>
-                );
-              })}
+              {analise.itens
+                .filter((item) => !soPendentes || item.precisaDeVoce)
+                .map((item) => (
+                  <LinhaDaPrevia
+                    key={item.transacao.idExterno}
+                    item={item}
+                    marcada={item.podeIncluir && marcadas.has(item.transacao.idExterno)}
+                    aberta={aberta === item.transacao.idExterno}
+                    categorias={categorias}
+                    categoriaId={categoriaDoItem(item)}
+                    sempre={escolhas.get(chaveDaEscolha(item))?.sempre ?? null}
+                    natureza={naturezaDaLinha(item.transacao, destino)}
+                    noCartao={tipoDestino === 'cartao'}
+                    antiga={fatura ? dataNaFatura(item.transacao.data, fatura.mes, fatura.cartao).ajustada : false}
+                    onAlternar={() => alternar(item.transacao.idExterno)}
+                    onAbrir={() => setAberta((atual) => (atual === item.transacao.idExterno ? null : item.transacao.idExterno))}
+                    onEscolher={(id) => escolherCategoria(item, id)}
+                    onSempre={(valor) => alternarSempre(item, valor)}
+                  />
+                ))}
             </View>
             <Button
               titulo={`Importar ${selecionadas.length} ${selecionadas.length === 1 ? 'lançamento' : 'lançamentos'}`}

@@ -15,6 +15,7 @@ import type { MovimentacoesRepository } from './movimentacoesRepository';
 import type { MovimentacoesReservaRepository } from './movimentacoesReservaRepository';
 import type { ParcelasRepository } from './parcelasRepository';
 import type { PreferenciasRepository } from './preferenciasRepository';
+import type { RegrasRepository } from './regrasRepository';
 import type { ReservaEmergenciaRepository } from './reservaEmergenciaRepository';
 
 /**
@@ -41,6 +42,7 @@ export type Repositorios = {
   movimentacoesReserva: MovimentacoesReservaRepository;
   parcelas: ParcelasRepository;
   preferencias: PreferenciasRepository;
+  regras: RegrasRepository;
   reservaEmergencia: ReservaEmergenciaRepository;
 };
 

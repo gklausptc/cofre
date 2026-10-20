@@ -10,10 +10,12 @@ import type {
   CompraParcelada,
   ContaBancaria,
   ContaFixa,
+  ContatoPix,
   Fatura,
   GastoRapido,
   Movimentacao,
   Parcela,
+  RegraCategorizacao,
 } from '@/domain/types/entities';
 
 let ultimoId = 1000;
@@ -187,6 +189,35 @@ export function umCofrinho(dados: Partial<Cofrinho> = {}): Cofrinho {
     indexador: 'nenhum',
     percentualIndexador: 10000,
     cobraIr: false,
+    ...dados,
+  };
+}
+
+export function umaRegra(dados: Partial<RegraCategorizacao> = {}): RegraCategorizacao {
+  return {
+    id: proximoId(),
+    padrao: 'PADRAO',
+    tipoCorrespondencia: 'contem',
+    natureza: 'ambas',
+    categoriaId: null,
+    membroId: null,
+    acao: 'categorizar',
+    contaFixaId: null,
+    criadaEm: '2026-10-01T12:00:00.000Z',
+    vezesUsada: 0,
+    ...dados,
+  };
+}
+
+export function umContatoPix(dados: Partial<ContatoPix> = {}): ContatoPix {
+  return {
+    id: proximoId(),
+    nomeNormalizado: 'FULANO DE TAL',
+    apelido: 'Fulano',
+    categoriaId: null,
+    membroId: null,
+    tipo: 'pessoa',
+    criadoEm: '2026-10-01T12:00:00.000Z',
     ...dados,
   };
 }

@@ -44,5 +44,11 @@ export type MembroFamilia = InferSelectModel<typeof schema.membrosFamilia>;
 export type Importacao = InferSelectModel<typeof schema.importacoes>;
 export type NovaImportacao = InferInsertModel<typeof schema.importacoes>;
 
+export type RegraCategorizacao = InferSelectModel<typeof schema.regrasCategorizacao>;
+export type NovaRegraCategorizacao = InferInsertModel<typeof schema.regrasCategorizacao>;
+
+export type ContatoPix = InferSelectModel<typeof schema.contatosPix>;
+export type NovoContatoPix = InferInsertModel<typeof schema.contatosPix>;
+
 export type Preferencias = InferSelectModel<typeof schema.preferencias>;
 export type PreferenciasAtualizaveis = Partial<Omit<InferInsertModel<typeof schema.preferencias>, 'id'>>;

@@ -41,6 +41,8 @@ export type MapeamentoColunas = {
   parcela?: number;
   /** Coluna com identificador único da transação (o Nubank tem). */
   identificador?: number;
+  /** Categoria que o próprio banco deu (fatura do C6, fatura antiga do Nubank). */
+  categoria?: number;
 };
 
 function dividirLinha(linha: string, separador: string): string[] {
@@ -107,6 +109,7 @@ const PAPEIS: { papel: keyof MapeamentoColunas; padrao: RegExp }[] = [
   { papel: 'tipo', padrao: /^(tipo|natureza|d\/c|c\/d|dc|cd|tipo lancamento|tipo de lancamento|tipo da transacao)$/ },
   { papel: 'parcela', padrao: /^(parcela|parcelas|parc|parcelamento)\b/ },
   { papel: 'identificador', padrao: /^(identificador|id|id da transacao|codigo|fitid)$/ },
+  { papel: 'categoria', padrao: /^(categoria|category)$/ },
   {
     papel: 'descricao',
     padrao:
@@ -151,6 +154,7 @@ export function mapearColunasPeloCabecalho(cabecalho: string[]): MapeamentoColun
     tipo: achados.tipo,
     parcela: achados.parcela,
     identificador: achados.identificador,
+    categoria: achados.categoria,
   };
 }
 
@@ -332,6 +336,9 @@ export function lerCsvComMapeamento(
       valor,
       parcela: mapeamento.parcela !== undefined ? lerParcelaDaColuna(pegar(mapeamento.parcela)) : null,
       linha: tabela.linhaDoCabecalho + i + 1,
+      ...(mapeamento.categoria !== undefined && pegar(mapeamento.categoria) !== ''
+        ? { categoriaDoBanco: pegar(mapeamento.categoria) }
+        : {}),
     });
     identificadores.push(
       mapeamento.identificador !== undefined && pegar(mapeamento.identificador) !== '' ? pegar(mapeamento.identificador) : null

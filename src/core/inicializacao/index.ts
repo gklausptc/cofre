@@ -20,6 +20,7 @@ import { movimentacoesRepositorySqlite } from '@/data/repositories/movimentacoes
 import { movimentacoesReservaRepositorySqlite } from '@/data/repositories/movimentacoesReservaRepository';
 import { parcelasRepositorySqlite } from '@/data/repositories/parcelasRepository';
 import { preferenciasRepositorySqlite } from '@/data/repositories/preferenciasRepository';
+import { regrasRepositorySqlite } from '@/data/repositories/regrasRepository';
 import { reservaEmergenciaRepositorySqlite } from '@/data/repositories/reservaEmergenciaRepository';
 import { registrarRepositorios } from '@/domain/repositories';
 
@@ -45,6 +46,7 @@ export function inicializarRepositorios(): void {
     movimentacoesReserva: movimentacoesReservaRepositorySqlite,
     parcelas: parcelasRepositorySqlite,
     preferencias: preferenciasRepositorySqlite,
+    regras: regrasRepositorySqlite,
     reservaEmergencia: reservaEmergenciaRepositorySqlite,
   });
 }

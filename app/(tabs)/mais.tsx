@@ -17,6 +17,7 @@ const ITENS: ItemMenu[] = [
   { icon: 'file-text', titulo: 'Contas fixas', href: '/conta-fixa' },
   { icon: 'dollar-sign', titulo: 'Contas bancárias', href: '/conta-bancaria' },
   { icon: 'upload', titulo: 'Importar extrato', href: '/importar-extrato' },
+  { icon: 'zap', titulo: 'Regras aprendidas', href: '/regras' },
   { icon: 'download', titulo: 'Exportar extrato', href: '/exportar-extrato' },
   { icon: 'target', titulo: 'Metas financeiras', href: '/metas' },
   { icon: 'gift', titulo: 'Cofrinhos', href: '/cofrinho' },

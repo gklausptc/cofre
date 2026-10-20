@@ -23,6 +23,8 @@ export type TransacaoLida = {
   parcela: MarcaParcela | null;
   /** Número da linha no arquivo (1 = primeira), para mensagens. */
   linha: number;
+  /** Categoria que o banco deu à compra, quando o arquivo traz (fatura do C6). */
+  categoriaDoBanco?: string;
 };
 
 export type ExtratoLido = {

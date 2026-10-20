@@ -229,4 +229,40 @@ export const importacoes = sqliteTable('importacoes', {
   ignoradas: integer('ignoradas').notNull(),
   pendentes: integer('pendentes').notNull().default(0),
   criadaEm: text('criada_em').notNull(),
+  // O que a importação mudou fora das próprias linhas (contas fixas e faturas pagas,
+  // lançamentos convertidos em transferência), com o estado de antes, em JSON: é o que
+  // permite desfazer a importação inteira (ver EfeitosDaImportacao).
+  efeitos: text('efeitos'),
+});
+
+// Regras aprendidas na importação: "o que tiver este texto vai para esta categoria" (ou é
+// transferência própria, empréstimo, conta fixa, ou deve ser ignorado). `padrao` é a
+// descrição já normalizada (normalizarDescricao).
+export const regrasCategorizacao = sqliteTable('regras_categorizacao', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  padrao: text('padrao').notNull(),
+  tipoCorrespondencia: text('tipo_correspondencia', { enum: ['exato', 'contem', 'comeca_com'] })
+    .notNull()
+    .default('contem'),
+  // vale para saídas (despesa), entradas (receita) ou as duas
+  natureza: text('natureza', { enum: ['despesa', 'receita', 'ambas'] }).notNull().default('ambas'),
+  categoriaId: integer('categoria_id'),
+  membroId: integer('membro_id'),
+  acao: text('acao', { enum: ['categorizar', 'ignorar', 'transferencia_propria', 'conta_fixa', 'emprestimo'] })
+    .notNull()
+    .default('categorizar'),
+  contaFixaId: integer('conta_fixa_id'),
+  criadaEm: text('criada_em').notNull(),
+  vezesUsada: integer('vezes_usada').notNull().default(0),
+});
+
+// Quem é quem nos PIX: o nome como vem no extrato (normalizado) e o que ele representa.
+export const contatosPix = sqliteTable('contatos_pix', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  nomeNormalizado: text('nome_normalizado').notNull(),
+  apelido: text('apelido').notNull(),
+  categoriaId: integer('categoria_id'),
+  membroId: integer('membro_id'),
+  tipo: text('tipo', { enum: ['pessoa', 'familia', 'servico', 'emprestimo', 'propria'] }).notNull(),
+  criadoEm: text('criado_em').notNull(),
 });

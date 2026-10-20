@@ -105,7 +105,10 @@ A fonte da verdade é `src/data/db/schema.ts`; toda mudança é uma migration no
 | `cofrinhos` + `aportes_cofrinho` | metas de economia; valor atual = soma dos aportes |
 | `reserva_emergencia` (singleton) + `movimentacoes_reserva` | reserva com histórico de aportes/retiradas; o valor guardado é **calculado** (aportes − retiradas, `saldoReserva.ts`) e não dá para retirar mais do que ele |
 | `metas_financeiras` | metas financeiras (nome, valor da meta, valor atual, data e categoria) — mantida; a tela Metas financeiras reúne reserva, cofrinhos e metas |
-| `preferencias` (singleton) | tema, bloqueio/biometria, tutorial, `ultimo_backup_em` |
+| `preferencias` (singleton) | tema, bloqueio/biometria, tutorial, `ultimo_backup_em`, taxas CDI/Selic de referência |
+| `importacoes` | cada extrato importado (arquivo, banco, período, números). As linhas guardam `importacao_id` e `id_externo`; `efeitos` (JSON) guarda o que a importação mudou fora das linhas, com o estado de antes, para desfazer |
+| `regras_categorizacao` | regra aprendida: `padrao` (texto de `textoParaRegra`), `tipo_correspondencia` (exato/contem/comeca_com), `natureza` (despesa/receita/ambas), `acao` (categorizar/ignorar/transferencia_propria/conta_fixa/emprestimo), `vezes_usada` |
+| `contatos_pix` | quem é quem nos PIX (`nome_normalizado`, `apelido`, `tipo` pessoa/familia/servico/emprestimo/propria, categoria e membro) |
 
 **Dinheiro é sempre `integer` em centavos** (R$ 12,34 = `1234`), do banco até as telas. Conversão para exibir/ler texto só em `src/core/utils/currency.ts` (`formatarMoeda`, `formatarDecimal`, `textoParaCentavos`, `dividirEmParcelas`); o `CurrencyInput` já trabalha em centavos. Nunca usar `parseFloat`/`toFixed` em dinheiro. A migration 0006 converteu os valores antigos com `ROUND(valor * 100)`, e backups de antes dela são convertidos na restauração (`CONVERSORES` em `src/domain/usecases/backup.ts` — toda migration que muda o significado de um dado precisa de um conversor ali).
 
@@ -132,6 +135,13 @@ A fonte da verdade é `src/data/db/schema.ts`; toda mudança é uma migration no
 - **`ehPagamentoDeCompromisso` / `ehDespesa`**: a saída que paga fatura/conta fixa conta no saldo, não nos relatórios. Transferência nunca é receita nem despesa.
 - **`calcularLimiteDisponivel`**: compra à vista no cartão libera o limite quando a fatura dela é paga.
 - Testes das regras de integração em `src/domain/usecases/__tests__/integracao.test.ts`.
+
+**Cofre 2.0 — importação de extrato (Fase 2, `src/domain/usecases/importacao/`):**
+
+- **`lerExtrato`** (CSV/OFX/TXT, layouts por banco em `layouts.ts`, guia em `docs/importacao-bancos.md`) → **`normalizarDescricao`** → **`deduplicar`** (id externo, depois valor igual + data ±2 dias + semelhança).
+- **`categorizar` / `prepararCategorizador`**, em camadas com confiança e motivo: regras e contatos PIX (1,0) → dicionário `src/domain/dados/comerciantes.ts` (0,9) → categoria do banco no arquivo (0,8) → histórico igual (0,7–0,8) → palavras-chave `palavrasChave.ts` (0,7) → histórico parecido (0,6). Abaixo de 0,7 (`CONFIANCA_MINIMA`) a linha "precisa de você". PIX para pessoa (`pareceNomeDePessoa`) não usa palavra-chave.
+- **`conciliarExtrato`**: conta fixa do mês (valor ±5% e data ±5 dias, com nome parecido ou mesma categoria se o valor não for quase igual) → baixa na ocorrência; fatura (valor igual ao total, ou texto de pagamento de fatura) → baixa e saída ligada; pagamento que o app já tem → "já paga"; transferência entre contas suas (outro lado já no app, contato/regra de conta própria, "mesma titularidade", aplicação) → transferência; receita recorrente prevista → confirmada com o valor do banco; salário (texto ou mesma fonte em ≥ 3 meses). Na fatura do cartão, parcela ou conta fixa que já está no app → "já na fatura".
+- **`analisarImportacao(extrato, destino, existentes, inteligencia)`** junta tudo e monta o resumo; **`montarRegistroDeImportacao`** devolve o que gravar (linhas, baixas, alterações, regras novas), e `registrarImportacao` grava numa transação só, guardando os `efeitos`.
 
 ## 8. Rotas / telas a criar (Expo Router)
 
