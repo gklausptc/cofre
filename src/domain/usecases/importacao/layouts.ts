@@ -25,8 +25,17 @@ type Layout = {
   };
   /** Compra vem negativa no arquivo (o app usa compra positiva). */
   inverterSinal?: boolean;
+  /** Repete o cabeçalho e lançamentos já listados (bloco "Últimos Lançamentos"). */
+  blocoRepetido?: boolean;
+  /** O cabeçalho precisa ter só essas colunas (para layouts com nomes muito comuns). */
+  exato?: boolean;
 };
 
+/**
+ * Fontes: pesquisa de out/2026 com arquivos reais publicados (ver docs/importacao-bancos.md).
+ * Santander (só PDF desde 2026), fatura do PicPay (só PDF) e InfinitePay (formato não
+ * encontrado) não têm layout: OFX e a detecção genérica de colunas cobrem o que existir.
+ */
 export const LAYOUTS: Layout[] = [
   {
     id: 'nubank-conta',
@@ -50,6 +59,13 @@ export const LAYOUTS: Layout[] = [
     colunas: { data: 'data de compra', descricao: ['descricao'], valor: 'valor em r$', parcela: 'parcela' },
   },
   {
+    id: 'c6-conta',
+    banco: 'c6',
+    origem: 'conta',
+    exige: ['data lancamento', 'data contabil', 'titulo', 'descricao', 'entrada r$', 'saida r$'],
+    colunas: { data: 'data lancamento', descricao: ['titulo', 'descricao'], credito: 'entrada r$', debito: 'saida r$' },
+  },
+  {
     id: 'bb-conta',
     banco: 'bb',
     origem: 'conta',
@@ -57,11 +73,43 @@ export const LAYOUTS: Layout[] = [
     colunas: { data: 'data', descricao: ['lancamento', 'detalhes'], valor: 'valor', tipo: 'tipo lancamento' },
   },
   {
+    // layout usado até ~2024 (arquivos antigos guardados)
+    id: 'bb-conta-antigo',
+    banco: 'bb',
+    origem: 'conta',
+    exige: ['data', 'dependencia origem', 'historico', 'data do balancete', 'valor'],
+    colunas: { data: 'data', descricao: ['historico'], valor: 'valor' },
+  },
+  {
     id: 'bradesco-conta',
     banco: 'bradesco',
     origem: 'conta',
     exige: ['data', 'historico', 'credito r$', 'debito r$'],
     colunas: { data: 'data', descricao: ['historico'], credito: 'credito r$', debito: 'debito r$' },
+    blocoRepetido: true,
+  },
+  {
+    // datas "dd/mm" sem ano: o ano vem da primeira linha ("Data: 10/01/2026 …")
+    id: 'bradesco-cartao',
+    banco: 'bradesco',
+    origem: 'cartao',
+    exige: ['data', 'historico', 'valor us$', 'valor r$'],
+    colunas: { data: 'data', descricao: ['historico'], valor: 'valor r$' },
+  },
+  {
+    id: 'itau-cartao',
+    banco: 'itau',
+    origem: 'cartao',
+    exige: ['data', 'lancamento', 'valor'],
+    colunas: { data: 'data', descricao: ['lancamento'], valor: 'valor' },
+    exato: true,
+  },
+  {
+    id: 'picpay-conta',
+    banco: 'picpay',
+    origem: 'conta',
+    exige: ['data', 'hora', 'tipo', 'origem / destino', 'valor'],
+    colunas: { data: 'data', descricao: ['tipo', 'origem / destino'], valor: 'valor' },
   },
 ];
 
@@ -70,12 +118,16 @@ export type LayoutReconhecido = {
   banco: BancoId;
   origem: OrigemExtrato;
   inverterSinal?: boolean;
+  blocoRepetido?: boolean;
   mapear: (cabecalho: string[]) => MapeamentoColunas | null;
 };
 
 export function reconhecerLayout(cabecalhoNormalizado: string[]): LayoutReconhecido | null {
   const presentes = new Set(cabecalhoNormalizado);
-  const candidatos = LAYOUTS.filter((l) => l.exige.every((coluna) => presentes.has(coluna))).sort(
+  const preenchidas = cabecalhoNormalizado.filter((c) => c !== '').length;
+  const candidatos = LAYOUTS.filter(
+    (l) => l.exige.every((coluna) => presentes.has(coluna)) && (!l.exato || preenchidas === l.exige.length)
+  ).sort(
     (a, b) => b.exige.length - a.exige.length
   );
   const layout = candidatos[0];
@@ -86,6 +138,7 @@ export function reconhecerLayout(cabecalhoNormalizado: string[]): LayoutReconhec
     banco: layout.banco,
     origem: layout.origem,
     inverterSinal: layout.inverterSinal,
+    blocoRepetido: layout.blocoRepetido,
     mapear: (cabecalho) => {
       const indice = (nome: string | undefined) => {
         if (nome === undefined) return undefined;

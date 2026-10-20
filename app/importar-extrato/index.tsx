@@ -9,6 +9,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card } from '@/components/Card';
 import { ChipSelect } from '@/components/ChipSelect';
 import { Button } from '@/components/Button';
+import { MonthSelector } from '@/components/MonthSelector';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { useContasBancariasStore } from '@/store/contasBancariasStore';
 import { useCartoesStore } from '@/store/cartoesStore';
@@ -19,16 +20,19 @@ import { decodificarLatin1, removerBOM, temCaracteresInvalidos } from '@/core/ut
 import { lerCsvComMapeamento, lerExtrato, type TabelaCsv } from '@/domain/usecases/importacao/lerExtrato';
 import {
   analisarImportacao,
+  dataNaFatura,
   existentesDoDestino,
   montarRegistroDeImportacao,
   sugerirDestino,
+  sugerirMesDaFatura,
 } from '@/domain/usecases/importacao/analisarImportacao';
+import { COMO_EXPORTAR } from '@/domain/dados/comoExportar';
 import { normalizarDescricao } from '@/domain/usecases/importacao/normalizarDescricao';
 import { NOMES_DOS_BANCOS } from '@/domain/usecases/importacao/bancos';
 import type { BancoId, ExtratoLido, OrigemExtrato } from '@/domain/usecases/importacao/tipos';
 import type { DestinoImportacao } from '@/domain/usecases/prepararImportacaoExtrato';
 import { formatarMoeda } from '@/core/utils/currency';
-import { formatarData } from '@/core/utils/date';
+import { formatarData, formatarMesReferencia, mesAnterior, mesSeguinte } from '@/core/utils/date';
 
 type Etapa = 'arquivo' | 'mapear' | 'destino' | 'preview';
 
@@ -59,6 +63,36 @@ async function lerArquivoComoTexto(uri: string): Promise<string> {
     texto = decodificarLatin1(bytes);
   }
   return removerBOM(texto);
+}
+
+function GuiaDosBancos() {
+  const { colors } = useAppTheme();
+  const [aberto, setAberto] = useState(false);
+  return (
+    <Card style={{ marginTop: 16 }}>
+      <Pressable onPress={() => setAberto((a) => !a)} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44 }}>
+        <Feather name="help-circle" size={18} color={colors.brand} style={{ marginRight: 8 }} />
+        <Text className="font-body-medium" style={{ color: colors.text, fontSize: 14, flex: 1 }}>
+          Como exportar do meu banco
+        </Text>
+        <Feather name={aberto ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
+      </Pressable>
+      {aberto &&
+        COMO_EXPORTAR.map((item) => (
+          <View key={item.banco} style={{ paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border }}>
+            <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 13 }}>
+              {NOMES_DOS_BANCOS[item.banco]}
+            </Text>
+            <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+              Conta: {item.conta}
+            </Text>
+            <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+              Cartão: {item.cartao}
+            </Text>
+          </View>
+        ))}
+    </Card>
+  );
 }
 
 function Voltar({ onPress }: { onPress: () => void }) {
@@ -105,6 +139,8 @@ export default function ImportarExtratoScreen() {
   const [tipoDestino, setTipoDestino] = useState<OrigemExtrato>('conta');
   const [contaId, setContaId] = useState<number | null>(null);
   const [cartaoId, setCartaoId] = useState<number | null>(null);
+  // fatura que vence neste mês ('YYYY-MM'): tudo do arquivo entra nela
+  const [mesFatura, setMesFatura] = useState<string | null>(null);
   const [marcadas, setMarcadas] = useState<Set<string>>(new Set());
 
   const cartoesAtivos = useMemo(() => cartoes.filter((c) => c.ativo !== false), [cartoes]);
@@ -113,6 +149,18 @@ export default function ImportarExtratoScreen() {
     if (tipoDestino === 'conta') return contaId !== null ? { tipo: 'conta', contaBancariaId: contaId } : null;
     return cartaoId !== null ? { tipo: 'cartao', cartaoId } : null;
   }, [tipoDestino, contaId, cartaoId]);
+
+  const cartaoEscolhido = useMemo(
+    () => (tipoDestino === 'cartao' ? (cartoesAtivos.find((c) => c.id === cartaoId) ?? null) : null),
+    [tipoDestino, cartoesAtivos, cartaoId]
+  );
+  const fatura = cartaoEscolhido && mesFatura ? { mes: mesFatura, cartao: cartaoEscolhido } : null;
+
+  function escolherCartao(id: number | null, lido: ExtratoLido | null = extrato) {
+    setCartaoId(id);
+    const cartao = cartoesAtivos.find((c) => c.id === id);
+    setMesFatura(cartao && lido ? sugerirMesDaFatura(lido, cartao) : null);
+  }
 
   const analise = useMemo(
     () => (extrato && destino ? analisarImportacao(extrato, destino, existentesDoDestino(destino, movimentacoes, gastos)) : null),
@@ -124,7 +172,7 @@ export default function ImportarExtratoScreen() {
     setExtrato(lido);
     setTipoDestino(sugestao.tipo);
     setContaId(sugestao.tipo === 'conta' ? sugestao.id : null);
-    setCartaoId(sugestao.tipo === 'cartao' ? sugestao.id : null);
+    escolherCartao(sugestao.tipo === 'cartao' ? sugestao.id : null, lido);
     setEtapa('destino');
   }
 
@@ -200,7 +248,7 @@ export default function ImportarExtratoScreen() {
     if (!extrato || !destino || selecionadas.length === 0) return;
     setSalvando(true);
     try {
-      await importar(montarRegistroDeImportacao({ arquivo: nomeArquivo, extrato, destino, selecionadas, agora: new Date() }));
+      await importar(montarRegistroDeImportacao({ arquivo: nomeArquivo, extrato, destino, selecionadas, agora: new Date(), fatura }));
       await Promise.all([carregarMovimentacoes(), carregarGastos()]);
       Alert.alert(
         'Extrato importado',
@@ -241,6 +289,7 @@ export default function ImportarExtratoScreen() {
               cartão). O Cofre reconhece o banco e o tipo de arquivo sozinho. PDF não é suportado.
             </Text>
             <Button titulo="Selecionar arquivo" onPress={handleEscolherArquivo} />
+            <GuiaDosBancos />
           </>
         )}
 
@@ -287,7 +336,7 @@ export default function ImportarExtratoScreen() {
                 setTipoDestino(tipo);
                 const sugestao = sugerirDestino({ banco: extrato.banco, origem: tipo }, contas, cartoesAtivos);
                 if (tipo === 'conta') setContaId(sugestao.id);
-                else setCartaoId(sugestao.id);
+                else escolherCartao(sugestao.id);
               }}
             />
             {opcoesDestino.length === 0 ? (
@@ -302,12 +351,24 @@ export default function ImportarExtratoScreen() {
                   label={tipoDestino === 'conta' ? 'Qual conta?' : 'Qual cartão?'}
                   opcoes={opcoesDestino}
                   valor={tipoDestino === 'conta' ? (contaId !== null ? String(contaId) : '') : cartaoId !== null ? String(cartaoId) : ''}
-                  onSelecionar={(v) => (tipoDestino === 'conta' ? setContaId(Number(v)) : setCartaoId(Number(v)))}
+                  onSelecionar={(v) => (tipoDestino === 'conta' ? setContaId(Number(v)) : escolherCartao(Number(v)))}
                 />
+                {tipoDestino === 'cartao' && mesFatura && (
+                  <View style={{ marginBottom: 12 }}>
+                    <Text className="font-body-medium" style={{ color: colors.textMuted, fontSize: 12, marginBottom: 4 }}>
+                      Fatura que vence em
+                    </Text>
+                    <MonthSelector
+                      mesReferencia={mesFatura}
+                      onAnterior={() => setMesFatura(mesAnterior(mesFatura))}
+                      onProximo={() => setMesFatura(mesSeguinte(mesFatura))}
+                    />
+                  </View>
+                )}
                 {tipoDestino === 'cartao' && (
                   <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginBottom: 16 }}>
-                    Cada compra da fatura vira um gasto no cartão. Pagamentos e estornos (valores negativos) não são
-                    importados.
+                    Cada compra da fatura vira um gasto no cartão, dentro da fatura acima. Pagamentos e estornos
+                    (valores negativos) não são importados.
                   </Text>
                 )}
                 <Button titulo="Ver o que vai entrar" onPress={handleVerPrevia} disabled={!destino} />
@@ -337,6 +398,11 @@ export default function ImportarExtratoScreen() {
                   .filter(Boolean)
                   .join(' · ')}
               </Text>
+              {fatura && (
+                <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>
+                  Tudo entra na fatura que vence em {formatarMesReferencia(fatura.mes)}.
+                </Text>
+              )}
             </Card>
 
             <View style={{ gap: 8, marginBottom: 20 }}>
@@ -344,6 +410,7 @@ export default function ImportarExtratoScreen() {
                 const t = item.transacao;
                 const marcada = item.podeIncluir && marcadas.has(t.idExterno);
                 const parcela = t.parcela ?? normalizarDescricao(t.descricao).parcela;
+                const antiga = fatura ? dataNaFatura(t.data, fatura.mes, fatura.cartao).ajustada : false;
                 const aviso =
                   item.situacao.tipo === 'ja_importada'
                     ? 'já importado antes'
@@ -368,7 +435,7 @@ export default function ImportarExtratoScreen() {
                           {t.descricao}
                         </Text>
                         <Text className="font-body" style={{ color: aviso && item.podeIncluir ? colors.warning : colors.textMuted, fontSize: 11 }}>
-                          {formatarData(t.data)}
+                          {antiga ? `compra em ${formatarData(t.data)}` : formatarData(t.data)}
                           {parcela ? ` · parcela ${parcela.numero}/${parcela.total}` : ''}
                           {aviso ? ` · ${aviso}` : ''}
                         </Text>

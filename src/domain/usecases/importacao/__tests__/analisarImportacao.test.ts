@@ -1,9 +1,11 @@
 import { describe, expect, it } from '@jest/globals';
 import {
   analisarImportacao,
+  dataNaFatura,
   existentesDoDestino,
   montarRegistroDeImportacao,
   sugerirDestino,
+  sugerirMesDaFatura,
 } from '@/domain/usecases/importacao/analisarImportacao';
 import type { ExtratoLido, TransacaoLida } from '@/domain/usecases/importacao/tipos';
 import { umaConta, umaMovimentacao, umCartao, umGasto } from '@/test/fabricas';
@@ -13,7 +15,7 @@ function transacao(dados: Partial<TransacaoLida>): TransacaoLida {
 }
 
 function extratoCom(transacoes: TransacaoLida[], dados: Partial<ExtratoLido> = {}): ExtratoLido {
-  return { formato: 'csv', banco: 'c6', origem: 'cartao', transacoes, ignoradas: 1, periodo: { inicio: '2026-10-01', fim: '2026-10-31' }, ...dados };
+  return { formato: 'csv', banco: 'c6', origem: 'cartao', transacoes, ignoradas: 1, periodo: { inicio: '2026-10-01', fim: '2026-10-31' }, vencimentoFatura: null, ...dados };
 }
 
 describe('existentesDoDestino', () => {
@@ -115,5 +117,51 @@ describe('montarRegistroDeImportacao', () => {
     });
     expect(registro.gastos.map((g) => [g.valor, g.idExterno, g.cartaoId])).toEqual([[5000, 'a', 2]]);
     expect(registro.movimentacoes).toEqual([]);
+  });
+});
+
+describe('fatura de cartão: em que fatura cada compra entra', () => {
+  // C6 fechando dia 2 e vencendo dia 10
+  const c6 = { id: 2, diaFechamento: 2, diaVencimento: 10 };
+
+  it('o vencimento que o arquivo informa vale', () => {
+    expect(sugerirMesDaFatura({ transacoes: [], vencimentoFatura: '2026-11-10' }, c6)).toBe('2026-11');
+  });
+
+  it('sem vencimento no arquivo: o mês da maioria das compras à vista, ignorando parcelas antigas', () => {
+    const extrato = {
+      vencimentoFatura: null,
+      transacoes: [
+        transacao({ idExterno: 'a', data: '2026-10-05', valor: 2590 }),
+        transacao({ idExterno: 'b', data: '2026-10-20', valor: 1000 }),
+        transacao({ idExterno: 'c', data: '2024-06-09', valor: 19590, parcela: { numero: 9, total: 10 } }),
+        transacao({ idExterno: 'd', data: '2026-10-25', valor: -150000 }),
+      ],
+    };
+    expect(sugerirMesDaFatura(extrato, c6)).toBe('2026-11');
+  });
+
+  it('compra antiga (parcela 9/10) entra na data de fechamento da fatura escolhida', () => {
+    expect(dataNaFatura('2024-06-09', '2026-11', c6)).toEqual({ data: '2026-11-02', ajustada: true });
+    expect(dataNaFatura('2026-10-05', '2026-11', c6)).toEqual({ data: '2026-10-05', ajustada: false });
+  });
+
+  it('ao gravar, a parcela antiga ganha a data da fatura e a data original na descrição', () => {
+    const extrato = extratoCom([
+      transacao({ idExterno: 'a', data: '2026-10-05', valor: 2590, descricao: 'PADARIA' }),
+      transacao({ idExterno: 'c', data: '2024-06-09', valor: 19590, descricao: 'LOJA', parcela: { numero: 9, total: 10 } }),
+    ]);
+    const registro = montarRegistroDeImportacao({
+      arquivo: 'Fatura_2026-11-10.csv',
+      extrato,
+      destino: { tipo: 'cartao', cartaoId: 2 },
+      selecionadas: extrato.transacoes,
+      agora: new Date(),
+      fatura: { mes: '2026-11', cartao: c6 },
+    });
+    expect(registro.gastos.map((g) => [g.data, g.descricao, g.idExterno])).toEqual([
+      ['2026-10-05', 'PADARIA', 'a'],
+      ['2026-11-02', 'LOJA (compra em 09/06/2024)', 'c'],
+    ]);
   });
 });

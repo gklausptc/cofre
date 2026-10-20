@@ -26,7 +26,8 @@ export type TransacaoLida = {
 };
 
 export type ExtratoLido = {
-  formato: 'ofx' | 'csv';
+  /** 'txt' é a fatura Ourocard do BB, em largura fixa. */
+  formato: 'ofx' | 'csv' | 'txt';
   banco: BancoId | null;
   /** Detectada pelo arquivo; null quando não dá para saber (o usuário escolhe). */
   origem: OrigemExtrato | null;
@@ -34,4 +35,6 @@ export type ExtratoLido = {
   /** Linhas que não viraram transação (saldo, totais, datas inválidas…). */
   ignoradas: number;
   periodo: { inicio: string; fim: string } | null;
+  /** Vencimento da fatura, quando o arquivo informa (só em faturas de cartão). */
+  vencimentoFatura: string | null;
 };

@@ -43,7 +43,11 @@ export function dividirEmParcelas(total: Centavos, quantidade: number): Centavos
  * Devolve NaN se não houver número.
  */
 export function textoParaCentavos(texto: string): Centavos {
-  const limpo = texto.trim().replace(/[^\d,.-]/g, '');
+  // o PicPay usa o sinal de menos tipográfico (U+2212); travessões viram hífen também
+  const limpo = texto
+    .trim()
+    .replace(/[−‒–—]/g, '-')
+    .replace(/[^\d,.-]/g, '');
   const negativo = limpo.includes('-');
   const semSinal = limpo.replace(/-/g, '');
   if (!/\d/.test(semSinal)) return Number.NaN;

@@ -11,6 +11,7 @@ import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { formatarCentesimos, textoParaCentesimos } from '@/core/utils/percentual';
 import { formatarData, hojeIso } from '@/core/utils/date';
 import { usePreferenciasStore } from '@/store/preferenciasStore';
+import { TAXAS_DE_REFERENCIA } from '@/domain/dados/taxasDeReferencia';
 
 /** Depois de tantos dias sem atualizar, a tela avisa que a taxa pode estar velha. */
 const DIAS_PARA_AVISAR = 60;
@@ -100,6 +101,25 @@ export default function TaxasDeReferenciaScreen() {
                 : 'Ainda não informadas.'}
             </Text>
             <Button titulo="Salvar taxas" onPress={handleSalvar} disabled={!valido} carregando={salvando} />
+          </Card>
+
+          <Card>
+            <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 14, marginBottom: 4 }}>
+              Últimas taxas conhecidas
+            </Text>
+            <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginBottom: 12 }}>
+              Em {formatarData(TAXAS_DE_REFERENCIA.data)}: Selic {formatarCentesimos(TAXAS_DE_REFERENCIA.selicAnual)}% e CDI{' '}
+              {formatarCentesimos(TAXAS_DE_REFERENCIA.cdiAnual)}% ao ano. A próxima reunião do Copom termina em{' '}
+              {formatarData(TAXAS_DE_REFERENCIA.proximaReuniaoCopom)}: depois dela, confira se a Selic mudou.
+            </Text>
+            <Button
+              titulo="Usar estes valores"
+              variante="secundaria"
+              onPress={() => {
+                setCdi(formatarCentesimos(TAXAS_DE_REFERENCIA.cdiAnual));
+                setSelic(formatarCentesimos(TAXAS_DE_REFERENCIA.selicAnual));
+              }}
+            />
           </Card>
         </View>
       </ScrollView>

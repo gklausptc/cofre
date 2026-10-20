@@ -90,8 +90,8 @@ describe('layouts de bancos', () => {
     );
     expect(extrato).toMatchObject({ banco: 'nubank', origem: 'conta' });
     expect(extrato.transacoes.map((t) => [t.valor, t.idExterno])).toEqual([
-      [-2390, 'csv:nubank:id:6713b1c2-aaaa'],
-      [150000, 'csv:nubank:id:6713b1c2-bbbb'],
+      [-2390, 'id:nubank:6713b1c2-aaaa'],
+      [150000, 'id:nubank:6713b1c2-bbbb'],
     ]);
   });
 
@@ -155,13 +155,38 @@ describe('OFX', () => {
     '</BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>',
   ].join('\n');
 
-  it('conta: banco pelo BANKID, FITID como id externo, MEMO e NAME juntos', () => {
+  it('conta: banco pelo BANKID, NAME e MEMO juntos, id que não depende do FITID', () => {
     const extrato = lerOk(conta, 'extrato.ofx');
     expect(extrato).toMatchObject({ formato: 'ofx', banco: 'bb', origem: 'conta' });
-    expect(extrato.transacoes.map((t) => [t.data, t.descricao, t.valor, t.idExterno])).toEqual([
-      ['2026-10-05', 'Pix - Enviado Maria Silva', -5000, 'ofx:bb:12345-6:A1'],
-      ['2026-10-06', 'Salario', 150050, 'ofx:bb:12345-6:A2'],
+    expect(extrato.transacoes.map((t) => [t.data, t.descricao, t.valor])).toEqual([
+      ['2026-10-05', 'Maria Silva - Pix - Enviado', -5000],
+      ['2026-10-06', 'Salario', 150050],
     ]);
+    expect(extrato.transacoes.every((t) => t.idExterno.startsWith('h:bb:'))).toBe(true);
+  });
+
+  it('o FITID muda entre downloads (Itaú, Bradesco, C6): o id da linha continua o mesmo', () => {
+    const outroDownload = conta.replace('<FITID>A1', '<FITID>Z9').replace('<FITID>A2', '<FITID>Z8');
+    expect(lerOk(outroDownload, 'extrato.ofx').transacoes.map((t) => t.idExterno)).toEqual(
+      lerOk(conta, 'extrato.ofx').transacoes.map((t) => t.idExterno)
+    );
+  });
+
+  it('conta Nubank: o FITID é o UUID do "Identificador", igual ao do CSV', () => {
+    const nubank = conta
+      .replace('<BANKID>001', '<BANKID>0260')
+      .replace('<FITID>A1', '<FITID>6713b1c2-0000-4000-8000-000000000001');
+    expect(lerOk(nubank, 'extrato.ofx').transacoes[0].idExterno).toBe('id:nubank:6713b1c2-0000-4000-8000-000000000001');
+  });
+
+  it('linhas de saldo (valor zero, data inválida) ficam de fora', () => {
+    const comSaldo = conta.replace(
+      '</BANKTRANLIST>',
+      '<STMTTRN><DTPOSTED>11300200<TRNAMT>0.00<FITID><MEMO>Saldo do dia</STMTTRN></BANKTRANLIST>'
+    );
+    const extrato = lerOk(comSaldo, 'extrato.ofx');
+    expect(extrato.transacoes).toHaveLength(2);
+    expect(extrato.ignoradas).toBe(1);
   });
 
   it('cartão: compra vem negativa no OFX e vira positiva no app', () => {

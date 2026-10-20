@@ -218,7 +218,7 @@ export const preferencias = sqliteTable('preferencias', {
 export const importacoes = sqliteTable('importacoes', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   arquivo: text('arquivo').notNull(),
-  formato: text('formato', { enum: ['ofx', 'csv'] }).notNull(),
+  formato: text('formato', { enum: ['ofx', 'csv', 'txt'] }).notNull(),
   banco: text('banco'),
   contaBancariaId: integer('conta_bancaria_id'),
   cartaoId: integer('cartao_id'),

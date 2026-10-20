@@ -1,18 +1,32 @@
 import { textoParaCentavos } from '@/core/utils/currency';
 import { pareceArquivoBinario, parseDataExtrato, removerBOM } from '@/core/utils/importParsers';
 import { bancoPorCodigo, bancoPorTexto, origemPorNomeDoArquivo } from './bancos';
-import { hashTexto, idExternoDeLinhas } from './deduplicar';
+import { idExternoDeLinhas } from './deduplicar';
 import { semAcentos } from './normalizarDescricao';
 import { reconhecerLayout } from './layouts';
 import type { BancoId, ExtratoLido, MarcaParcela, OrigemExtrato, TransacaoLida } from './tipos';
+
+/**
+ * Leitura de extratos e faturas em OFX, CSV e no TXT da fatura Ourocard (BB). Regras que
+ * valem para todos os bancos (pesquisa de out/2026):
+ * - o id de cada linha NÃO usa o FITID do OFX, que repete (BB, parcelas do Nubank) ou muda a
+ *   cada download (Itaú, Bradesco, C6): usa data + valor + descrição normalizada + ordem entre
+ *   linhas iguais, igual em CSV e OFX. A exceção é o identificador único do Nubank (UUID),
+ *   que é o mesmo no CSV e no OFX da conta;
+ * - linhas de saldo e totais aparecem no meio dos lançamentos e são descartadas;
+ * - o sinal muda de arquivo para arquivo: aqui conta tem saída negativa e cartão tem compra
+ *   positiva, sempre.
+ */
 
 // ---------------------------------------------------------------- CSV
 
 export type TabelaCsv = {
   cabecalho: string[];
   linhas: string[][];
-  /** Número (1 = primeira) da linha do cabeçalho no arquivo. */
+  /** Número (1 = primeira) da linha do cabeçalho no arquivo; 0 se o arquivo não tem cabeçalho. */
   linhaDoCabecalho: number;
+  /** Linhas de título antes do cabeçalho (agência, período, data da fatura…). */
+  preambulo: string[];
 };
 
 /** Papel de cada coluna, pelo índice no cabeçalho. Precisa de valor OU débito/crédito. */
@@ -91,11 +105,12 @@ const PAPEIS: { papel: keyof MapeamentoColunas; padrao: RegExp }[] = [
   { papel: 'debito', padrao: /^(debito|saida|saidas)\b/ },
   { papel: 'valor', padrao: /^(valor|amount|quantia|montante)\b|valor .*r\$|valor em r|^r\$$/ },
   { papel: 'tipo', padrao: /^(tipo|natureza|d\/c|c\/d|dc|cd|tipo lancamento|tipo de lancamento|tipo da transacao)$/ },
-  { papel: 'parcela', padrao: /^(parcela|parcelas|parc)\b/ },
+  { papel: 'parcela', padrao: /^(parcela|parcelas|parc|parcelamento)\b/ },
   { papel: 'identificador', padrao: /^(identificador|id|id da transacao|codigo|fitid)$/ },
   {
     papel: 'descricao',
-    padrao: /^(descricao|historico|lancamento|lancamentos|titulo|title|estabelecimento|detalhes|memo|description|nome|favorecido|movimentacao|descricao da transacao|transacao)\b/,
+    padrao:
+      /^(descricao|historico|lancamento|lancamentos|titulo|title|estabelecimento|detalhes|memo|description|nome|favorecido|movimentacao|descricao da transacao|transacao|origem|destino)\b/,
   },
 ];
 
@@ -139,28 +154,60 @@ export function mapearColunasPeloCabecalho(cabecalho: string[]): MapeamentoColun
   };
 }
 
+/** Linha "data; texto; valor" sem cabeçalho (TXT do Itaú). */
+function pareceLinhaDeLancamento(campos: string[]): boolean {
+  return (
+    campos.length >= 3 &&
+    parseDataExtrato(campos[0]) !== null &&
+    Number.isFinite(textoParaCentavos(campos[campos.length - 1])) &&
+    /[A-Za-z]/.test(campos.slice(1, -1).join(' '))
+  );
+}
+
 /** Separa o CSV e acha a linha de cabeçalho (bancos costumam pôr linhas de título antes dela). */
 export function lerTabelaCsv(texto: string): TabelaCsv | null {
   const todas = texto.split(/\r\n|\n|\r/);
   const comConteudo = todas.map((linha, i) => ({ linha, numero: i + 1 })).filter((l) => l.linha.trim() !== '');
-  if (comConteudo.length < 2) return null;
+  if (comConteudo.length < 1) return null;
 
   const separador = detectarSeparador(comConteudo.map((l) => l.linha));
-  const divididas = comConteudo.map((l) => ({ campos: dividirLinha(l.linha, separador), numero: l.numero }));
+  const divididas = comConteudo.map((l) => ({ campos: dividirLinha(l.linha, separador), numero: l.numero, bruta: l.linha }));
+  const linhasDeDados = (desde: number) =>
+    divididas
+      .slice(desde)
+      .filter((l) => l.campos.some((c) => c !== ''))
+      .map((l) => l.campos);
 
   const indiceCabecalho = divididas.slice(0, 30).findIndex((l) => mapearColunasPeloCabecalho(l.campos) !== null);
-  const inicio = indiceCabecalho >= 0 ? indiceCabecalho : divididas.findIndex((l) => l.campos.length > 1);
-  if (inicio < 0) return null;
+  if (indiceCabecalho >= 0) {
+    return {
+      cabecalho: divididas[indiceCabecalho].campos,
+      linhaDoCabecalho: divididas[indiceCabecalho].numero,
+      preambulo: divididas.slice(0, indiceCabecalho).map((l) => l.bruta),
+      linhas: linhasDeDados(indiceCabecalho + 1),
+    };
+  }
 
-  const cabecalho = divididas[inicio].campos;
+  // sem cabeçalho reconhecível, mas as linhas já são lançamentos (data; histórico; valor)
+  const amostra = divididas.slice(0, 10);
+  if (amostra.length > 0 && amostra.filter((l) => pareceLinhaDeLancamento(l.campos)).length >= Math.ceil(amostra.length * 0.6)) {
+    const colunas = Math.max(...amostra.map((l) => l.campos.length));
+    const cabecalho = ['Data', ...Array.from({ length: colunas - 2 }, (_, i) => (i === 0 ? 'Histórico' : `Coluna ${i + 2}`)), 'Valor'];
+    return { cabecalho, linhaDoCabecalho: 0, preambulo: [], linhas: linhasDeDados(0) };
+  }
+
+  const inicio = divididas.findIndex((l) => l.campos.length > 1);
+  if (inicio < 0) return null;
   return {
-    cabecalho,
+    cabecalho: divididas[inicio].campos,
     linhaDoCabecalho: divididas[inicio].numero,
-    linhas: divididas.slice(inicio + 1).filter((l) => l.campos.some((c) => c !== '')).map((l) => l.campos),
+    preambulo: divididas.slice(0, inicio).map((l) => l.bruta),
+    linhas: linhasDeDados(inicio + 1),
   };
 }
 
-const LINHA_DE_SALDO = /^(SALDO|S A L D O|TOTAL|SUBTOTAL|LANCAMENTOS FUTUROS|SALDO ANTERIOR|SALDO DO DIA|SALDO FINAL)\b/;
+const LINHA_DE_SALDO =
+  /^(SALDO|S A L D O|TOTAL|SUBTOTAL|SUB TOTAL|LANCAMENTOS FUTUROS|SALDO ANTERIOR|SALDO DO DIA|SALDO FINAL|COD\.? LANC\.? 0)\b/;
 
 function lerParcelaDaColuna(texto: string): MarcaParcela | null {
   const achado = texto.match(/(\d{1,2})\s*(\/|de)\s*(\d{1,2})/i);
@@ -178,7 +225,7 @@ function sentidoDoTipo(texto: string): -1 | 1 | null {
   return null;
 }
 
-/** "1.234,56 D" / "-50,00" / "50,00-": valor em centavos com o sinal que o texto indica. */
+/** "1.234,56 D" / "-50,00" / "50,00-" / "−R$ 7,50": valor em centavos com o sinal que o texto indica. */
 function lerValorComSinal(texto: string): number {
   const limpo = texto.trim();
   const centavos = textoParaCentavos(limpo);
@@ -189,28 +236,77 @@ function lerValorComSinal(texto: string): number {
   return centavos;
 }
 
+/** Primeira data completa (dd/mm/aaaa) do preâmbulo: referência para datas sem ano. */
+function dataDeReferencia(preambulo: string[]): { ano: number; mes: number } | null {
+  for (const linha of preambulo) {
+    const achado = linha.match(/(\d{2})[/.](\d{2})[/.](\d{4})/);
+    if (achado) return { ano: Number(achado[3]), mes: Number(achado[2]) };
+  }
+  return null;
+}
+
+/** Data com ano, ou "dd/mm" completada com o ano da referência (mês depois dela = ano anterior). */
+function lerData(texto: string, referencia: { ano: number; mes: number } | null): string | null {
+  const completa = parseDataExtrato(texto);
+  if (completa || !referencia) return completa;
+  const curta = texto.trim().match(/^(\d{1,2})[/.](\d{1,2})$/);
+  if (!curta) return null;
+  const mes = Number(curta[2]);
+  const ano = mes > referencia.mes ? referencia.ano - 1 : referencia.ano;
+  return parseDataExtrato(`${curta[1]}/${curta[2]}/${ano}`);
+}
+
+export type OpcoesLeituraCsv = {
+  /** Compra vem negativa no arquivo (o app usa compra positiva). */
+  inverterSinal?: boolean;
+  /**
+   * O arquivo repete o cabeçalho e, depois dele, lançamentos que já apareceram (bloco
+   * "Últimos Lançamentos" do Bradesco): essas repetições são descartadas.
+   */
+  blocoRepetido?: boolean;
+  /** Vencimento da fatura, quando o arquivo diz (nome do arquivo, cabeçalho). */
+  vencimentoFatura?: string | null;
+};
+
 /**
  * Linhas do CSV → transações, com o mapeamento de colunas dado (detectado ou escolhido pelo
- * usuário). `inverterSinal` é para arquivos em que a compra vem negativa.
+ * usuário).
  */
 export function lerCsvComMapeamento(
   tabela: TabelaCsv,
   mapeamento: MapeamentoColunas,
   banco: BancoId | null,
   origem: OrigemExtrato | null,
-  opcoes: { inverterSinal?: boolean } = {}
+  opcoes: OpcoesLeituraCsv = {}
 ): ExtratoLido {
   const lidas: Omit<TransacaoLida, 'idExterno'>[] = [];
   const identificadores: (string | null)[] = [];
+  const referencia = dataDeReferencia(tabela.preambulo);
+  const cabecalhoNormalizado = tabela.cabecalho.map(normalizarCabecalho).join('|');
+  const jaVistas = new Set<string>();
+  let depoisDeRepeticao = false;
   let ignoradas = 0;
 
   tabela.linhas.forEach((campos, i) => {
     const pegar = (indice: number | undefined) => (indice === undefined ? '' : (campos[indice] ?? '').trim());
+
+    if (campos.map(normalizarCabecalho).join('|') === cabecalhoNormalizado) {
+      depoisDeRepeticao = true;
+      ignoradas++;
+      return;
+    }
+    const assinatura = campos.join('\u0001');
+    if (opcoes.blocoRepetido && depoisDeRepeticao && jaVistas.has(assinatura)) {
+      ignoradas++;
+      return;
+    }
+    jaVistas.add(assinatura);
+
     const descricao = mapeamento.descricao
       .map(pegar)
       .filter((parte, posicao, todas) => parte !== '' && todas.indexOf(parte) === posicao)
       .join(' - ');
-    const data = parseDataExtrato(pegar(mapeamento.data));
+    const data = lerData(pegar(mapeamento.data), referencia);
 
     let valor = Number.NaN;
     if (mapeamento.valor !== undefined && pegar(mapeamento.valor) !== '') {
@@ -237,16 +333,17 @@ export function lerCsvComMapeamento(
       parcela: mapeamento.parcela !== undefined ? lerParcelaDaColuna(pegar(mapeamento.parcela)) : null,
       linha: tabela.linhaDoCabecalho + i + 1,
     });
-    identificadores.push(mapeamento.identificador !== undefined && pegar(mapeamento.identificador) !== '' ? pegar(mapeamento.identificador) : null);
+    identificadores.push(
+      mapeamento.identificador !== undefined && pegar(mapeamento.identificador) !== '' ? pegar(mapeamento.identificador) : null
+    );
   });
 
-  const prefixo = `csv:${banco ?? 'outro'}`;
-  const porHash = idExternoDeLinhas(lidas, prefixo);
+  const porHash = idExternoDeLinhas(lidas, `h:${banco ?? 'outro'}`);
   const transacoes = lidas.map((t, i) => ({
     ...t,
-    idExterno: identificadores[i] ? `${prefixo}:id:${identificadores[i]}` : porHash[i],
+    idExterno: identificadores[i] ? `id:${banco ?? 'outro'}:${identificadores[i]}` : porHash[i],
   }));
-  return montarExtrato('csv', banco, origem, transacoes, ignoradas);
+  return montarExtrato('csv', banco, origem, transacoes, ignoradas, opcoes.vencimentoFatura ?? null);
 }
 
 // ---------------------------------------------------------------- OFX
@@ -257,54 +354,100 @@ function campoOfx(bloco: string, nome: string): string | null {
   return valor ? valor : null;
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function lerOfx(texto: string, nomeArquivo: string): ExtratoLido {
   const ehCartao = /<CREDITCARDMSGSRSV1>|<CCSTMTRS>/i.test(texto);
   const codigo = campoOfx(texto, 'BANKID');
   const org = campoOfx(texto, 'ORG') ?? '';
-  const conta = campoOfx(texto, 'ACCTID') ?? '';
   const banco = (codigo ? bancoPorCodigo(codigo) : null) ?? bancoPorTexto(org) ?? bancoPorTexto(nomeArquivo);
 
   const blocos = texto.match(/<STMTTRN>[\s\S]*?(<\/STMTTRN>|(?=<STMTTRN>)|(?=<\/BANKTRANLIST>))/gi) ?? [];
-  const transacoes: TransacaoLida[] = [];
+  const lidas: Omit<TransacaoLida, 'idExterno'>[] = [];
+  const fitids: (string | null)[] = [];
   let ignoradas = 0;
-  const vistos = new Map<string, number>();
 
   blocos.forEach((bloco, i) => {
-    const data = campoOfx(bloco, 'DTPOSTED');
+    const dataOfx = campoOfx(bloco, 'DTPOSTED') ?? '';
+    const data = /^\d{8}/.test(dataOfx) ? parseDataExtrato(`${dataOfx.slice(0, 4)}-${dataOfx.slice(4, 6)}-${dataOfx.slice(6, 8)}`) : null;
     const valorTexto = campoOfx(bloco, 'TRNAMT');
     const valorOfx = valorTexto ? textoParaCentavos(valorTexto) : Number.NaN;
-    if (!data || !/^\d{8}/.test(data) || !Number.isFinite(valorOfx) || valorOfx === 0) {
+    // saldo do dia vem como lançamento de valor zero (e às vezes data inválida, no BB)
+    if (!data || !Number.isFinite(valorOfx) || valorOfx === 0) {
       ignoradas++;
       return;
     }
     const memo = campoOfx(bloco, 'MEMO');
     const nome = campoOfx(bloco, 'NAME');
-    // quando os dois existem e dizem coisas diferentes, os dois ajudam ("PIX ENVIADO" + "MARIA")
+    // BB: NAME é o lançamento ("Pix - Enviado") e MEMO os detalhes; os dois juntos ajudam
     const descricao =
       memo && nome && !memo.toUpperCase().includes(nome.toUpperCase()) && !nome.toUpperCase().includes(memo.toUpperCase())
-        ? `${memo} ${nome}`
+        ? `${nome} - ${memo}`
         : (memo ?? nome ?? 'Importado do extrato');
+    if (LINHA_DE_SALDO.test(semAcentos(descricao))) {
+      ignoradas++;
+      return;
+    }
 
-    const iso = `${data.slice(0, 4)}-${data.slice(4, 6)}-${data.slice(6, 8)}`;
-    // na fatura em OFX a compra vem negativa (débito no cartão); aqui compra é positiva
-    const valor = ehCartao ? -valorOfx : valorOfx;
-    const fitid = campoOfx(bloco, 'FITID');
-    // alguns bancos repetem o FITID entre transações diferentes: a ocorrência desempata
-    const chave = fitid ?? hashTexto(`${iso}|${valor}|${descricao}`);
-    const ocorrencia = (vistos.get(chave) ?? 0) + 1;
-    vistos.set(chave, ocorrencia);
-
-    transacoes.push({
-      data: iso,
+    lidas.push({
+      data,
       descricao: descricao.trim(),
-      valor,
+      // na fatura em OFX a compra vem negativa (débito no cartão); aqui compra é positiva
+      valor: ehCartao ? -valorOfx : valorOfx,
       parcela: null,
       linha: i + 1,
-      idExterno: `ofx:${banco ?? codigo ?? 'outro'}:${conta}:${chave}${ocorrencia > 1 ? `#${ocorrencia}` : ''}`,
     });
+    fitids.push(campoOfx(bloco, 'FITID'));
   });
 
-  return montarExtrato('ofx', banco, ehCartao ? 'cartao' : 'conta', transacoes, ignoradas);
+  const porHash = idExternoDeLinhas(lidas, `h:${banco ?? 'outro'}`);
+  const transacoes = lidas.map((t, i) => {
+    const fitid = fitids[i];
+    // só o UUID da conta Nubank é confiável (e igual ao "Identificador" do CSV); no cartão ele repete entre parcelas
+    const usaFitid = !ehCartao && fitid !== null && UUID.test(fitid);
+    return { ...t, idExterno: usaFitid ? `id:${banco ?? 'outro'}:${fitid}` : porHash[i] };
+  });
+  return montarExtrato('ofx', banco, ehCartao ? 'cartao' : 'conta', transacoes, ignoradas, null);
+}
+
+// ---------------------------------------------------------------- TXT da fatura Ourocard (BB)
+
+const LINHA_OUROCARD = /^(\d{2})\.(\d{2})\.(\d{4})(.*?)\s+(-?[\d.]+,\d{2})\s+(-?[\d.]+,\d{2})\s*$/;
+
+function ehFaturaOurocard(texto: string): boolean {
+  return /Vencimento\s*:\s*\d{2}\.\d{2}\.\d{4}/i.test(texto) && /^\d{2}\.\d{2}\.\d{4}\S/m.test(texto);
+}
+
+/** TXT de largura fixa: "15.10.2026PADARIA EXEMPLO   SAO PAULO   BR   25,90   0,00". */
+function lerFaturaOurocard(texto: string): ExtratoLido {
+  const vencimento = texto.match(/Vencimento\s*:\s*(\d{2})\.(\d{2})\.(\d{4})/i);
+  const lidas: Omit<TransacaoLida, 'idExterno'>[] = [];
+  let ignoradas = 0;
+
+  texto.split(/\r\n|\n|\r/).forEach((linha, i) => {
+    const achado = linha.match(LINHA_OUROCARD);
+    if (!achado) return;
+    const [, dia, mes, ano, resto, valorReais] = achado;
+    // tira o país no fim ("   BR") e junta os espaços da largura fixa
+    const descricao = resto.replace(/\s{2,}[A-Z]{2}\s*$/, '').replace(/\s+/g, ' ').trim();
+    const data = parseDataExtrato(`${dia}/${mes}/${ano}`);
+    const valor = textoParaCentavos(valorReais);
+    if (!data || !Number.isFinite(valor) || valor === 0 || LINHA_DE_SALDO.test(semAcentos(descricao))) {
+      ignoradas++;
+      return;
+    }
+    lidas.push({ data, descricao, valor, parcela: null, linha: i + 1 });
+  });
+
+  const porHash = idExternoDeLinhas(lidas, 'h:bb');
+  return montarExtrato(
+    'txt',
+    'bb',
+    'cartao',
+    lidas.map((t, i) => ({ ...t, idExterno: porHash[i] })),
+    ignoradas,
+    vencimento ? `${vencimento[3]}-${vencimento[2]}-${vencimento[1]}` : null
+  );
 }
 
 // ---------------------------------------------------------------- geral
@@ -314,7 +457,8 @@ function montarExtrato(
   banco: BancoId | null,
   origem: OrigemExtrato | null,
   transacoes: TransacaoLida[],
-  ignoradas: number
+  ignoradas: number,
+  vencimentoFatura: string | null
 ): ExtratoLido {
   const datas = transacoes.map((t) => t.data).sort();
   return {
@@ -324,7 +468,14 @@ function montarExtrato(
     transacoes,
     ignoradas,
     periodo: datas.length > 0 ? { inicio: datas[0], fim: datas[datas.length - 1] } : null,
+    vencimentoFatura: origem === 'cartao' ? vencimentoFatura : null,
   };
+}
+
+/** "Fatura_2026-11-10.csv" (C6), "Nubank_2026-11-05.csv": a data do nome é o vencimento. */
+function vencimentoPeloNomeDoArquivo(nome: string): string | null {
+  const achado = nome.match(/(\d{4})-(\d{2})-(\d{2})/);
+  return achado ? parseDataExtrato(achado[0]) : null;
 }
 
 export type ResultadoLeitura =
@@ -334,16 +485,17 @@ export type ResultadoLeitura =
   | { ok: false; motivo: 'nao_suportado' | 'sem_transacoes'; mensagem: string };
 
 const MENSAGEM_NAO_SUPORTADO =
-  'Esse arquivo não é CSV nem OFX. PDF não é suportado: exporte o extrato em CSV ou OFX no app do banco.';
+  'Esse arquivo não é CSV, OFX nem TXT de extrato. PDF e Excel não são suportados: exporte em CSV ou OFX no app do banco.';
 
 /**
- * Primeira etapa da importação: lê um extrato de conta ou fatura de cartão, em OFX ou CSV de
- * qualquer um dos bancos conhecidos, e devolve as transações no formato único do app. Quando o
- * CSV é de um formato desconhecido, devolve a tabela para o usuário mapear as colunas.
+ * Primeira etapa da importação: lê um extrato de conta ou fatura de cartão (OFX, CSV ou o TXT
+ * da fatura Ourocard) de qualquer um dos bancos conhecidos e devolve as transações no formato
+ * único do app. Quando o CSV é de um formato desconhecido, devolve a tabela para o usuário
+ * mapear as colunas.
  */
 export function lerExtrato(conteudo: string, nomeArquivo: string): ResultadoLeitura {
   const texto = removerBOM(conteudo);
-  if (/\.pdf$/i.test(nomeArquivo) || pareceArquivoBinario(texto)) {
+  if (/\.(pdf|xlsx?|zip)$/i.test(nomeArquivo) || pareceArquivoBinario(texto) || texto.startsWith('PK')) {
     return { ok: false, motivo: 'nao_suportado', mensagem: MENSAGEM_NAO_SUPORTADO };
   }
 
@@ -354,18 +506,30 @@ export function lerExtrato(conteudo: string, nomeArquivo: string): ResultadoLeit
       : { ok: false, motivo: 'sem_transacoes', mensagem: 'Não encontrei transações nesse arquivo OFX.' };
   }
 
+  if (ehFaturaOurocard(texto)) {
+    const extrato = lerFaturaOurocard(texto);
+    return extrato.transacoes.length > 0
+      ? { ok: true, extrato }
+      : { ok: false, motivo: 'sem_transacoes', mensagem: 'Não encontrei compras nessa fatura.' };
+  }
+
   const tabela = lerTabelaCsv(texto);
   if (!tabela || tabela.linhas.length === 0) {
     return { ok: false, motivo: 'nao_suportado', mensagem: MENSAGEM_NAO_SUPORTADO };
   }
 
-  const layout = reconhecerLayout(tabela.cabecalho.map(normalizarCabecalho));
+  const cabecalhoNormalizado = tabela.cabecalho.map(normalizarCabecalho);
+  const layout = reconhecerLayout(cabecalhoNormalizado);
   const banco = layout?.banco ?? bancoPorTexto(nomeArquivo);
   const origem = layout?.origem ?? origemPorNomeDoArquivo(nomeArquivo);
-  const mapeamento = layout?.mapear(tabela.cabecalho.map(normalizarCabecalho)) ?? mapearColunasPeloCabecalho(tabela.cabecalho);
+  const mapeamento = layout?.mapear(cabecalhoNormalizado) ?? mapearColunasPeloCabecalho(tabela.cabecalho);
   if (!mapeamento) return { ok: false, motivo: 'precisa_mapear', tabela, banco, origem };
 
-  const extrato = lerCsvComMapeamento(tabela, mapeamento, banco, origem, { inverterSinal: layout?.inverterSinal });
+  const extrato = lerCsvComMapeamento(tabela, mapeamento, banco, origem, {
+    inverterSinal: layout?.inverterSinal,
+    blocoRepetido: layout?.blocoRepetido,
+    vencimentoFatura: vencimentoPeloNomeDoArquivo(nomeArquivo),
+  });
   return extrato.transacoes.length > 0
     ? { ok: true, extrato }
     : { ok: false, motivo: 'precisa_mapear', tabela, banco, origem };

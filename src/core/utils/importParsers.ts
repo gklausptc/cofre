@@ -106,15 +106,22 @@ export function parseOFX(conteudo: string): TransacaoImportada[] {
     .filter((t): t is TransacaoImportada => t !== null);
 }
 
+/** Bytes 0x80–0x9F do Windows-1252 (no Latin-1 puro eles são caracteres de controle). */
+const WINDOWS_1252: Record<number, string> = {
+  0x80: '€', 0x82: '‚', 0x83: 'ƒ', 0x84: '„', 0x85: '…', 0x86: '†', 0x87: '‡', 0x88: 'ˆ', 0x89: '‰',
+  0x8a: 'Š', 0x8b: '‹', 0x8c: 'Œ', 0x8e: 'Ž', 0x91: '‘', 0x92: '’', 0x93: '“', 0x94: '”', 0x95: '•',
+  0x96: '–', 0x97: '—', 0x98: '˜', 0x99: '™', 0x9a: 'š', 0x9b: '›', 0x9c: 'œ', 0x9e: 'ž', 0x9f: 'Ÿ',
+};
+
 /**
- * Decodifica bytes como ISO-8859-1 (Latin-1), um byte = um caractere — extratos de bancos
- * brasileiros costumam vir nessa codificação (ou Windows-1252, que é quase igual).
- * Feito à mão porque `TextDecoder` não está disponível em todo runtime do Hermes.
+ * Decodifica bytes como Windows-1252 (o "Latin-1" que os bancos brasileiros usam de verdade),
+ * um byte = um caractere. Feito à mão porque `TextDecoder` não está disponível em todo
+ * runtime do Hermes.
  */
 export function decodificarLatin1(bytes: Uint8Array): string {
   let texto = '';
   for (let i = 0; i < bytes.length; i++) {
-    texto += String.fromCharCode(bytes[i]);
+    texto += WINDOWS_1252[bytes[i]] ?? String.fromCharCode(bytes[i]);
   }
   return texto;
 }

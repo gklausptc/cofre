@@ -1,4 +1,7 @@
 import { bancoPorTexto } from './bancos';
+import { normalizarDescricao } from './normalizarDescricao';
+import { dataFechamentoDaFatura, mesDeCobrancaDoGasto } from '@/domain/usecases/mesDaFatura';
+import { formatarData } from '@/core/utils/date';
 import { deduplicar, type LancamentoExistente, type SituacaoDuplicidade } from './deduplicar';
 import { ehPagamentoOuEstorno, prepararImportacaoExtrato, type DestinoImportacao } from '@/domain/usecases/prepararImportacaoExtrato';
 import type { RegistroDeImportacao } from '@/domain/repositories/importacoesRepository';
@@ -101,6 +104,44 @@ export function sugerirDestino(
   return { tipo, id: null };
 }
 
+type DiasDoCartao = Pick<Cartao, 'id' | 'diaFechamento' | 'diaVencimento'>;
+
+const parcelaDe = (t: TransacaoLida) => t.parcela ?? normalizarDescricao(t.descricao).parcela;
+
+/**
+ * Mês ('YYYY-MM') de vencimento da fatura que o arquivo traz: o que o arquivo diz (nome ou
+ * cabeçalho) ou, senão, o mês em que cai a maioria das compras à vista e primeiras parcelas
+ * (as demais parcelas vêm com a data da compra original, de meses atrás).
+ */
+export function sugerirMesDaFatura(extrato: Pick<ExtratoLido, 'transacoes' | 'vencimentoFatura'>, cartao: DiasDoCartao): string | null {
+  if (extrato.vencimentoFatura) return extrato.vencimentoFatura.slice(0, 7);
+  const cartoes = new Map([[cartao.id, cartao]]);
+  const contagem = new Map<string, number>();
+  for (const t of extrato.transacoes) {
+    const parcela = parcelaDe(t);
+    if (t.valor <= 0 || (parcela && parcela.numero > 1)) continue;
+    const mes = mesDeCobrancaDoGasto({ data: t.data, formaPagamento: 'cartao', cartaoId: cartao.id }, cartoes);
+    contagem.set(mes, (contagem.get(mes) ?? 0) + 1);
+  }
+  let melhor: string | null = null;
+  for (const [mes, vezes] of contagem) {
+    const atual = melhor ? (contagem.get(melhor) ?? 0) : -1;
+    if (vezes > atual || (vezes === atual && melhor !== null && mes > melhor)) melhor = mes;
+  }
+  return melhor;
+}
+
+/**
+ * Data com que a compra entra no app para cair na fatura escolhida. Parcelas e compras antigas
+ * (o C6 e o Itaú mandam a data da compra original) ficam na data de fechamento dessa fatura.
+ */
+export function dataNaFatura(dataCompra: string, mesDaFatura: string, cartao: DiasDoCartao): { data: string; ajustada: boolean } {
+  const cartoes = new Map([[cartao.id, cartao]]);
+  const mes = mesDeCobrancaDoGasto({ data: dataCompra, formaPagamento: 'cartao', cartaoId: cartao.id }, cartoes);
+  if (mes === mesDaFatura) return { data: dataCompra, ajustada: false };
+  return { data: dataFechamentoDaFatura(mesDaFatura, cartao), ajustada: true };
+}
+
 /** O que gravar: a importação (com os números) e as linhas escolhidas, já com o id externo. */
 export function montarRegistroDeImportacao(params: {
   arquivo: string;
@@ -108,9 +149,18 @@ export function montarRegistroDeImportacao(params: {
   destino: DestinoImportacao;
   selecionadas: TransacaoLida[];
   agora: Date;
+  /** Fatura de cartão: tudo entra na fatura que vence neste mês. */
+  fatura?: { mes: string; cartao: DiasDoCartao } | null;
 }): RegistroDeImportacao {
-  const { arquivo, extrato, destino, selecionadas, agora } = params;
-  const preparada = prepararImportacaoExtrato(selecionadas, destino);
+  const { arquivo, extrato, destino, selecionadas, agora, fatura } = params;
+  const naFatura =
+    fatura && destino.tipo === 'cartao'
+      ? selecionadas.map((t) => {
+          const { data, ajustada } = dataNaFatura(t.data, fatura.mes, fatura.cartao);
+          return ajustada ? { ...t, data, descricao: `${t.descricao} (compra em ${formatarData(t.data)})` } : t;
+        })
+      : selecionadas;
+  const preparada = prepararImportacaoExtrato(naFatura, destino);
   const totalLinhas = extrato.transacoes.length + extrato.ignoradas;
   return {
     importacao: {
