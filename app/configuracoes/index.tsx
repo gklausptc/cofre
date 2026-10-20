@@ -10,7 +10,8 @@ import { Button } from '@/components/Button';
 import { PinPad } from '@/components/PinPad';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { usePreferenciasStore } from '@/store/preferenciasStore';
-import { definirPin, removerPin, verificarPin } from '@/core/auth/appLock';
+import { definirPin, removerPin, tentarPin } from '@/core/auth/appLock';
+import { descreverEspera } from '@/domain/usecases/bloqueioPin';
 import { biometriaDisponivel } from '@/core/auth/biometria';
 import { repositorios } from '@/domain/repositories';
 import type { Preferencias } from '@/domain/types/entities';
@@ -36,6 +37,7 @@ export default function ConfiguracoesScreen() {
   const [primeiroPin, setPrimeiroPin] = useState('');
   const [erroPin, setErroPin] = useState(false);
   const [acaoComPinAtual, setAcaoComPinAtual] = useState<AcaoComPinAtual>('alterar');
+  const [avisoPinAtual, setAvisoPinAtual] = useState<string | null>(null);
   const [limpando, setLimpando] = useState(false);
 
   useFocusEffect(
@@ -64,6 +66,7 @@ export default function ConfiguracoesScreen() {
     setPinDigitado('');
     setErroPin(false);
     setAcaoComPinAtual(acao);
+    setAvisoPinAtual(null);
     setEtapaPin('atual');
   }
 
@@ -79,9 +82,14 @@ export default function ConfiguracoesScreen() {
     if (novoValor.length < 4) return;
 
     if (etapaPin === 'atual') {
-      verificarPin(novoValor).then((correto) => {
-        if (!correto) {
+      tentarPin(novoValor).then((resultado) => {
+        if (!resultado.ok) {
           setErroPin(true);
+          setAvisoPinAtual(
+            resultado.esperaSegundos > 0
+              ? `Muitas tentativas erradas. Tente de novo em ${descreverEspera(resultado.esperaSegundos)}.`
+              : 'PIN incorreto, tente de novo'
+          );
           setTimeout(() => {
             setPinDigitado('');
             setErroPin(false);
@@ -190,9 +198,7 @@ export default function ConfiguracoesScreen() {
               <View style={{ alignItems: 'center', paddingVertical: 8 }}>
                 <Text className="font-body-medium" style={{ color: colors.text, fontSize: 13, marginBottom: 16 }}>
                   {etapaPin === 'atual'
-                    ? erroPin
-                      ? 'PIN incorreto, tente de novo'
-                      : 'Digite o PIN atual'
+                    ? (avisoPinAtual ?? 'Digite o PIN atual')
                     : erroPin
                       ? 'Os PINs não coincidem, tente de novo'
                       : etapaPin === 'primeiro'
