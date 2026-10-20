@@ -7,16 +7,16 @@ describe('calcularGastosFixosDoMes', () => {
 
   it('lista contas fixas, parcelas e compras no cartão que vencem no mês', () => {
     expect(resumo.itens.map((i) => [i.nome, i.valor, i.paga])).toEqual([
-      ['Compras no Nubank', 100, false],
-      ['Luz', 100, true],
-      ['Streaming', 50, false],
-      ['TV (3/10) · Nubank', 300, false],
+      ['Compras no Nubank', 10000, false],
+      ['Luz', 10000, true],
+      ['Streaming', 5000, false],
+      ['TV (3/10) · Nubank', 30000, false],
     ]);
   });
 
   it('separa o que já foi pago do que falta', () => {
-    expect(resumo.total).toBe(550);
-    expect(resumo.totalPago).toBe(100);
-    expect(resumo.totalPendente).toBe(450);
+    expect(resumo.total).toBe(55000);
+    expect(resumo.totalPago).toBe(10000);
+    expect(resumo.totalPendente).toBe(45000);
   });
 });

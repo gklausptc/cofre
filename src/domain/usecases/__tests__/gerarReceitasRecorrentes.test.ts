@@ -8,7 +8,7 @@ const salario = umaMovimentacao({
   id: 1,
   contaBancariaId: 3,
   tipo: 'entrada',
-  valor: 5000,
+  valor: 500000,
   data: '2026-01-31',
   descricao: 'Salário',
   categoriaId: 9,
@@ -22,7 +22,7 @@ describe('gerarReceitasRecorrentes', () => {
       {
         contaBancariaId: 3,
         tipo: 'entrada',
-        valor: 5000,
+        valor: 500000,
         data: '2026-04-30',
         descricao: 'Salário',
         categoriaId: 9,

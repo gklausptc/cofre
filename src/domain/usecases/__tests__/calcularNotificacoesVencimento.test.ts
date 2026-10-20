@@ -19,27 +19,27 @@ describe('calcularNotificacoesVencimento', () => {
   });
 
   it('conta fixa: lembrete às 9h do dia anterior ao vencimento', () => {
-    const parcela = umaParcela({ id: 100, contaFixaId: 10, valor: 120, mesReferencia: '2026-04' });
+    const parcela = umaParcela({ id: 100, contaFixaId: 10, valor: 12000, mesReferencia: '2026-04' });
     const [item] = calcularNotificacoesVencimento([luz], [], [], [parcela]);
 
     expect(item).toEqual({
       identificador: 'conta-fixa-100',
       titulo: 'Luz vence amanhã',
-      corpo: `${formatarMoeda(120)} · dia 10`,
+      corpo: `${formatarMoeda(12000)} · dia 10`,
       data: new Date(2026, 3, 9, 9, 0, 0),
     });
   });
 
   it('parcela no cartão: lembrete na véspera do vencimento da fatura em que ela cai', () => {
     // fecha em abril (mesReferencia) e, como o Nubank vence antes de fechar, vence em 05/05
-    const parcela = umaParcela({ id: 101, compraParceladaId: 1, numero: 2, valor: 300, mesReferencia: '2026-04' });
+    const parcela = umaParcela({ id: 101, compraParceladaId: 1, numero: 2, valor: 30000, mesReferencia: '2026-04' });
     const [item] = calcularNotificacoesVencimento([], [nubank], [tv], [parcela]).filter((i) =>
       i.identificador.startsWith('parcela-cartao')
     );
 
     expect(item.identificador).toBe('parcela-cartao-101');
     expect(item.titulo).toBe('Fatura do Nubank vence amanhã');
-    expect(item.corpo).toBe(`Parcela 2 de "TV" · ${formatarMoeda(300)}`);
+    expect(item.corpo).toBe(`Parcela 2 de "TV" · ${formatarMoeda(30000)}`);
     expect(item.data).toEqual(new Date(2026, 4, 4, 9, 0, 0));
   });
 

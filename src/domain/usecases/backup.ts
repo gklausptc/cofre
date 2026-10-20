@@ -51,7 +51,44 @@ export function nomeArquivoBackup(agora: Date): string {
  * Só migrations que mudam o significado dos dados precisam de um (ex.: reais → centavos);
  * coluna nova não precisa, porque na restauração ela recebe o valor padrão.
  */
-const CONVERSORES: Record<number, (tabelas: TabelasBackup) => TabelasBackup> = {};
+const CONVERSORES: Record<number, (tabelas: TabelasBackup) => TabelasBackup> = {
+  6: converterReaisParaCentavos,
+};
+
+/** Colunas de dinheiro que a migration 0006 passou de reais para centavos inteiros. */
+const COLUNAS_EM_CENTAVOS_DESDE_0006: Record<string, string[]> = {
+  aportes_cofrinho: ['valor'],
+  cartoes: ['limite'],
+  cofrinhos: ['valor_meta'],
+  compras_parceladas: ['valor_total'],
+  contas_bancarias: ['saldo_inicial'],
+  contas_fixas: ['valor'],
+  faturas: ['valor_pago'],
+  gastos_rapidos: ['valor', 'valor_original'],
+  metas_financeiras: ['valor_meta', 'valor_atual'],
+  movimentacoes: ['valor'],
+  movimentacoes_reserva: ['valor'],
+  parcelas: ['valor', 'valor_original'],
+  reserva_emergencia: ['valor_meta', 'valor_atual'],
+};
+
+/** Backup feito antes da 0006 (dinheiro em reais): mesma conversão da migration, ROUND(valor * 100). */
+function converterReaisParaCentavos(tabelas: TabelasBackup): TabelasBackup {
+  const convertidas: TabelasBackup = { ...tabelas };
+  for (const [tabela, colunas] of Object.entries(COLUNAS_EM_CENTAVOS_DESDE_0006)) {
+    const linhas = tabelas[tabela];
+    if (!linhas) continue;
+    convertidas[tabela] = linhas.map((linha) => {
+      const nova: LinhaBackup = { ...linha };
+      for (const coluna of colunas) {
+        const valor = linha[coluna];
+        if (typeof valor === 'number') nova[coluna] = Math.round(valor * 100);
+      }
+      return nova;
+    });
+  }
+  return convertidas;
+}
 
 export type ResultadoValidacaoBackup = { ok: true; backup: BackupCofre } | { ok: false; erro: string };
 

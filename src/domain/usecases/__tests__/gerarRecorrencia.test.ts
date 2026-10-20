@@ -6,12 +6,12 @@ const hoje = new Date(2026, 2, 15); // 15/03/2026 → janela de março a maio
 
 describe('gerarRecorrencia', () => {
   it('mensal: cria uma ocorrência por mês nos próximos 3 meses', () => {
-    const conta = umaContaFixa({ id: 1, valor: 120, recorrencia: 'mensal', dataInicio: '2026-01-10' });
+    const conta = umaContaFixa({ id: 1, valor: 12000, recorrencia: 'mensal', dataInicio: '2026-01-10' });
     const novas = gerarRecorrencia([conta], [], hoje);
 
     expect(novas.map((p) => p.mesReferencia)).toEqual(['2026-03', '2026-04', '2026-05']);
     expect(novas.every((p) => p.contaFixaId === 1 && p.compraParceladaId === null)).toBe(true);
-    expect(novas.every((p) => p.valor === 120 && p.status === 'pendente')).toBe(true);
+    expect(novas.every((p) => p.valor === 12000 && p.status === 'pendente')).toBe(true);
   });
 
   it('não duplica o que já foi gerado', () => {

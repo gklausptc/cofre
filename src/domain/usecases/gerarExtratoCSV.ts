@@ -1,3 +1,4 @@
+import { formatarDecimal } from '@/core/utils/currency';
 import { formatarData } from '@/core/utils/date';
 import { efeitoMovimentacaoNaConta } from '@/domain/usecases/calcularSaldoConta';
 import { dataNoMes, mesDeCobrancaDaParcela, mesDeCobrancaDoGasto } from '@/domain/usecases/mesDaFatura';
@@ -29,8 +30,9 @@ export function formatarCampoCSV(valor: string): string {
   return precisaAspas ? `"${valor.replace(/"/g, '""')}"` : valor;
 }
 
-export function formatarValorCSV(valor: number): string {
-  return valor.toFixed(2).replace('.', ',');
+/** Centavos como "1234,56" (vírgula decimal, sem separador de milhar). */
+export function formatarValorCSV(centavos: number): string {
+  return formatarDecimal(centavos);
 }
 
 export function montarCSV(linhas: string[][]): string {

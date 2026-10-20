@@ -15,24 +15,24 @@ import {
 
 describe('efeitoMovimentacaoNaConta', () => {
   it('entrada soma, saída e transferência enviada tiram, transferência recebida soma', () => {
-    expect(efeitoMovimentacaoNaConta(1, umaMovimentacao({ contaBancariaId: 1, tipo: 'entrada', valor: 10 }))).toBe(10);
-    expect(efeitoMovimentacaoNaConta(1, umaMovimentacao({ contaBancariaId: 1, tipo: 'saida', valor: 10 }))).toBe(-10);
+    expect(efeitoMovimentacaoNaConta(1, umaMovimentacao({ contaBancariaId: 1, tipo: 'entrada', valor: 1000 }))).toBe(1000);
+    expect(efeitoMovimentacaoNaConta(1, umaMovimentacao({ contaBancariaId: 1, tipo: 'saida', valor: 1000 }))).toBe(-1000);
     expect(
-      efeitoMovimentacaoNaConta(1, umaMovimentacao({ contaBancariaId: 1, tipo: 'transferencia', valor: 10, contaDestinoId: 2 }))
-    ).toBe(-10);
+      efeitoMovimentacaoNaConta(1, umaMovimentacao({ contaBancariaId: 1, tipo: 'transferencia', valor: 1000, contaDestinoId: 2 }))
+    ).toBe(-1000);
     expect(
-      efeitoMovimentacaoNaConta(2, umaMovimentacao({ contaBancariaId: 1, tipo: 'transferencia', valor: 10, contaDestinoId: 2 }))
-    ).toBe(10);
+      efeitoMovimentacaoNaConta(2, umaMovimentacao({ contaBancariaId: 1, tipo: 'transferencia', valor: 1000, contaDestinoId: 2 }))
+    ).toBe(1000);
   });
 
   it('movimentação de outra conta não mexe no saldo', () => {
-    expect(efeitoMovimentacaoNaConta(3, umaMovimentacao({ contaBancariaId: 1, tipo: 'entrada', valor: 10 }))).toBe(0);
+    expect(efeitoMovimentacaoNaConta(3, umaMovimentacao({ contaBancariaId: 1, tipo: 'entrada', valor: 1000 }))).toBe(0);
   });
 });
 
 describe('calcularSaldoConta', () => {
   it('só com saldo inicial', () => {
-    expect(calcularSaldoConta(contaPrincipal, [])).toBe(1000);
+    expect(calcularSaldoConta(contaPrincipal, [])).toBe(100000);
   });
 
   it('considera movimentações, débito/pix, contas fixas pagas e faturas pagas pela conta', () => {
@@ -50,12 +50,12 @@ describe('calcularSaldoConta', () => {
 
   it('gasto no cartão não desconta da conta na compra', () => {
     const soCartao = gastosDoCenario.filter((g) => g.formaPagamento === 'cartao');
-    expect(calcularSaldoConta(contaPrincipal, [], soCartao)).toBe(1000);
+    expect(calcularSaldoConta(contaPrincipal, [], soCartao)).toBe(100000);
   });
 
   it('conta fixa pendente não desconta', () => {
     const soPendentes = parcelasDoCenario.filter((p) => p.status === 'pendente');
-    expect(calcularSaldoConta(contaPrincipal, [], [], soPendentes, contasFixasDoCenario)).toBe(1000);
+    expect(calcularSaldoConta(contaPrincipal, [], [], soPendentes, contasFixasDoCenario)).toBe(100000);
   });
 });
 

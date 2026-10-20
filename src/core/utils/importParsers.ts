@@ -1,3 +1,5 @@
+import { textoParaCentavos } from './currency';
+
 export type LinhaCSV = string[];
 
 function detectarDelimitador(primeiraLinha: string): string {
@@ -39,16 +41,9 @@ export function parseCSV(conteudo: string): { headers: string[]; linhas: LinhaCS
   };
 }
 
-/** Converte '1.234,56' ou '1234.56' ou '-50,00' em number. */
-export function parseValorMonetario(valor: string): number {
-  const limpo = valor.trim().replace(/[^\d,.-]/g, '');
-  if (limpo.includes(',') && limpo.includes('.')) {
-    return parseFloat(limpo.replace(/\./g, '').replace(',', '.'));
-  }
-  if (limpo.includes(',')) {
-    return parseFloat(limpo.replace(',', '.'));
-  }
-  return parseFloat(limpo);
+/** Converte '1.234,56', '1,234.56', '1234.56' ou '-50,00' em centavos (NaN se não for número). */
+export function parseValorEmCentavos(valor: string): number {
+  return textoParaCentavos(valor);
 }
 
 /** Converte datas comuns em extratos (DD/MM/AAAA, AAAA-MM-DD) para ISO 'YYYY-MM-DD'. */
@@ -71,6 +66,7 @@ export function parseDataExtrato(valor: string): string | null {
 export type TransacaoImportada = {
   data: string;
   descricao: string;
+  /** Em centavos, com sinal (negativo = saída). */
   valor: number;
 };
 
@@ -89,7 +85,7 @@ export function parseOFX(conteudo: string): TransacaoImportada[] {
 
       const bruto = dataMatch[1];
       const data = `${bruto.slice(0, 4)}-${bruto.slice(4, 6)}-${bruto.slice(6, 8)}`;
-      const valor = parseFloat(valorMatch[1]);
+      const valor = textoParaCentavos(valorMatch[1]);
       const descricao = (memoMatch?.[1] ?? nameMatch?.[1] ?? 'Importado do extrato').trim();
 
       if (Number.isNaN(valor)) return null;

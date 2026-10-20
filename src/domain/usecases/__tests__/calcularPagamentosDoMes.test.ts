@@ -19,20 +19,20 @@ describe('calcularPagamentosDoMes', () => {
   it('a fatura reúne conta fixa no cartão, parcela e compras à vista que vencem no mês', () => {
     const fatura = resultado.grupos[1];
     expect(fatura.itens.map((i) => [i.nome, i.valor])).toEqual([
-      ['iFood', 40],
-      ['Mercado', 60],
-      ['Streaming', 50],
-      ['TV', 300],
+      ['iFood', 4000],
+      ['Mercado', 6000],
+      ['Streaming', 5000],
+      ['TV', 30000],
     ]);
     expect(fatura.vencimento).toBe('2026-04-05');
-    expect(fatura.total).toBe(450);
-    expect(fatura.pendente).toBe(450);
+    expect(fatura.total).toBe(45000);
+    expect(fatura.pendente).toBe(45000);
   });
 
   it('totais do mês', () => {
-    expect(resultado.total).toBe(550);
-    expect(resultado.totalPago).toBe(100);
-    expect(resultado.totalPendente).toBe(450);
+    expect(resultado.total).toBe(55000);
+    expect(resultado.totalPago).toBe(10000);
+    expect(resultado.totalPendente).toBe(45000);
   });
 
   it('fatura paga marca todos os itens do grupo como pagos', () => {

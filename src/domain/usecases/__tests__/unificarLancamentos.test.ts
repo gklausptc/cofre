@@ -5,11 +5,11 @@ import { umaMovimentacao, umGasto } from '@/test/fabricas';
 describe('unificarLancamentos', () => {
   const lista = unificarLancamentos(
     [
-      umaMovimentacao({ id: 1, tipo: 'entrada', valor: 100, data: '2026-03-01' }),
-      umaMovimentacao({ id: 2, tipo: 'saida', valor: 20, data: '2026-03-03', descricao: 'Farmácia', membroId: 4 }),
-      umaMovimentacao({ id: 3, tipo: 'transferencia', valor: 50, data: '2026-03-02', reservarProximoMes: true }),
+      umaMovimentacao({ id: 1, tipo: 'entrada', valor: 10000, data: '2026-03-01' }),
+      umaMovimentacao({ id: 2, tipo: 'saida', valor: 2000, data: '2026-03-03', descricao: 'Farmácia', membroId: 4 }),
+      umaMovimentacao({ id: 3, tipo: 'transferencia', valor: 5000, data: '2026-03-02', reservarProximoMes: true }),
     ],
-    [umGasto({ id: 1, valor: 10, data: '2026-03-04' })]
+    [umGasto({ id: 1, valor: 1000, data: '2026-03-04' })]
   );
 
   it('junta movimentações e gastos, do mais recente para o mais antigo', () => {

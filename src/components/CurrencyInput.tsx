@@ -5,9 +5,9 @@ import { formatarMoeda } from '@/core/utils/currency';
 
 type CurrencyInputProps = {
   label: string;
-  /** valor em reais (não em centavos) */
+  /** valor em centavos (R$ 12,34 = 1234) */
   valor: number;
-  onChangeValor: (valor: number) => void;
+  onChangeValor: (centavos: number) => void;
 };
 
 export function CurrencyInput({ label, valor, onChangeValor }: CurrencyInputProps) {
@@ -15,8 +15,7 @@ export function CurrencyInput({ label, valor, onChangeValor }: CurrencyInputProp
 
   function handleChangeText(texto: string) {
     const digitos = texto.replace(/\D/g, '');
-    const centavos = digitos ? parseInt(digitos, 10) : 0;
-    onChangeValor(centavos / 100);
+    onChangeValor(digitos ? parseInt(digitos, 10) : 0);
   }
 
   return (

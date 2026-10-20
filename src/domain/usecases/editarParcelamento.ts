@@ -1,9 +1,6 @@
 import { addMonths, format, parseISO } from 'date-fns';
+import { dividirEmParcelas, formatarMoeda } from '@/core/utils/currency';
 import type { CompraParcelada, NovaParcela, Parcela } from '@/domain/types/entities';
-
-function arredondar(valor: number): number {
-  return Math.round(valor * 100) / 100;
-}
 
 export type PlanoEdicaoParcelamento = {
   atualizar: { id: number; numero: number; valor: number; mesReferencia: string }[];
@@ -33,8 +30,8 @@ export function editarParcelamento(
     .filter((p) => p.status !== 'paga')
     .sort((a, b) => a.numero - b.numero);
 
-  const totalPago = arredondar(pagas.reduce((soma, p) => soma + p.valor, 0));
-  const restante = arredondar(valorTotal - totalPago);
+  const totalPago = pagas.reduce((soma, p) => soma + p.valor, 0);
+  const restante = valorTotal - totalPago;
   const qtdPendentes = numParcelas - pagas.length;
 
   if (qtdPendentes < 1) {
@@ -46,7 +43,7 @@ export function editarParcelamento(
   if (restante <= 0) {
     return {
       ok: false,
-      erro: `O valor total precisa ser maior que o já pago (${totalPago.toFixed(2).replace('.', ',')}).`,
+      erro: `O valor total precisa ser maior que o já pago (${formatarMoeda(totalPago)}).`,
     };
   }
 
@@ -60,9 +57,8 @@ export function editarParcelamento(
   const mesBase = parseISO(`${mesPrimeiraParcela}-01`);
   const mesDoNumero = (numero: number) => format(addMonths(mesBase, numero - 1), 'yyyy-MM');
 
-  const valorBase = arredondar(restante / qtdPendentes);
-  const valorUltima = arredondar(restante - valorBase * (qtdPendentes - 1));
-  const valorDaPosicao = (i: number) => (i === qtdPendentes - 1 ? valorUltima : valorBase);
+  const valores = dividirEmParcelas(restante, qtdPendentes);
+  const valorDaPosicao = (i: number) => valores[i];
 
   const atualizar: PlanoEdicaoParcelamento['atualizar'] = [];
   const criar: PlanoEdicaoParcelamento['criar'] = [];

@@ -1,4 +1,8 @@
-import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+
+// Dinheiro é sempre gravado em CENTAVOS inteiros (R$ 12,34 = 1234), nunca em reais com
+// casas decimais — evita erro de arredondamento de ponto flutuante nas somas. A conversão
+// para exibição fica em src/core/utils/currency.ts.
 
 export const membrosFamilia = sqliteTable('membros_familia', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -21,7 +25,7 @@ export const contasBancarias = sqliteTable('contas_bancarias', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   banco: text('banco').notNull(),
   nomeConta: text('nome_conta').notNull(),
-  saldoInicial: real('saldo_inicial').notNull().default(0),
+  saldoInicial: integer('saldo_inicial').notNull().default(0),
   cor: text('cor').notNull(),
   icone: text('icone').notNull(),
   ativo: integer('ativo', { mode: 'boolean' }).default(true),
@@ -32,7 +36,7 @@ export const movimentacoes = sqliteTable('movimentacoes', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   contaBancariaId: integer('conta_bancaria_id').notNull(),
   tipo: text('tipo', { enum: ['entrada', 'saida', 'transferencia'] }).notNull(),
-  valor: real('valor').notNull(),
+  valor: integer('valor').notNull(),
   data: text('data').notNull(), // ISO date
   descricao: text('descricao'),
   categoriaId: integer('categoria_id'),
@@ -50,7 +54,7 @@ export const movimentacoes = sqliteTable('movimentacoes', {
 export const cartoes = sqliteTable('cartoes', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   nome: text('nome').notNull(),
-  limite: real('limite').notNull(),
+  limite: integer('limite').notNull(),
   diaFechamento: integer('dia_fechamento').notNull(),
   diaVencimento: integer('dia_vencimento').notNull(),
   cor: text('cor').notNull(),
@@ -66,7 +70,7 @@ export const faturas = sqliteTable('faturas', {
   status: text('status', { enum: ['aberta', 'fechada', 'paga'] }).default('aberta'),
   // preenchidos ao pagar a fatura: de qual conta saiu o dinheiro e quanto foi pago
   contaBancariaId: integer('conta_bancaria_id'),
-  valorPago: real('valor_pago'),
+  valorPago: integer('valor_pago'),
   dataPagamento: text('data_pagamento'),
   // valor_total NÃO é coluna — calculado a partir da soma das parcelas vinculadas
 });
@@ -74,7 +78,7 @@ export const faturas = sqliteTable('faturas', {
 export const comprasParceladas = sqliteTable('compras_parceladas', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   descricao: text('descricao').notNull(),
-  valorTotal: real('valor_total').notNull(),
+  valorTotal: integer('valor_total').notNull(),
   numParcelas: integer('num_parcelas').notNull(),
   cartaoId: integer('cartao_id').notNull(),
   categoriaId: integer('categoria_id'),
@@ -88,13 +92,13 @@ export const parcelas = sqliteTable('parcelas', {
   compraParceladaId: integer('compra_parcelada_id'), // nullable
   contaFixaId: integer('conta_fixa_id'), // nullable — exatamente um dos dois deve ser preenchido
   numero: integer('numero').notNull(), // 1, 2, 3...
-  valor: real('valor').notNull(),
+  valor: integer('valor').notNull(),
   mesReferencia: text('mes_referencia').notNull(), // 'YYYY-MM'
   faturaId: integer('fatura_id'),
   status: text('status', { enum: ['pendente', 'paga'] }).default('pendente'),
   dataPagamento: text('data_pagamento'),
   // quando o valor é alterado: o valor de antes e o motivo (obrigatório na tela)
-  valorOriginal: real('valor_original'),
+  valorOriginal: integer('valor_original'),
   justificativaAlteracao: text('justificativa_alteracao'),
 });
 
@@ -102,7 +106,7 @@ export const contasFixas = sqliteTable('contas_fixas', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   nome: text('nome').notNull(),
   categoriaId: integer('categoria_id'),
-  valor: real('valor').notNull(),
+  valor: integer('valor').notNull(),
   diaVencimento: integer('dia_vencimento').notNull(),
   formaPagamento: text('forma_pagamento', { enum: ['debito', 'pix', 'cartao', 'boleto'] }).notNull(),
   contaBancariaId: integer('conta_bancaria_id'),
@@ -118,7 +122,7 @@ export const contasFixas = sqliteTable('contas_fixas', {
 
 export const gastosRapidos = sqliteTable('gastos_rapidos', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  valor: real('valor').notNull(),
+  valor: integer('valor').notNull(),
   categoriaId: integer('categoria_id'),
   descricao: text('descricao'),
   data: text('data').notNull(),
@@ -126,14 +130,14 @@ export const gastosRapidos = sqliteTable('gastos_rapidos', {
   contaBancariaId: integer('conta_bancaria_id'),
   cartaoId: integer('cartao_id'),
   membroId: integer('membro_id'),
-  valorOriginal: real('valor_original'),
+  valorOriginal: integer('valor_original'),
   justificativaAlteracao: text('justificativa_alteracao'),
 });
 
 export const cofrinhos = sqliteTable('cofrinhos', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   nome: text('nome').notNull(),
-  valorMeta: real('valor_meta').notNull(),
+  valorMeta: integer('valor_meta').notNull(),
   dataMeta: text('data_meta'),
   cor: text('cor').notNull(),
   icone: text('icone').notNull(),
@@ -144,21 +148,21 @@ export const cofrinhos = sqliteTable('cofrinhos', {
 export const aportesCofrinho = sqliteTable('aportes_cofrinho', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   cofrinhoId: integer('cofrinho_id').notNull(),
-  valor: real('valor').notNull(),
+  valor: integer('valor').notNull(),
   data: text('data').notNull(),
 });
 
 export const reservaEmergencia = sqliteTable('reserva_emergencia', {
   id: integer('id').primaryKey({ autoIncrement: true }), // singleton, sempre id=1
-  valorMeta: real('valor_meta').notNull(),
-  valorAtual: real('valor_atual').notNull().default(0),
+  valorMeta: integer('valor_meta').notNull(),
+  valorAtual: integer('valor_atual').notNull().default(0),
   mesesCoberturaDesejados: integer('meses_cobertura_desejados'),
 });
 
 export const movimentacoesReserva = sqliteTable('movimentacoes_reserva', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   tipo: text('tipo', { enum: ['aporte', 'retirada'] }).notNull(),
-  valor: real('valor').notNull(),
+  valor: integer('valor').notNull(),
   data: text('data').notNull(),
   justificativa: text('justificativa'), // obrigatória apenas para retirada, validado na tela
 });
@@ -166,8 +170,8 @@ export const movimentacoesReserva = sqliteTable('movimentacoes_reserva', {
 export const metasFinanceiras = sqliteTable('metas_financeiras', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   nome: text('nome').notNull(),
-  valorMeta: real('valor_meta').notNull(),
-  valorAtual: real('valor_atual').notNull().default(0),
+  valorMeta: integer('valor_meta').notNull(),
+  valorAtual: integer('valor_atual').notNull().default(0),
   dataMeta: text('data_meta'),
   categoria: text('categoria'),
 });

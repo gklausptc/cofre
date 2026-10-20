@@ -84,159 +84,30 @@ Regra de arquitetura: `presentation` (app/, components/, store/) nunca acessa `d
 
 O app continua local, em um único aparelho — não há sincronização entre celulares de pessoas diferentes (exigiria backend). O jeito correto de cobrir uso familiar aqui é: adicionar uma entidade `membros_familia` (nome, cor, ícone) e um campo opcional `membro_id` em `movimentacoes`, `gastos_rapidos`, `contas_fixas` e `compras_parceladas`. O dashboard deve permitir filtrar/agrupar por membro. Implementar isso desde o MVP (é simples e evita retrabalho de migration depois).
 
-## 6. Schema do banco (Drizzle) — implementar exatamente assim
+## 6. Schema do banco (Drizzle)
 
-```typescript
-// src/data/db/schema.ts
-import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
+A fonte da verdade é `src/data/db/schema.ts`; toda mudança é uma migration nova gerada com `npx drizzle-kit generate` (nunca editar migration já publicada, nunca resetar o banco). Tabelas atuais:
 
-export const membrosFamilia = sqliteTable('membros_familia', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  nome: text('nome').notNull(),
-  cor: text('cor').notNull(),
-  icone: text('icone').notNull(),
-  ativo: integer('ativo', { mode: 'boolean' }).default(true),
-});
+| Tabela | Para quê |
+|---|---|
+| `membros_familia` | pessoas da família (nome, cor, ícone) — `membro_id` opcional nos lançamentos |
+| `categorias` | receita/despesa; seed com as padrão |
+| `contas_bancarias` | `saldo_inicial`; saldo atual é sempre calculado |
+| `movimentacoes` | entrada/saída/transferência em conta; `recorrente` + `recorrente_origem_id` (salário), `reservar_proximo_mes` |
+| `cartoes` | limite, dia de fechamento e de vencimento |
+| `faturas` | por cartão/mês de vencimento; quando paga guarda `conta_bancaria_id`, `valor_pago`, `data_pagamento` |
+| `compras_parceladas` | compra no cartão em N vezes |
+| `parcelas` | parcelas de compra **e** ocorrências de conta fixa (exatamente um de `compra_parcelada_id`/`conta_fixa_id`); `valor_original` + `justificativa_alteracao` quando o valor é ajustado |
+| `contas_fixas` | recorrência mensal/quinzenal/semanal/anual/única, débito/pix/cartão/boleto |
+| `gastos_rapidos` | gasto em dinheiro/débito/pix/cartão sem passar por movimentação |
+| `cofrinhos` + `aportes_cofrinho` | metas de economia; valor atual = soma dos aportes |
+| `reserva_emergencia` (singleton) + `movimentacoes_reserva` | reserva com histórico de aportes/retiradas |
+| `metas_financeiras` | metas financeiras (nome, valor da meta, valor atual, data e categoria) — mantida; a tela Metas financeiras reúne reserva, cofrinhos e metas |
+| `preferencias` (singleton) | tema, bloqueio/biometria, tutorial, `ultimo_backup_em` |
 
-export const categorias = sqliteTable('categorias', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  nome: text('nome').notNull(),
-  icone: text('icone').notNull(),
-  cor: text('cor').notNull(),
-  tipo: text('tipo', { enum: ['receita', 'despesa'] }).notNull(),
-  isPadrao: integer('is_padrao', { mode: 'boolean' }).default(false),
-});
+**Dinheiro é sempre `integer` em centavos** (R$ 12,34 = `1234`), do banco até as telas. Conversão para exibir/ler texto só em `src/core/utils/currency.ts` (`formatarMoeda`, `formatarDecimal`, `textoParaCentavos`, `dividirEmParcelas`); o `CurrencyInput` já trabalha em centavos. Nunca usar `parseFloat`/`toFixed` em dinheiro. A migration 0006 converteu os valores antigos com `ROUND(valor * 100)`, e backups de antes dela são convertidos na restauração (`CONVERSORES` em `src/domain/usecases/backup.ts` — toda migration que muda o significado de um dado precisa de um conversor ali).
 
-export const contasBancarias = sqliteTable('contas_bancarias', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  banco: text('banco').notNull(),
-  nomeConta: text('nome_conta').notNull(),
-  saldoInicial: real('saldo_inicial').notNull().default(0),
-  cor: text('cor').notNull(),
-  icone: text('icone').notNull(),
-  ativo: integer('ativo', { mode: 'boolean' }).default(true),
-  // saldo_atual NÃO é coluna — é sempre calculado a partir de movimentacoes (ver usecases)
-});
-
-export const movimentacoes = sqliteTable('movimentacoes', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  contaBancariaId: integer('conta_bancaria_id').notNull(),
-  tipo: text('tipo', { enum: ['entrada', 'saida', 'transferencia'] }).notNull(),
-  valor: real('valor').notNull(),
-  data: text('data').notNull(),               // ISO date
-  descricao: text('descricao'),
-  categoriaId: integer('categoria_id'),
-  contaDestinoId: integer('conta_destino_id'),  // só para transferencia
-  origem: text('origem', { enum: ['manual', 'conta_fixa', 'gasto', 'parcela'] }).default('manual'),
-  membroId: integer('membro_id'),
-});
-
-export const cartoes = sqliteTable('cartoes', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  nome: text('nome').notNull(),
-  limite: real('limite').notNull(),
-  diaFechamento: integer('dia_fechamento').notNull(),
-  diaVencimento: integer('dia_vencimento').notNull(),
-  cor: text('cor').notNull(),
-  ativo: integer('ativo', { mode: 'boolean' }).default(true),
-});
-
-export const faturas = sqliteTable('faturas', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  cartaoId: integer('cartao_id').notNull(),
-  mesReferencia: text('mes_referencia').notNull(),   // 'YYYY-MM'
-  dataFechamento: text('data_fechamento').notNull(),
-  dataVencimento: text('data_vencimento').notNull(),
-  status: text('status', { enum: ['aberta', 'fechada', 'paga'] }).default('aberta'),
-  // valor_total NÃO é coluna — calculado a partir da soma das parcelas vinculadas
-});
-
-export const comprasParceladas = sqliteTable('compras_parceladas', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  descricao: text('descricao').notNull(),
-  valorTotal: real('valor_total').notNull(),
-  numParcelas: integer('num_parcelas').notNull(),
-  cartaoId: integer('cartao_id').notNull(),
-  categoriaId: integer('categoria_id'),
-  dataCompra: text('data_compra').notNull(),
-  membroId: integer('membro_id'),
-  ativo: integer('ativo', { mode: 'boolean' }).default(true),
-});
-
-export const parcelas = sqliteTable('parcelas', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  compraParceladaId: integer('compra_parcelada_id'),  // nullable
-  contaFixaId: integer('conta_fixa_id'),               // nullable — exatamente um dos dois deve ser preenchido
-  numero: integer('numero').notNull(),                  // 1, 2, 3...
-  valor: real('valor').notNull(),
-  mesReferencia: text('mes_referencia').notNull(),      // 'YYYY-MM'
-  faturaId: integer('fatura_id'),
-  status: text('status', { enum: ['pendente', 'paga'] }).default('pendente'),
-  dataPagamento: text('data_pagamento'),
-});
-
-export const contasFixas = sqliteTable('contas_fixas', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  nome: text('nome').notNull(),
-  categoriaId: integer('categoria_id'),
-  valor: real('valor').notNull(),
-  diaVencimento: integer('dia_vencimento').notNull(),
-  formaPagamento: text('forma_pagamento', { enum: ['debito', 'cartao', 'boleto'] }).notNull(),
-  contaBancariaId: integer('conta_bancaria_id'),
-  cartaoId: integer('cartao_id'),
-  recorrencia: text('recorrencia', { enum: ['mensal', 'quinzenal', 'semanal', 'anual', 'unica'] }).notNull(),
-  dataInicio: text('data_inicio').notNull(),
-  dataFim: text('data_fim'),
-  membroId: integer('membro_id'),
-  ativo: integer('ativo', { mode: 'boolean' }).default(true),
-});
-
-export const gastosRapidos = sqliteTable('gastos_rapidos', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  valor: real('valor').notNull(),
-  categoriaId: integer('categoria_id'),
-  descricao: text('descricao'),
-  data: text('data').notNull(),
-  formaPagamento: text('forma_pagamento', { enum: ['debito', 'cartao', 'dinheiro'] }).notNull(),
-  contaBancariaId: integer('conta_bancaria_id'),
-  cartaoId: integer('cartao_id'),
-  membroId: integer('membro_id'),
-});
-
-export const cofrinhos = sqliteTable('cofrinhos', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  nome: text('nome').notNull(),
-  valorMeta: real('valor_meta').notNull(),
-  dataMeta: text('data_meta'),
-  cor: text('cor').notNull(),
-  icone: text('icone').notNull(),
-  status: text('status', { enum: ['ativo', 'concluido'] }).default('ativo'),
-  // valor_atual NÃO é coluna — calculado pela soma de aportes_cofrinho
-});
-
-export const aportesCofrinho = sqliteTable('aportes_cofrinho', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  cofrinhoId: integer('cofrinho_id').notNull(),
-  valor: real('valor').notNull(),
-  data: text('data').notNull(),
-});
-
-export const reservaEmergencia = sqliteTable('reserva_emergencia', {
-  id: integer('id').primaryKey({ autoIncrement: true }),   // singleton, sempre id=1
-  valorMeta: real('valor_meta').notNull(),
-  valorAtual: real('valor_atual').notNull().default(0),
-  mesesCoberturaDesejados: integer('meses_cobertura_desejados'),
-});
-
-export const metasFinanceiras = sqliteTable('metas_financeiras', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  nome: text('nome').notNull(),
-  valorMeta: real('valor_meta').notNull(),
-  valorAtual: real('valor_atual').notNull().default(0),
-  dataMeta: text('data_meta'),
-  categoria: text('categoria'),
-});
-```
+**Backup**: antes de qualquer migration pendente o app grava uma cópia automática em `documentDirectory/backups` (`src/data/db/prepararBanco.ts`); a tela `app/backup` exporta/restaura o JSON completo.
 
 **Regra importante de design:** `saldo_atual` de conta bancária, `valor_total` de fatura, e `valor_atual` de cofrinho **nunca são colunas gravadas diretamente** — são sempre calculados a partir das tabelas de movimento (`movimentacoes`, `parcelas`, `aportes_cofrinho`). Implemente como funções/queries derivadas, não como campos que o usuário edita.
 

@@ -20,7 +20,7 @@ import {
   parseCSV,
   parseDataExtrato,
   parseOFX,
-  parseValorMonetario,
+  parseValorEmCentavos,
   removerBOM,
   temCaracteresInvalidos,
 } from '@/core/utils/importParsers';
@@ -168,7 +168,7 @@ export default function ImportarExtratoScreen() {
     const importadas = csv.linhas
       .map((linha, i) => {
         const dataIso = parseDataExtrato(linha[idxData] ?? '');
-        const valor = parseValorMonetario(linha[idxValor] ?? '');
+        const valor = parseValorEmCentavos(linha[idxValor] ?? '');
         if (!dataIso || Number.isNaN(valor)) return null;
         return {
           id: `csv-${i}`,

@@ -53,6 +53,38 @@ describe('validarBackup', () => {
     expect(resultado.ok && resultado.backup.versaoSchema).toBe(5);
   });
 
+  it('backup de antes dos centavos (até a versão 5) tem o dinheiro convertido de reais para centavos', () => {
+    const antigo = montarBackup(
+      {
+        categorias: [{ id: 1, nome: 'Mercado' }],
+        movimentacoes: [{ id: 1, valor: 10.07, descricao: 'Pão', conta_bancaria_id: 2 }],
+        parcelas: [{ id: 1, valor: 33.33, valor_original: null, numero: 3 }],
+        contas_bancarias: [{ id: 1, saldo_inicial: -1234.56 }],
+        reserva_emergencia: [{ id: 1, valor_meta: 15000, valor_atual: 1234.5, meses_cobertura_desejados: 6 }],
+        metas_financeiras: [{ id: 1, nome: 'Carro', valor_meta: 45000, valor_atual: 0.5 }],
+      },
+      5,
+      agora
+    );
+    const resultado = validarBackup(comoArquivo(antigo), 6);
+    if (!resultado.ok) throw new Error(resultado.erro);
+
+    expect(resultado.backup.tabelas.movimentacoes).toEqual([{ id: 1, valor: 1007, descricao: 'Pão', conta_bancaria_id: 2 }]);
+    expect(resultado.backup.tabelas.parcelas).toEqual([{ id: 1, valor: 3333, valor_original: null, numero: 3 }]);
+    expect(resultado.backup.tabelas.contas_bancarias).toEqual([{ id: 1, saldo_inicial: -123456 }]);
+    expect(resultado.backup.tabelas.reserva_emergencia).toEqual([
+      { id: 1, valor_meta: 1500000, valor_atual: 123450, meses_cobertura_desejados: 6 },
+    ]);
+    expect(resultado.backup.tabelas.metas_financeiras).toEqual([{ id: 1, nome: 'Carro', valor_meta: 4500000, valor_atual: 50 }]);
+    expect(resultado.backup.tabelas.categorias).toEqual([{ id: 1, nome: 'Mercado' }]);
+  });
+
+  it('backup já em centavos (versão 6) não é convertido de novo', () => {
+    const atual = montarBackup({ categorias: [], movimentacoes: [{ id: 1, valor: 1007 }] }, 6, agora);
+    const resultado = validarBackup(comoArquivo(atual), 6);
+    expect(resultado.ok && resultado.backup.tabelas.movimentacoes).toEqual([{ id: 1, valor: 1007 }]);
+  });
+
   it('recusa backup de uma versão mais nova do app', () => {
     const resultado = validarBackup(comoArquivo(montarBackup(tabelasValidas, 6, agora)), 5);
     expect(resultado).toEqual({ ok: false, erro: expect.stringContaining('mais nova') });

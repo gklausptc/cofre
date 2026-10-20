@@ -1,17 +1,14 @@
 import { addMonths, format, parseISO } from 'date-fns';
+import { dividirEmParcelas } from '@/core/utils/currency';
 import type { Cartao, CompraParcelada, NovaParcela } from '@/domain/types/entities';
-
-function arredondar(valor: number): number {
-  return Math.round(valor * 100) / 100;
-}
 
 function primeiroMesReferencia(dataCompra: Date, diaFechamento: number): Date {
   return dataCompra.getDate() > diaFechamento ? addMonths(dataCompra, 1) : dataCompra;
 }
 
 /**
- * Cria N parcelas para uma compra parcelada. O valor é dividido igualmente entre
- * as parcelas, ajustando centavos na última para bater exatamente o total.
+ * Cria N parcelas para uma compra parcelada. O valor (em centavos) é dividido igualmente
+ * entre as parcelas, e o resto da divisão vai para a última para bater exatamente o total.
  */
 export function gerarParcelas(
   compra: Pick<CompraParcelada, 'id' | 'valorTotal' | 'numParcelas' | 'dataCompra'>,
@@ -19,9 +16,7 @@ export function gerarParcelas(
   /** Mês de fechamento da fatura da 1ª parcela ('YYYY-MM'); por padrão vem da data da compra. */
   mesPrimeiraParcela?: string
 ): Omit<NovaParcela, 'id'>[] {
-  const valorBase = arredondar(compra.valorTotal / compra.numParcelas);
-  const somaAntesDaUltima = arredondar(valorBase * (compra.numParcelas - 1));
-  const valorUltima = arredondar(compra.valorTotal - somaAntesDaUltima);
+  const valores = dividirEmParcelas(compra.valorTotal, compra.numParcelas);
 
   const mesInicial = mesPrimeiraParcela
     ? parseISO(`${mesPrimeiraParcela}-01`)
@@ -31,7 +26,7 @@ export function gerarParcelas(
     compraParceladaId: compra.id,
     contaFixaId: null,
     numero: i + 1,
-    valor: i === compra.numParcelas - 1 ? valorUltima : valorBase,
+    valor: valores[i],
     mesReferencia: format(addMonths(mesInicial, i), 'yyyy-MM'),
     faturaId: null,
     status: 'pendente' as const,

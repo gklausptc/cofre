@@ -4,7 +4,7 @@ export type TransacaoExtrato = {
   /** ISO 'YYYY-MM-DD' */
   data: string;
   descricao: string;
-  /** Com sinal: em conta, negativo = saída; em fatura de cartão, negativo = pagamento/estorno. */
+  /** Em centavos, com sinal: em conta, negativo = saída; em fatura de cartão, negativo = pagamento/estorno. */
   valor: number;
 };
 

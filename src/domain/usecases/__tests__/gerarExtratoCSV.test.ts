@@ -49,9 +49,9 @@ describe('formatação CSV', () => {
     expect(formatarCampoCSV('diz "oi"')).toBe('"diz ""oi"""');
   });
 
-  it('valor com vírgula decimal e duas casas', () => {
-    expect(formatarValorCSV(1234.5)).toBe('1234,50');
-    expect(formatarValorCSV(-10)).toBe('-10,00');
+  it('centavos viram valor com vírgula decimal e duas casas', () => {
+    expect(formatarValorCSV(123450)).toBe('1234,50');
+    expect(formatarValorCSV(-1000)).toBe('-10,00');
   });
 
   it('começa com BOM, separa com ; e termina cada linha com CRLF', () => {

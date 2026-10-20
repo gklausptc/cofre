@@ -4,7 +4,7 @@ import {
   parseCSV,
   parseDataExtrato,
   parseOFX,
-  parseValorMonetario,
+  parseValorEmCentavos,
   pareceArquivoBinario,
   removerBOM,
   temCaracteresInvalidos,
@@ -32,12 +32,16 @@ describe('parseCSV', () => {
   });
 });
 
-describe('parseValorMonetario', () => {
-  it('entende o formato brasileiro e o com ponto decimal', () => {
-    expect(parseValorMonetario('1.234,56')).toBe(1234.56);
-    expect(parseValorMonetario('1234.56')).toBe(1234.56);
-    expect(parseValorMonetario('-50,00')).toBe(-50);
-    expect(parseValorMonetario('R$ 10,5')).toBe(10.5);
+describe('parseValorEmCentavos', () => {
+  it('entende o formato brasileiro e o com ponto decimal, em centavos', () => {
+    expect(parseValorEmCentavos('1.234,56')).toBe(123456);
+    expect(parseValorEmCentavos('1234.56')).toBe(123456);
+    expect(parseValorEmCentavos('-50,00')).toBe(-5000);
+    expect(parseValorEmCentavos('R$ 10,5')).toBe(1050);
+  });
+
+  it('entende o formato americano com separador de milhar', () => {
+    expect(parseValorEmCentavos('1,234.56')).toBe(123456);
   });
 });
 
@@ -76,10 +80,10 @@ describe('parseOFX', () => {
     '</BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>',
   ].join('\r\n');
 
-  it('lê data, valor com sinal e descrição (MEMO ou NAME); pula transação sem valor', () => {
+  it('lê data, valor em centavos com sinal e descrição (MEMO ou NAME); pula transação sem valor', () => {
     expect(parseOFX(ofx)).toEqual([
-      { data: '2026-03-05', descricao: 'PADARIA DO ZE', valor: -50 },
-      { data: '2026-03-06', descricao: 'SALARIO', valor: 1500.5 },
+      { data: '2026-03-05', descricao: 'PADARIA DO ZE', valor: -5000 },
+      { data: '2026-03-06', descricao: 'SALARIO', valor: 150050 },
     ]);
   });
 });
