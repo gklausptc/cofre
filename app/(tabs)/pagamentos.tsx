@@ -2,11 +2,12 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { MonthSelector } from '@/components/MonthSelector';
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
+import { Button } from '@/components/Button';
 import { AjusteValorModal } from '@/components/AjusteValorModal';
 import { PagarFaturaModal } from '@/components/PagarFaturaModal';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
@@ -54,7 +55,17 @@ export default function PagamentosScreen() {
   const { contas, carregar: carregarContas } = useContasBancariasStore();
 
   const hoje = hojeIso();
+  // vindo de uma notificação: /pagamentos?mes=2026-10&item=parcela-12 (ou fatura-3), &paga=1 se já deu baixa
+  const params = useLocalSearchParams<{ mes?: string; item?: string; paga?: string }>();
   const [mes, setMes] = useState(MES_ATUAL);
+  const [destaque, setDestaque] = useState<{ item: string; paga: boolean } | null>(null);
+  const [paramsLidos, setParamsLidos] = useState<string | null>(null);
+  const chaveDosParams = `${params.mes ?? ''}|${params.item ?? ''}|${params.paga ?? ''}`;
+  if (chaveDosParams !== paramsLidos) {
+    setParamsLidos(chaveDosParams);
+    if (params.mes && /^\d{4}-\d{2}$/.test(params.mes)) setMes(params.mes);
+    setDestaque(params.item ? { item: params.item, paga: params.paga === '1' } : null);
+  }
   const [itemEmEdicao, setItemEmEdicao] = useState<ItemPagamento | null>(null);
   const [grupoEmPagamento, setGrupoEmPagamento] = useState<GrupoPagamento | null>(null);
 
@@ -82,6 +93,20 @@ export default function PagamentosScreen() {
     () => calcularPagamentosDoMes(contasFixas, parcelas, compras, cartoes, gastos, faturas, mes),
     [contasFixas, parcelas, compras, cartoes, gastos, faturas, mes]
   );
+
+  const itemDestacado = (() => {
+    if (!destaque) return null;
+    if (destaque.item.startsWith('fatura-')) {
+      const cartaoId = Number(destaque.item.slice('fatura-'.length));
+      const grupo = pagamentos.grupos.find((g) => g.cartao?.id === cartaoId) ?? null;
+      return grupo ? { tipo: 'fatura' as const, grupo } : null;
+    }
+    for (const grupo of pagamentos.grupos) {
+      const item = grupo.itens.find((i) => i.chave === destaque.item);
+      if (item) return { tipo: 'item' as const, item, grupo };
+    }
+    return null;
+  })();
 
   async function handleConfirmarAjuste(novoValor: number, justificativa: string) {
     if (!itemEmEdicao) return;
@@ -122,6 +147,42 @@ export default function PagamentosScreen() {
         />
 
         <View style={{ paddingHorizontal: 20, gap: 12 }}>
+          {itemDestacado && (
+            <Card style={{ borderColor: colors.brand }}>
+              {itemDestacado.tipo === 'item' ? (
+                <>
+                  <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15 }}>
+                    {itemDestacado.item.nome} · {formatarMoeda(itemDestacado.item.valor)}
+                  </Text>
+                  <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginTop: 2, marginBottom: 12 }}>
+                    {itemDestacado.item.paga
+                      ? 'Marcada como paga.'
+                      : (prazoDoItem(itemDestacado.item, hoje)?.texto ?? itemDestacado.item.detalhe)}
+                  </Text>
+                  {!itemDestacado.item.paga && itemDestacado.item.tipo === 'parcela' && itemDestacado.grupo.cartao === null ? (
+                    <Button titulo="Marcar como paga" onPress={() => marcarPaga(itemDestacado.item.origemId)} />
+                  ) : (
+                    <Button titulo="Ok" variante="secundaria" onPress={() => setDestaque(null)} />
+                  )}
+                </>
+              ) : (
+                <>
+                  <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15 }}>
+                    {itemDestacado.grupo.titulo} · {formatarMoeda(itemDestacado.grupo.pendente)}
+                  </Text>
+                  <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginTop: 2, marginBottom: 12 }}>
+                    {itemDestacado.grupo.faturaPaga ? 'Fatura paga.' : (prazoDoGrupo(itemDestacado.grupo, hoje)?.texto ?? '')}
+                  </Text>
+                  {!itemDestacado.grupo.faturaPaga && itemDestacado.grupo.pendente > 0 ? (
+                    <Button titulo="Pagar fatura" onPress={() => setGrupoEmPagamento(itemDestacado.grupo)} />
+                  ) : (
+                    <Button titulo="Ok" variante="secundaria" onPress={() => setDestaque(null)} />
+                  )}
+                </>
+              )}
+            </Card>
+          )}
+
           <Card>
             <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12 }}>
               Falta pagar

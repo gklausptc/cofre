@@ -13,6 +13,9 @@ const PADRAO: Omit<Preferencias, 'id'> = {
   taxaCdiAnual: null,
   taxaSelicAnual: null,
   taxasAtualizadasEm: null,
+  configNotificacoes: null,
+  adiamentosNotificacoes: null,
+  permissaoNotificacoesPedida: false,
 };
 
 export async function buscarPreferencias(): Promise<Preferencias> {

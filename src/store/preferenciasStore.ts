@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { repositorios } from '@/domain/repositories';
 import type { Preferencias, PreferenciasAtualizaveis } from '@/domain/types/entities';
+import { pedirReagendamento } from '@/core/notifications/agendador';
 
 const repo = () => repositorios().preferencias;
 
@@ -24,5 +25,6 @@ export const usePreferenciasStore = create<PreferenciasState>((set, get) => ({
   atualizar: async (dados) => {
     await repo().atualizarPreferencias(dados);
     await get().carregar();
+    pedirReagendamento();
   },
 }));

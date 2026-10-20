@@ -3,6 +3,7 @@ import { repositorios } from '@/domain/repositories';
 import type { Parcela } from '@/domain/types/entities';
 import { hojeIso } from '@/core/utils/date';
 import { planejarPagamentoContaFixa } from '@/domain/usecases/pagarFatura';
+import { pedirReagendamento } from '@/core/notifications/agendador';
 
 const repo = () => repositorios().parcelas;
 
@@ -36,10 +37,12 @@ export const useParcelasStore = create<ParcelasState>((set, get) => ({
       await repos.movimentacoes.registrarPagamentoVinculado({ parcelaId: plano.parcelaId }, plano.saida);
     });
     await get().carregar();
+    pedirReagendamento();
   },
 
   ajustarValor: async (id, novoValor, justificativa) => {
     await repo().ajustarValorParcela(id, novoValor, justificativa);
     await get().carregar();
+    pedirReagendamento();
   },
 }));

@@ -17,6 +17,7 @@ import type { ContaFixa } from '@/domain/types/entities';
 import { useCartoesStore } from '@/store/cartoesStore';
 import { addMonths, format, parseISO } from 'date-fns';
 import { hojeIso } from '@/core/utils/date';
+import { pedirPermissaoNaPrimeiraVez } from '@/core/notifications/agendador';
 
 function calcularDataFim(dataInicio: string, numParcelas: string, recorrencia: ContaFixa['recorrencia']): string | null {
   const total = parseInt(numParcelas, 10);
@@ -93,6 +94,8 @@ export default function NovaContaFixaScreen() {
         dataFim: calcularDataFim(dataInicio, numParcelas, recorrencia),
         membroId,
       });
+      // a primeira conta fixa é a hora de pedir a permissão de notificação (não na abertura do app)
+      pedirPermissaoNaPrimeiraVez().catch(() => {});
       router.back();
     } finally {
       setSalvando(false);

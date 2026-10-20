@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { repositorios } from '@/domain/repositories';
 import type { RegistroDeImportacao } from '@/domain/repositories/importacoesRepository';
 import type { Importacao } from '@/domain/types/entities';
+import { pedirReagendamento } from '@/core/notifications/agendador';
 
 const repo = () => repositorios().importacoes;
 
@@ -24,11 +25,13 @@ export const useImportacoesStore = create<ImportacoesState>((set, get) => ({
   importar: async (registro) => {
     const id = await repo().registrarImportacao(registro);
     await get().carregar();
+    pedirReagendamento();
     return id;
   },
 
   desfazer: async (id) => {
     await repo().desfazerImportacao(id);
     await get().carregar();
+    pedirReagendamento();
   },
 }));

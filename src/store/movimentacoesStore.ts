@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { repositorios } from '@/domain/repositories';
 import type { Movimentacao, NovaMovimentacao } from '@/domain/types/entities';
+import { pedirReagendamento } from '@/core/notifications/agendador';
 
 const repo = () => repositorios().movimentacoes;
 
@@ -26,15 +27,18 @@ export const useMovimentacoesStore = create<MovimentacoesState>((set, get) => ({
   criar: async (dados) => {
     await repo().criarMovimentacao(dados);
     await get().carregar();
+    pedirReagendamento();
   },
 
   atualizar: async (id, dados) => {
     await repo().atualizarMovimentacao(id, dados);
     await get().carregar();
+    pedirReagendamento();
   },
 
   remover: async (id) => {
     await repo().excluirMovimentacao(id);
     await get().carregar();
+    pedirReagendamento();
   },
 }));

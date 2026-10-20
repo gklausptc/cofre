@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { repositorios } from '@/domain/repositories';
 import type { DadosEdicaoCompra } from '@/domain/repositories/comprasParceladasRepository';
 import type { CompraParcelada, NovaCompraParcelada } from '@/domain/types/entities';
+import { pedirReagendamento } from '@/core/notifications/agendador';
 
 const repo = () => repositorios().comprasParceladas;
 
@@ -26,10 +27,12 @@ export const useComprasParceladasStore = create<ComprasParceladasState>((set, ge
   criar: async (dados, mesPrimeiraParcela) => {
     await repo().criarCompraParcelada(dados, mesPrimeiraParcela);
     await get().carregar();
+    pedirReagendamento();
   },
 
   editar: async (id, dados) => {
     await repo().editarCompraParcelada(id, dados);
     await get().carregar();
+    pedirReagendamento();
   },
 }));

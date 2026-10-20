@@ -92,6 +92,13 @@
       "when": 1792469828960,
       "tag": "0012_nostalgic_vampiro",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1792471350523,
+      "tag": "0013_cool_stature",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { repositorios } from '@/domain/repositories';
 import type { ContaFixa, NovaContaFixa } from '@/domain/types/entities';
+import { gerarRecorrencia } from '@/domain/usecases/gerarRecorrencia';
+import { pedirReagendamento } from '@/core/notifications/agendador';
 
 const repo = () => repositorios().contasFixas;
 
@@ -24,17 +26,24 @@ export const useContasFixasStore = create<ContasFixasState>((set, get) => ({
   },
 
   criar: async (dados) => {
-    await repo().criarContaFixa(dados);
+    const conta = await repo().criarContaFixa(dados);
+    // as próximas ocorrências já entram agora (antes só na próxima abertura do app)
+    const repos = repositorios();
+    const existentes = await repos.parcelas.listarParcelasPorContaFixa(conta.id);
+    await repos.parcelas.inserirParcelas(gerarRecorrencia([conta], existentes));
     await get().carregar();
+    pedirReagendamento();
   },
 
   atualizar: async (id, dados) => {
     await repo().atualizarContaFixa(id, dados);
     await get().carregar();
+    pedirReagendamento();
   },
 
   remover: async (id) => {
     await repo().desativarContaFixa(id);
     await get().carregar();
+    pedirReagendamento();
   },
 }));

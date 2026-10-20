@@ -3,6 +3,7 @@ import { repositorios } from '@/domain/repositories';
 import { planejarResposta, type RespostaPergunta } from '@/domain/usecases/importacao/responderPergunta';
 import type { PerguntaPendente } from '@/domain/types/entities';
 import type { DadosDaPergunta } from '@/domain/types/perguntas';
+import { pedirReagendamento } from '@/core/notifications/agendador';
 
 const repo = () => repositorios().perguntas;
 
@@ -30,5 +31,6 @@ export const usePerguntasStore = create<PerguntasState>((set, get) => ({
     const plano = planejarResposta(dadosDaPergunta(pergunta), resposta, { agora: new Date(), cartoes, gastos });
     await repo().responder(pergunta.id, plano);
     await get().carregar();
+    pedirReagendamento();
   },
 }));

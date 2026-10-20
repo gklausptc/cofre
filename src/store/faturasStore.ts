@@ -3,6 +3,7 @@ import { repositorios } from '@/domain/repositories';
 import { planejarPagamentoFatura, type PedidoPagamentoFatura } from '@/domain/usecases/pagarFatura';
 import { hojeIso } from '@/core/utils/date';
 import type { Fatura } from '@/domain/types/entities';
+import { pedirReagendamento } from '@/core/notifications/agendador';
 
 const repo = () => repositorios().faturas;
 
@@ -30,5 +31,6 @@ export const useFaturasStore = create<FaturasState>((set, get) => ({
       await repos.movimentacoes.registrarPagamentoVinculado({ faturaId }, plano.saida);
     });
     await get().carregar();
+    pedirReagendamento();
   },
 }));

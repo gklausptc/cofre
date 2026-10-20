@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { repositorios } from '@/domain/repositories';
 import type { GastoRapido, NovoGastoRapido } from '@/domain/types/entities';
+import { pedirReagendamento } from '@/core/notifications/agendador';
 
 const repo = () => repositorios().gastosRapidos;
 
@@ -27,20 +28,24 @@ export const useGastosRapidosStore = create<GastosRapidosState>((set, get) => ({
   criar: async (dados) => {
     await repo().criarGastoRapido(dados);
     await get().carregar();
+    pedirReagendamento();
   },
 
   atualizar: async (id, dados) => {
     await repo().atualizarGastoRapido(id, dados);
     await get().carregar();
+    pedirReagendamento();
   },
 
   remover: async (id) => {
     await repo().excluirGastoRapido(id);
     await get().carregar();
+    pedirReagendamento();
   },
 
   ajustarValor: async (id, novoValor, justificativa) => {
     await repo().ajustarValorGasto(id, novoValor, justificativa);
     await get().carregar();
+    pedirReagendamento();
   },
 }));

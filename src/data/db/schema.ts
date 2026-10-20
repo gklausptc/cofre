@@ -213,6 +213,12 @@ export const preferencias = sqliteTable('preferencias', {
   taxaCdiAnual: integer('taxa_cdi_anual'),
   taxaSelicAnual: integer('taxa_selic_anual'),
   taxasAtualizadasEm: text('taxas_atualizadas_em'),
+  // Notificações: configuração por tipo (JSON de ConfigNotificacoes; null = padrão), os
+  // "Lembrar amanhã" pendentes (JSON id → ISO) e se a permissão já foi pedida (o pedido é
+  // feito na primeira conta fixa, não na abertura do app).
+  configNotificacoes: text('config_notificacoes'),
+  adiamentosNotificacoes: text('adiamentos_notificacoes'),
+  permissaoNotificacoesPedida: integer('permissao_notificacoes_pedida', { mode: 'boolean' }).notNull().default(false),
 });
 
 export const importacoes = sqliteTable('importacoes', {

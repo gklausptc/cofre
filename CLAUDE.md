@@ -147,6 +147,14 @@ A fonte da verdade é `src/data/db/schema.ts`; toda mudança é uma migration no
 - **Resultado e desfazer**: `resumirImportacao` (entradas, gastos por categoria, comparação com o mês anterior, `detectarForaDoPadrao`) alimenta `app/importar-extrato/resultado.tsx`, com o `GraficoProjecao` (também no Planejamento). `desfazerImportacao` (repositório) apaga as linhas da importação e volta tudo o que está em `efeitos` (parcelas, faturas, lançamentos alterados, compras/contas fixas criadas pelas respostas, gastos antigos que viraram parcela); `importacoesQueDependem` impede desfazer uma importação usada por outra mais nova. As regras aprendidas continuam.
 - **`analisarImportacao(extrato, destino, existentes, inteligencia)`** junta tudo e monta o resumo; **`montarRegistroDeImportacao`** devolve o que gravar (linhas, baixas, alterações, regras novas), e `registrarImportacao` grava numa transação só, guardando os `efeitos`.
 
+**Cofre 2.0 — notificações (Fase 3):**
+
+- Só locais (`expo-notifications`); no Expo Go Android o módulo não existe e tudo vira no-op (`notificacoesIndisponiveis`).
+- **`planejarNotificacoes`** (puro, `src/domain/usecases/notificacoes/`) decide tudo o que deve estar agendado a partir de `obterLancamentosDoPeriodo`: vencimento de conta fixa e de fatura (agrupados por dia), fechamento da fatura, conta atrasada, parcelas do mês, fechamento do mês, resumo semanal, lembrete de importar e de backup. Nada entre 21h e 8h, no máximo 60 agendadas (limite do iOS é 64). Configuração por tipo em `preferencias.config_notificacoes` (`lerConfigNotificacoes`), adiamentos ("Lembrar amanhã") em `preferencias.adiamentos_notificacoes`.
+- **`reagendarTodas()`** (`src/core/notifications/agendador.ts`) cancela e reagenda; roda ao abrir, ao voltar do segundo plano e, com `pedirReagendamento()` (debounce), depois de qualquer mutação nos stores. A permissão é pedida na primeira conta fixa (`pedirPermissaoNaPrimeiraVez`) ou em Configurações → Notificações, nunca na abertura.
+- Ações: "Marcar como paga" (conta fixa) e "Lembrar amanhã"; tocar abre a tela pelo `url` (ex.: `/pagamentos?mes=2026-10&item=parcela-12`, que já mostra o botão de marcar como paga). Tratado em `src/components/RespostasDeNotificacao.tsx`.
+- Marcos de cofrinho (25/50/75/100%) avisam na hora (`marcoAtingido`).
+
 ## 8. Rotas / telas a criar (Expo Router)
 
 | Rota | Conteúdo |

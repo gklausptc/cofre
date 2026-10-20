@@ -238,6 +238,18 @@ export default function ConfiguracoesScreen() {
 
           <Card>
             <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15, marginBottom: 4 }}>
+              Notificações
+            </Text>
+            <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginBottom: 16 }}>
+              Vencimentos, fechamento da fatura, contas atrasadas, metas e lembretes. Escolha o que quer receber.
+            </Text>
+            <Button titulo="Notificações" variante="secundaria" onPress={() => router.push('/configuracoes/notificacoes')} />
+          </Card>
+
+          <View style={{ height: 16 }} />
+
+          <Card>
+            <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15, marginBottom: 4 }}>
               Rendimento das metas
             </Text>
             <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginBottom: 16 }}>

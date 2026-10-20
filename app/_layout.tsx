@@ -17,6 +17,7 @@ import { usePreferenciasStore } from '@/store/preferenciasStore';
 import { useBloqueioStore } from '@/store/bloqueioStore';
 import { AppLockScreen } from '@/components/AppLockScreen';
 import { Button } from '@/components/Button';
+import { RespostasDeNotificacao } from '@/components/RespostasDeNotificacao';
 import {
   agendarLembretesDoDia,
   inicializarRepositorios,
@@ -136,6 +137,7 @@ function RootNavigator() {
   return (
     <>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+      <RespostasDeNotificacao />
       <Stack
         screenOptions={{
           headerShown: false,
@@ -174,6 +176,7 @@ function RootNavigator() {
         <Stack.Screen name="configuracoes/index" options={{ headerShown: true, title: 'Configurações' }} />
         <Stack.Screen name="backup/index" options={{ headerShown: true, title: 'Backup e restauração' }} />
         <Stack.Screen name="configuracoes/taxas" options={{ headerShown: true, title: 'Taxas de referência' }} />
+        <Stack.Screen name="configuracoes/notificacoes" options={{ headerShown: true, title: 'Notificações' }} />
       </Stack>
     </>
   );
