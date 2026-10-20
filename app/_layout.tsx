@@ -187,6 +187,7 @@ function RootNavigator() {
         <Stack.Screen name="cartao/[id]" options={{ headerShown: true, title: 'Cartão' }} />
         <Stack.Screen name="compra-parcelada/novo" options={{ headerShown: true, title: 'Nova compra parcelada' }} />
         <Stack.Screen name="compra-parcelada/[id]" options={{ headerShown: true, title: 'Editar compra parcelada' }} />
+        <Stack.Screen name="metas/index" options={{ headerShown: true, title: 'Metas financeiras' }} />
         <Stack.Screen name="cofrinho/index" options={{ headerShown: true, title: 'Cofrinhos' }} />
         <Stack.Screen name="cofrinho/novo" options={{ headerShown: true, title: 'Novo cofrinho' }} />
         <Stack.Screen name="cofrinho/[id]" options={{ headerShown: true, title: 'Cofrinho' }} />

@@ -110,7 +110,7 @@ export default function DetalheCofrinhoScreen() {
           percentual={progresso.percentual}
           legenda={
             progresso.previsaoMeses
-              ? `Previsão: ${progresso.previsaoMeses} mês${progresso.previsaoMeses === 1 ? '' : 'es'} no ritmo atual`
+              ? `Previsão: ${progresso.previsaoMeses} ${progresso.previsaoMeses === 1 ? 'mês' : 'meses'} no ritmo atual`
               : undefined
           }
         />

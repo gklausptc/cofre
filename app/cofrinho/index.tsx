@@ -10,6 +10,7 @@ import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { useCofrinhosStore } from '@/store/cofrinhosStore';
 import { useAportesCofrinhoStore } from '@/store/aportesCofrinhoStore';
 import { calcularProgressoCofrinho } from '@/domain/usecases/calcularProgressoCofrinho';
+import { legendaDoCofrinho } from '@/domain/usecases/resumirMetasFinanceiras';
 
 export default function CofrinhosScreen() {
   const { colors } = useAppTheme();
@@ -50,13 +51,7 @@ export default function CofrinhosScreen() {
                     valorAtual={progresso.valorAtual}
                     valorMeta={cofrinho.valorMeta}
                     percentual={progresso.percentual}
-                    legenda={
-                      cofrinho.status === 'concluido'
-                        ? 'Meta concluída 🎉'
-                        : progresso.previsaoMeses
-                          ? `Previsão: ${progresso.previsaoMeses} mês${progresso.previsaoMeses === 1 ? '' : 'es'}`
-                          : undefined
-                    }
+                    legenda={legendaDoCofrinho(cofrinho, progresso)}
                   />
                 </Pressable>
               );

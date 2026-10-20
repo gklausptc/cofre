@@ -6,6 +6,7 @@ import type {
   AporteCofrinho,
   Cartao,
   Categoria,
+  Cofrinho,
   CompraParcelada,
   ContaBancaria,
   ContaFixa,
@@ -164,6 +165,19 @@ export function umAporte(dados: Partial<AporteCofrinho> = {}): AporteCofrinho {
     cofrinhoId: 1,
     valor: 0,
     data: '2026-01-01',
+    ...dados,
+  };
+}
+
+export function umCofrinho(dados: Partial<Cofrinho> = {}): Cofrinho {
+  return {
+    id: proximoId(),
+    nome: 'Cofrinho',
+    valorMeta: 0,
+    dataMeta: null,
+    cor: '#06B6D4',
+    icone: 'gift',
+    status: 'ativo',
     ...dados,
   };
 }
