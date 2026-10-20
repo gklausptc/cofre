@@ -17,7 +17,7 @@ import {
   sugerirMetaDaReserva,
 } from '@/domain/usecases/automacoes/simuladores';
 import { lerDivisao, salarioParaDividir, sugerirDivisao } from '@/domain/usecases/automacoes/divisaoSalario';
-import { primeiroDiaNegativo } from '@/domain/usecases/automacoes/saldoProjetado';
+import { menorSaldoPrevisto, primeiroDiaNegativo } from '@/domain/usecases/automacoes/saldoProjetado';
 import { gerarInsights } from '@/domain/usecases/automacoes/insights';
 import { buscarLancamentos } from '@/domain/usecases/automacoes/busca';
 import { montarFechamentoDoMes, numerosDoMes } from '@/domain/usecases/automacoes/fechamentoDoMes';
@@ -350,5 +350,22 @@ describe('fechamento do mês e relatório', () => {
     for (const secao of ['Resumo', 'Saldo por conta', 'Despesas por categoria', 'Receita × despesa (6 meses)', 'Comprometido nos próximos 12 meses', 'Lançamentos']) {
       expect(html).toContain(`<h2>${secao}`);
     }
+  });
+});
+
+describe('menor saldo previsto', () => {
+  it('soma as contas e acha o dia mais baixo do período', () => {
+    const r = menorSaldoPrevisto({
+      saldoHoje: 100000,
+      lancamentos: [
+        lanc({ tipo: 'conta_fixa', status: 'previsto', data: '2026-10-23', valor: 70000 }),
+        lanc({ tipo: 'fatura', natureza: 'fatura', status: 'previsto', data: '2026-10-25', valor: 50000 }),
+        lanc({ tipo: 'movimentacao', natureza: 'receita', status: 'previsto', data: '2026-10-30', valor: 500000 }),
+        lanc({ tipo: 'conta_fixa', status: 'pago', data: '2026-10-05', valor: 99999 }),
+      ],
+      hoje: '2026-10-20',
+      ate: '2026-10-31',
+    });
+    expect(r).toEqual({ valor: -20000, data: '2026-10-25' });
   });
 });

@@ -60,3 +60,33 @@ export function primeiroDiaNegativo(params: {
   }
   return resultado.sort((a, b) => a.data.localeCompare(b.data));
 }
+
+/**
+ * Menor saldo previsto somando todas as contas, de hoje até `ate`: parte do saldo de hoje e
+ * aplica o que ainda vai sair (contas fixas fora do cartão, faturas) e entrar (entradas
+ * previstas). Devolve o valor e o dia. Para o "Menor saldo previsto: R$ 120 em 23/11".
+ */
+export function menorSaldoPrevisto(params: {
+  saldoHoje: number;
+  lancamentos: Pick<LancamentoDoPeriodo, 'tipo' | 'natureza' | 'status' | 'data' | 'valor' | 'noCartao'>[];
+  hoje: string;
+  ate: string;
+}): { valor: number; data: string } {
+  const { saldoHoje, hoje, ate } = params;
+  const efeitos: { data: string; valor: number }[] = [];
+  for (const l of params.lancamentos) {
+    if (l.status === 'pago' || l.data > ate) continue;
+    const data = l.data < hoje ? hoje : l.data;
+    if (l.tipo === 'conta_fixa' && l.natureza === 'despesa' && !l.noCartao) efeitos.push({ data, valor: -l.valor });
+    else if (l.natureza === 'fatura') efeitos.push({ data, valor: -l.valor });
+    else if (l.natureza === 'receita' && l.data > hoje) efeitos.push({ data, valor: l.valor });
+  }
+  efeitos.sort((a, b) => a.data.localeCompare(b.data) || b.valor - a.valor);
+  let saldo = saldoHoje;
+  let menor = { valor: saldoHoje, data: hoje };
+  for (const e of efeitos) {
+    saldo += e.valor;
+    if (saldo < menor.valor) menor = { valor: saldo, data: e.data };
+  }
+  return menor;
+}

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { TextField } from '@/components/TextField';
 import { CurrencyInput } from '@/components/CurrencyInput';
 import { DateField } from '@/components/DateField';
@@ -84,7 +84,11 @@ export default function NovaMovimentacaoScreen() {
   const { categorias, carregar: carregarCategorias } = useCategoriasStore();
   const { membros, carregar: carregarMembros } = useMembrosFamiliaStore();
 
-  const [tipo, setTipo] = useState<TipoMovimentacao>('saida');
+  // a folha do (+) já abre com o tipo escolhido (?tipo=entrada|saida|transferencia)
+  const { tipo: tipoInicial } = useLocalSearchParams<{ tipo?: string }>();
+  const [tipo, setTipo] = useState<TipoMovimentacao>(
+    tipoInicial === 'entrada' || tipoInicial === 'transferencia' ? tipoInicial : 'saida'
+  );
   const [contaId, setContaId] = useState<number | null>(null);
   const [contaDestinoId, setContaDestinoId] = useState<number | null>(null);
   const [categoriaId, setCategoriaId] = useState<number | null>(null);

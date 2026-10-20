@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -11,6 +11,7 @@ import { ChipSelect } from '@/components/ChipSelect';
 import { CategoryPicker } from '@/components/CategoryPicker';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { useRegrasStore } from '@/store/regrasStore';
+import { useAvisoStore } from '@/store/avisoStore';
 import { useCategoriasStore } from '@/store/categoriasStore';
 import type { Categoria, ContatoPix, RegraCategorizacao } from '@/domain/types/entities';
 
@@ -42,16 +43,11 @@ function descreverRegra(regra: RegraCategorizacao, categorias: Categoria[]): str
   return ACOES.find((a) => a.valor === regra.acao)?.rotulo ?? regra.acao;
 }
 
-function confirmarExclusao(titulo: string, onConfirmar: () => void) {
-  Alert.alert(titulo, 'As próximas importações deixam de usar isso. O que já foi importado não muda.', [
-    { text: 'Cancelar', style: 'cancel' },
-    { text: 'Excluir', style: 'destructive', onPress: onConfirmar },
-  ]);
-}
 
 function CartaoDaRegra({ regra, categorias }: { regra: RegraCategorizacao; categorias: Categoria[] }) {
   const { colors } = useAppTheme();
-  const { atualizarRegra, excluirRegra } = useRegrasStore();
+  const { atualizarRegra, excluirRegra, criarRegra } = useRegrasStore();
+  const mostrarAviso = useAvisoStore((s) => s.mostrar);
   const [aberta, setAberta] = useState(false);
   const tipoDaCategoria = regra.natureza === 'receita' ? 'receita' : regra.natureza === 'despesa' ? 'despesa' : undefined;
 
@@ -88,7 +84,12 @@ function CartaoDaRegra({ regra, categorias }: { regra: RegraCategorizacao; categ
           <Button
             titulo="Excluir regra"
             variante="secundaria"
-            onPress={() => confirmarExclusao('Excluir esta regra?', () => excluirRegra(regra.id))}
+            onPress={async () => {
+              await excluirRegra(regra.id);
+              const { id: _id, ...dados } = regra;
+              void _id;
+              mostrarAviso({ mensagem: 'Regra excluída', desfazer: () => void criarRegra(dados) });
+            }}
           />
         </View>
       )}
@@ -98,7 +99,8 @@ function CartaoDaRegra({ regra, categorias }: { regra: RegraCategorizacao; categ
 
 function CartaoDoContato({ contato, categorias }: { contato: ContatoPix; categorias: Categoria[] }) {
   const { colors } = useAppTheme();
-  const { atualizarContato, excluirContato } = useRegrasStore();
+  const { atualizarContato, excluirContato, salvarContato } = useRegrasStore();
+  const mostrarAviso = useAvisoStore((s) => s.mostrar);
   const [aberto, setAberto] = useState(false);
   const categoria = categorias.find((c) => c.id === contato.categoriaId);
   const tipo = TIPOS_DE_CONTATO.find((t) => t.valor === contato.tipo)?.rotulo ?? contato.tipo;
@@ -130,7 +132,12 @@ function CartaoDoContato({ contato, categorias }: { contato: ContatoPix; categor
           <Button
             titulo="Excluir contato"
             variante="secundaria"
-            onPress={() => confirmarExclusao('Excluir este contato?', () => excluirContato(contato.id))}
+            onPress={async () => {
+              await excluirContato(contato.id);
+              const { id: _id, ...dados } = contato;
+              void _id;
+              mostrarAviso({ mensagem: 'Contato excluído', desfazer: () => void salvarContato(dados) });
+            }}
           />
         </View>
       )}

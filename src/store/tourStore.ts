@@ -12,34 +12,35 @@ export type PassoTour = {
 
 export const PASSOS_TOUR: PassoTour[] = [
   {
-    id: 'tema',
-    titulo: 'Troque o tema',
-    descricao: 'Toque aqui pra alternar entre claro, escuro e o tema do sistema.',
+    id: 'acoes-rapidas',
+    titulo: 'Comece importando o extrato',
+    descricao:
+      'Toque em Importar extrato (ou no + embaixo) e escolha o CSV ou OFX do seu banco. O app categoriza sozinho e só pergunta o que não souber.',
   },
   {
-    id: 'acoes-rapidas',
-    titulo: 'Ações rápidas',
-    descricao: 'Atalhos pra cadastrar movimentação, gasto rápido, conta bancária, conta fixa ou cofrinho sem navegar por menus.',
+    id: 'pendencias',
+    titulo: 'Responda as perguntas',
+    descricao: 'O que a importação não soube resolver aparece aqui. Cada resposta vira uma regra para as próximas vezes.',
+  },
+  {
+    id: 'livre',
+    titulo: 'Livre para gastar',
+    descricao: 'Quanto sobra até o fim do mês e quanto dá por dia. Toque para ver a conta.',
+  },
+  {
+    id: 'proximos',
+    titulo: 'Próximos 7 dias',
+    descricao: 'O que vence nesta semana. Toque em Paguei para dar baixa; o resto fica na aba Agenda.',
   },
   {
     id: 'saldo',
-    titulo: 'Saldo em contas',
-    descricao: 'O total de todas as suas contas bancárias. Toque no card pra ver o detalhe de cada uma.',
+    titulo: 'Seu dinheiro',
+    descricao: 'Saldo nas contas, faturas em aberto e o que está guardado. Cada linha abre o detalhe.',
   },
   {
-    id: 'resumo-mes',
-    titulo: 'Resumo do mês',
-    descricao: 'Quanto entrou, quanto saiu e o saldo do mês. Toque pra abrir o relatório completo.',
-  },
-  {
-    id: 'gastos-fixos',
-    titulo: 'Gastos fixos do mês',
-    descricao: 'Contas fixas que vencem este mês, com o que já foi pago e o que ainda falta.',
-  },
-  {
-    id: 'fab',
-    titulo: 'Gasto rápido',
-    descricao: 'Registre um gasto em segundos a qualquer momento, tocando neste botão.',
+    id: 'menu',
+    titulo: 'Tudo o mais',
+    descricao: 'Cartões, contas, relatórios, regras aprendidas, notificações e backup ficam aqui.',
   },
 ];
 

@@ -134,7 +134,7 @@ export function planejarNotificacoes(entrada: EntradaDoPlanejamento): Notificaca
         corpo: ehFatura ? `${formatarMoeda(l.valor)} previstos.` : `${formatarMoeda(l.valor)}. Toque para marcar como paga.`,
         data,
         categoria: ehFatura ? 'lembrete' : 'conta_fixa',
-        url: ehFatura ? `/pagamentos?mes=${l.competencia}&item=fatura-${cartaoId}` : `/pagamentos?mes=${mes}&item=${l.id}`,
+        url: ehFatura ? `/agenda?mes=${l.competencia}&item=fatura-${cartaoId}` : `/agenda?mes=${mes}&item=${l.id}`,
         parcelaId: ehFatura ? null : parcelaDoId(l.id),
       });
     } else {
@@ -147,7 +147,7 @@ export function planejarNotificacoes(entrada: EntradaDoPlanejamento): Notificaca
         corpo: `${formatarMoeda(total)}: ${itens.map((i) => i.lancamento.descricao).join(', ')}.`,
         data,
         categoria: 'lembrete',
-        url: `/pagamentos?mes=${mes}`,
+        url: `/agenda?mes=${mes}`,
         parcelaId: null,
       });
     }
@@ -191,7 +191,7 @@ export function planejarNotificacoes(entrada: EntradaDoPlanejamento): Notificaca
         corpo: `${formatarMoeda(l.valor)} ainda não ${ehFatura ? 'foi paga' : 'foi marcada como paga'}.`,
         data: disparo,
         categoria: ehFatura ? 'lembrete' : 'conta_fixa',
-        url: ehFatura ? `/pagamentos?mes=${l.competencia}&item=fatura-${l.cartaoId}` : `/pagamentos?mes=${l.data.slice(0, 7)}&item=${l.id}`,
+        url: ehFatura ? `/agenda?mes=${l.competencia}&item=fatura-${l.cartaoId}` : `/agenda?mes=${l.data.slice(0, 7)}&item=${l.id}`,
         parcelaId: ehFatura ? null : parcelaDoId(l.id),
       });
     }
@@ -210,7 +210,7 @@ export function planejarNotificacoes(entrada: EntradaDoPlanejamento): Notificaca
         corpo: `${doMes.length} ${doMes.length === 1 ? 'parcela' : 'parcelas'}, ${formatarMoeda(doMes.reduce((s, l) => s + l.valor, 0))} no total.`,
         data: noHorario(primeiroDoProximo, config.parcela_mes.hora),
         categoria: null,
-        url: `/pagamentos?mes=${proximoMes}`,
+        url: `/agenda?mes=${proximoMes}`,
         parcelaId: null,
       });
     }

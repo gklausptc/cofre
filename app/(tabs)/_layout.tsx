@@ -1,8 +1,41 @@
 import React from 'react';
-import { Tabs } from 'expo-router';
+import { Pressable, View } from 'react-native';
+import { Tabs, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
 
+/** Botão (+) do meio: abre a folha de ações em vez de trocar de aba. */
+function BotaoMais() {
+  const { colors } = useAppTheme();
+  const router = useRouter();
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <Pressable
+        onPress={() => router.push('/acoes')}
+        accessibilityRole="button"
+        accessibilityLabel="Lançar: gasto, entrada, transferência, compra parcelada ou importar extrato"
+        style={{
+          width: 52,
+          height: 52,
+          borderRadius: 26,
+          backgroundColor: colors.brand,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginTop: -14,
+          borderWidth: 3,
+          borderColor: colors.card,
+        }}
+      >
+        <Feather name="plus" size={26} color="#FFFFFF" />
+      </Pressable>
+    </View>
+  );
+}
+
+/**
+ * Cinco abas: Início · Extrato · (+) · Agenda · Metas. Cartões, Planejamento e Mais viraram
+ * telas (abrem pelo Início); Pagamentos está inteira dentro da Agenda.
+ */
 export default function TabsLayout() {
   const { colors } = useAppTheme();
 
@@ -30,38 +63,33 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="lancamentos"
         options={{
-          title: 'Lançamentos',
+          title: 'Extrato',
           tabBarIcon: ({ color, size }) => <Feather name="list" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="pagamentos"
+        name="novo"
         options={{
-          title: 'Pagamentos',
-          tabBarIcon: ({ color, size }) => <Feather name="check-square" size={size} color={color} />,
+          title: 'Lançar',
+          tabBarButton: () => <BotaoMais />,
         }}
       />
       <Tabs.Screen
-        name="cartoes"
+        name="agenda"
         options={{
-          title: 'Cartões',
-          tabBarIcon: ({ color, size }) => <Feather name="credit-card" size={size} color={color} />,
+          title: 'Agenda',
+          tabBarIcon: ({ color, size }) => <Feather name="calendar" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="planejamento"
+        name="metas"
         options={{
-          title: 'Planejamento',
-          tabBarIcon: ({ color, size }) => <Feather name="trending-up" size={size} color={color} />,
+          title: 'Metas',
+          tabBarIcon: ({ color, size }) => <Feather name="target" size={size} color={color} />,
         }}
       />
-      <Tabs.Screen
-        name="mais"
-        options={{
-          title: 'Mais',
-          tabBarIcon: ({ color, size }) => <Feather name="more-horizontal" size={size} color={color} />,
-        }}
-      />
+      <Tabs.Screen name="pagamentos" options={{ href: null }} />
+      <Tabs.Screen name="index" options={{ href: null }} />
     </Tabs>
   );
 }

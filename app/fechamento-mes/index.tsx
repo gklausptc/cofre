@@ -194,7 +194,7 @@ export default function FechamentoDoMesScreen() {
                   <Button titulo={`Responder ${perguntas.length} ${perguntas.length === 1 ? 'pergunta' : 'perguntas'} da importação`} variante="secundaria" onPress={() => router.push('/revisao')} />
                 )}
                 {atrasadas > 0 && (
-                  <Button titulo={`${atrasadas} ${atrasadas === 1 ? 'conta atrasada' : 'contas atrasadas'}`} variante="secundaria" onPress={() => router.push('/pagamentos')} />
+                  <Button titulo={`${atrasadas} ${atrasadas === 1 ? 'conta atrasada' : 'contas atrasadas'}`} variante="secundaria" onPress={() => router.push('/agenda')} />
                 )}
               </View>
             )}

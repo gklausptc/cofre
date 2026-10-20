@@ -12,7 +12,7 @@ import { NOME_DO_APP } from '@/core/marca';
 import { useOrcamentosStore } from '@/store/orcamentosStore';
 import { usePerguntasStore } from '@/store/perguntasStore';
 import { EmptyState } from '@/components/EmptyState';
-import { FabButton } from '@/components/FabButton';
+import { GraficoProjecao } from '@/components/GraficoProjecao';
 import { TourTarget } from '@/components/TourTarget';
 import { TourOverlay } from '@/components/TourOverlay';
 import { useTourStore } from '@/store/tourStore';
@@ -39,14 +39,19 @@ import { calcularGastosPorCategoria } from '@/domain/usecases/calcularGastosPorC
 import { calcularGastosFixosDoMes } from '@/domain/usecases/calcularGastosFixosDoMes';
 import { obterLancamentosDoPeriodo } from '@/domain/usecases/obterLancamentosDoPeriodo';
 import { calcularLivreParaGastar } from '@/domain/usecases/calcularLivreParaGastar';
+import { calcularPagamentosDoMes } from '@/domain/usecases/calcularPagamentosDoMes';
+import { projetarFluxoCaixa } from '@/domain/usecases/projetarFluxoCaixa';
 import { dataNoMes } from '@/domain/usecases/mesDaFatura';
-import { hojeIso, mesAnterior, mesAtualIso } from '@/core/utils/date';
+import { formatarData, hojeIso, mesAnterior, mesAtualIso } from '@/core/utils/date';
+import { addDays, format, getDaysInMonth, parseISO } from 'date-fns';
+import type { LancamentoDoPeriodo } from '@/domain/types/lancamento';
 
 const MES_ATUAL = mesAtualIso();
 
 type AcaoRapida = { icon: React.ComponentProps<typeof Feather>['name']; rotulo: string; href: Href };
 
 const ACOES_RAPIDAS: AcaoRapida[] = [
+  { icon: 'upload', rotulo: 'Importar extrato', href: '/importar-extrato' },
   { icon: 'arrow-up-right', rotulo: 'Movimentação', href: '/movimentacao/novo' },
   { icon: 'zap', rotulo: 'Gasto rápido', href: '/gasto-rapido' },
   { icon: 'dollar-sign', rotulo: 'Conta bancária', href: '/conta-bancaria/novo' },
@@ -74,7 +79,7 @@ export default function DashboardScreen() {
   const { aportes, carregar: carregarAportes } = useAportesCofrinhoStore();
   const { membros, carregar: carregarMembros } = useMembrosFamiliaStore();
   const { contas: contasFixas, carregar: carregarContasFixas } = useContasFixasStore();
-  const { parcelas, carregar: carregarParcelas } = useParcelasStore();
+  const { parcelas, carregar: carregarParcelas, marcarPaga } = useParcelasStore();
   const { cartoes, carregar: carregarCartoes } = useCartoesStore();
   const { faturas, carregar: carregarFaturas } = useFaturasStore();
   const { compras, carregar: carregarCompras } = useComprasParceladasStore();
@@ -84,6 +89,7 @@ export default function DashboardScreen() {
   const fecharAviso = useCallback(() => setAviso(null), []);
 
   const [membroSelecionadoId, setMembroSelecionadoId] = useState<number | null>(null);
+  const [verConta, setVerConta] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -220,6 +226,57 @@ export default function DashboardScreen() {
     [aportes]
   );
 
+  // próximos 7 dias e faturas em aberto, da lista unificada (com o filtro de membro)
+  const hoje = hojeIso();
+  const lancamentosProximos = useMemo(
+    () =>
+      obterLancamentosDoPeriodo(
+        format(addDays(parseISO(hoje), -35), 'yyyy-MM-dd'),
+        format(addDays(parseISO(hoje), 70), 'yyyy-MM-dd'),
+        {
+          movimentacoes: movimentacoesFiltradas,
+          gastos: gastosFiltrados,
+          parcelas: parcelasFiltradas,
+          contasFixas: contasFixasFiltradas,
+          comprasParceladas: comprasFiltradas,
+          cartoes,
+          faturas,
+        },
+        hoje
+      ),
+    [hoje, movimentacoesFiltradas, gastosFiltrados, parcelasFiltradas, contasFixasFiltradas, comprasFiltradas, cartoes, faturas]
+  );
+  const limiteDaSemana = format(addDays(parseISO(hoje), 7), 'yyyy-MM-dd');
+  const proximos = lancamentosProximos
+    .filter((l: LancamentoDoPeriodo) => l.status !== 'pago' && l.data <= limiteDaSemana)
+    .filter((l) => (l.tipo === 'conta_fixa' && !l.noCartao) || (l.tipo === 'fatura' && l.valor > 0) || (l.natureza === 'receita' && l.data >= hoje))
+    .sort((a, b) => a.data.localeCompare(b.data));
+  const faturasEmAberto = lancamentosProximos
+    .filter((l) => l.natureza === 'fatura' && l.status !== 'pago' && l.competencia >= MES_ATUAL)
+    .reduce((s, l) => s + l.valor, 0);
+  const pagamentosDoMes = useMemo(
+    () => calcularPagamentosDoMes(contasFixasFiltradas, parcelasFiltradas, comprasFiltradas, cartoes, gastosFiltrados, faturas, MES_ATUAL),
+    [contasFixasFiltradas, parcelasFiltradas, comprasFiltradas, cartoes, gastosFiltrados, faturas]
+  );
+  const projecao = useMemo(
+    () => projetarFluxoCaixa(3, parcelasFiltradas, movimentacoesFiltradas, gastosFiltrados, contasFixasFiltradas, comprasFiltradas, cartoes),
+    [parcelasFiltradas, movimentacoesFiltradas, gastosFiltrados, contasFixasFiltradas, comprasFiltradas, cartoes]
+  );
+
+  // ritmo: quanto do que sobrou para gastar no mês (fora do cartão) já foi gasto, contra o
+  // quanto do mês já passou
+  const diasNoMes = getDaysInMonth(parseISO(`${MES_ATUAL}-01`));
+  const diasPassados = Number(hoje.slice(8, 10));
+  const disponivelNoMes = livre.livre + livre.gastos;
+  const ritmo =
+    disponivelNoMes > 0
+      ? {
+          gasto: livre.gastos / disponivelNoMes,
+          esperado: diasPassados / diasNoMes,
+          diferenca: livre.gastos - Math.round((disponivelNoMes * diasPassados) / diasNoMes),
+        }
+      : null;
+
   const positivo = resumoMensal.saldo >= 0;
   const tema = preferencias?.tema ?? 'sistema';
 
@@ -241,6 +298,15 @@ export default function DashboardScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 20 }}>
           <ScreenHeader title={NOME_DO_APP} subtitle="Seu dinheiro, sob controle" />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Pressable
+            onPress={() => router.push('/busca')}
+            accessibilityRole="button"
+            accessibilityLabel="Buscar lançamentos"
+            style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Feather name="search" size={16} color={colors.brand} />
+          </Pressable>
           <TourTarget id="tema">
             <Pressable
               onPress={handleAlternarTema}
@@ -258,6 +324,17 @@ export default function DashboardScreen() {
               <Feather name={ICONE_TEMA[tema]} size={16} color={colors.brand} />
             </Pressable>
           </TourTarget>
+          <TourTarget id="menu">
+            <Pressable
+              onPress={() => router.push('/mais')}
+              accessibilityRole="button"
+              accessibilityLabel="Mais: contas, cartões, relatórios e configurações"
+              style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Feather name="menu" size={16} color={colors.brand} />
+            </Pressable>
+          </TourTarget>
+          </View>
         </View>
 
         {membros.length > 0 && (
@@ -314,6 +391,217 @@ export default function DashboardScreen() {
           </ScrollView>
         )}
 
+        <TourTarget id="livre" style={{ marginHorizontal: 20 }}>
+          <Pressable onPress={() => setVerConta((v) => !v)} accessibilityRole="button" accessibilityLabel="Livre para gastar. Toque para ver a conta">
+            <Card style={{ borderColor: livre.livre < 0 ? colors.danger : colors.border }}>
+              <Text className="font-body-medium" style={{ color: colors.textMuted, fontSize: 13 }}>
+                Livre para gastar até {formatarData(dataNoMes(MES_ATUAL, diasNoMes), 'dd/MM')}
+              </Text>
+              <Text
+                className="font-heading"
+                style={{ color: livre.livre < 0 ? colors.danger : colors.text, fontSize: 32, marginTop: 4, fontVariant: ['tabular-nums'] }}
+              >
+                {formatarMoeda(livre.livre)}
+              </Text>
+              <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                {livre.porDia > 0
+                  ? `≈ ${formatarMoeda(livre.porDia)} por dia nos próximos ${livre.diasRestantes} ${livre.diasRestantes === 1 ? 'dia' : 'dias'}`
+                  : livre.livre < 0
+                    ? 'As saídas previstas do mês já passam das entradas.'
+                    : 'Nada livre até o fim do mês.'}
+              </Text>
+              {ritmo && (
+                <View style={{ marginTop: 12 }}>
+                  <View style={{ height: 8, borderRadius: 4, backgroundColor: colors.border, overflow: 'hidden' }}>
+                    <View
+                      style={{
+                        width: `${Math.min(1, ritmo.gasto) * 100}%`,
+                        height: 8,
+                        backgroundColor: ritmo.diferenca > 0 ? colors.warning : colors.brand,
+                      }}
+                    />
+                  </View>
+                  <View
+                    style={{
+                      position: 'absolute',
+                      left: `${Math.min(1, ritmo.esperado) * 100}%`,
+                      top: -3,
+                      width: 2,
+                      height: 14,
+                      backgroundColor: colors.text,
+                    }}
+                  />
+                  <Text className="font-body" style={{ color: ritmo.diferenca > 0 ? colors.warning : colors.textMuted, fontSize: 11, marginTop: 6 }}>
+                    {ritmo.diferenca > 0
+                      ? `Acima do ritmo: ${formatarMoeda(ritmo.diferenca)} a mais do que o esperado até hoje`
+                      : 'Dentro do ritmo do mês'}
+                  </Text>
+                </View>
+              )}
+              {verConta && (
+                <View style={{ marginTop: 12, gap: 4, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border }}>
+                  {[
+                    { rotulo: 'Entradas do mês', valor: livre.receitas, sinal: '+' },
+                    { rotulo: 'Contas fixas', valor: livre.contasFixas, sinal: '−' },
+                    { rotulo: 'Faturas de cartão', valor: livre.faturas, sinal: '−' },
+                    { rotulo: 'Gastos fora do cartão', valor: livre.gastos, sinal: '−' },
+                    { rotulo: 'Guardado em metas', valor: livre.guardado, sinal: '−' },
+                  ].map((linha) => (
+                    <View key={linha.rotulo} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12 }}>
+                        {linha.rotulo}
+                      </Text>
+                      <Text className="font-body-medium" style={{ color: colors.text, fontSize: 12, fontVariant: ['tabular-nums'] }}>
+                        {linha.sinal} {formatarMoeda(linha.valor)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+              <Text className="font-body-medium" style={{ color: colors.brand, fontSize: 12, marginTop: 8 }}>
+                {verConta ? 'Esconder a conta' : 'Ver a conta'}
+              </Text>
+            </Card>
+          </Pressable>
+        </TourTarget>
+
+        <View style={{ height: 12 }} />
+        <TourTarget id="pendencias">
+          <AvisoPendencias quantidade={perguntas.length} />
+        </TourTarget>
+        <AutomacoesDoInicio onAvisar={(mensagem, desfazer) => setAviso({ mensagem, desfazer })} />
+
+        <TourTarget id="proximos" style={{ marginHorizontal: 20 }}>
+          <Card>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15 }}>
+                Próximos 7 dias
+              </Text>
+              <Pressable onPress={() => router.push('/agenda')} accessibilityRole="button" hitSlop={8}>
+                <Text className="font-body-medium" style={{ color: colors.brand, fontSize: 12 }}>
+                  Agenda
+                </Text>
+              </Pressable>
+            </View>
+            {proximos.length === 0 ? (
+              <Text className="font-body" style={{ color: colors.textMuted, fontSize: 13, marginTop: 6 }}>
+                Nada vence nos próximos 7 dias.
+              </Text>
+            ) : (
+              proximos.slice(0, 5).map((l) => {
+                const parcelaId = l.tipo === 'conta_fixa' ? Number(l.id.replace('parcela-', '')) : null;
+                return (
+                  <View
+                    key={l.id}
+                    style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border, marginTop: 6 }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text className="font-body-medium" style={{ color: colors.text, fontSize: 13 }} numberOfLines={1}>
+                        {l.descricao}
+                      </Text>
+                      <Text
+                        className="font-body"
+                        style={{ color: l.status === 'atrasado' ? colors.danger : colors.textMuted, fontSize: 11 }}
+                      >
+                        {l.status === 'atrasado'
+                          ? `Atrasada · venceu ${formatarData(l.data, 'dd/MM')}`
+                          : l.data === hoje
+                            ? 'Hoje'
+                            : formatarData(l.data, "EEE, dd/MM")}
+                        {` · ${formatarMoeda(l.valor)}`}
+                      </Text>
+                    </View>
+                    {parcelaId !== null && Number.isFinite(parcelaId) ? (
+                      <Pressable
+                        onPress={() => marcarPaga(parcelaId)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Marcar ${l.descricao} como paga`}
+                        style={{ minHeight: 36, paddingHorizontal: 12, justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: colors.brand }}
+                      >
+                        <Text className="font-body-medium" style={{ color: colors.brand, fontSize: 12 }}>
+                          Paguei
+                        </Text>
+                      </Pressable>
+                    ) : l.tipo === 'fatura' ? (
+                      <Pressable
+                        onPress={() => router.push(`/agenda?mes=${l.competencia}&item=fatura-${l.cartaoId}` as Href)}
+                        accessibilityRole="button"
+                        style={{ minHeight: 36, paddingHorizontal: 12, justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: colors.brand }}
+                      >
+                        <Text className="font-body-medium" style={{ color: colors.brand, fontSize: 12 }}>
+                          Pagar
+                        </Text>
+                      </Pressable>
+                    ) : (
+                      <Text className="font-body-medium" style={{ color: colors.success, fontSize: 12 }}>
+                        entrada
+                      </Text>
+                    )}
+                  </View>
+                );
+              })
+            )}
+            {pagamentosDoMes.total > 0 && (
+              <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginTop: 8 }}>
+                Falta pagar {formatarMoeda(pagamentosDoMes.totalPendente)} de {formatarMoeda(pagamentosDoMes.total)} este mês
+              </Text>
+            )}
+          </Card>
+        </TourTarget>
+
+        <View style={{ height: 12 }} />
+
+        <TourTarget id="saldo" style={{ marginHorizontal: 20 }}>
+          <Card style={{ paddingVertical: 4 }}>
+            <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15, paddingTop: 10 }}>
+              Seu dinheiro
+            </Text>
+            {[
+              { rotulo: 'Em contas', detalhe: `${contas.length} ${contas.length === 1 ? 'conta' : 'contas'}`, valor: saldoTotal, href: '/conta-bancaria' as Href, cor: colors.text },
+              { rotulo: 'Faturas em aberto', detalhe: `${cartoes.length} ${cartoes.length === 1 ? 'cartão' : 'cartões'}`, valor: faturasEmAberto, href: '/cartoes' as Href, cor: faturasEmAberto > 0 ? colors.danger : colors.text },
+              { rotulo: 'Guardado', detalhe: `reserva ${formatarMoeda(reserva?.valorAtual ?? 0)} · ${cofrinhos.length} ${cofrinhos.length === 1 ? 'cofrinho' : 'cofrinhos'}`, valor: (reserva?.valorAtual ?? 0) + valorCofrinhos, href: '/metas' as Href, cor: colors.text },
+            ].map((linha, i) => (
+              <Pressable
+                key={linha.rotulo}
+                onPress={() => router.push(linha.href)}
+                accessibilityRole="button"
+                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: colors.border }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text className="font-body-medium" style={{ color: colors.text, fontSize: 14 }}>
+                    {linha.rotulo}
+                  </Text>
+                  <Text className="font-body" style={{ color: colors.textMuted, fontSize: 11 }}>
+                    {linha.detalhe}
+                  </Text>
+                </View>
+                <Text className="font-heading-medium" style={{ color: linha.cor, fontSize: 15, fontVariant: ['tabular-nums'] }}>
+                  {formatarMoeda(linha.valor)}
+                </Text>
+                <Feather name="chevron-right" size={16} color={colors.textMuted} style={{ marginLeft: 6 }} />
+              </Pressable>
+            ))}
+          </Card>
+        </TourTarget>
+
+        <View style={{ height: 12 }} />
+
+        <Pressable onPress={() => router.push('/planejamento')} accessibilityRole="button" style={{ marginHorizontal: 20 }}>
+          <Card>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15 }}>
+                Próximos meses
+              </Text>
+              <Text className="font-body-medium" style={{ color: colors.brand, fontSize: 12 }}>
+                Planejamento
+              </Text>
+            </View>
+            <GraficoProjecao projecao={projecao} altura={160} />
+          </Card>
+        </Pressable>
+
+        <View style={{ height: 16 }} />
+
         <TourTarget id="acoes-rapidas">
           <ScrollView
             horizontal
@@ -324,6 +612,7 @@ export default function DashboardScreen() {
               <Pressable
                 key={acao.rotulo}
                 onPress={() => router.push(acao.href)}
+                accessibilityRole="button"
                 style={{ alignItems: 'center', width: 72 }}
               >
                 <View
@@ -339,103 +628,13 @@ export default function DashboardScreen() {
                 >
                   <Feather name={acao.icon} size={18} color="#FFFFFF" />
                 </View>
-                <Text
-                  className="font-body"
-                  style={{ color: colors.textMuted, fontSize: 11, textAlign: 'center' }}
-                  numberOfLines={2}
-                >
+                <Text className="font-body" style={{ color: colors.textMuted, fontSize: 11, textAlign: 'center' }} numberOfLines={2}>
                   {acao.rotulo}
                 </Text>
               </Pressable>
             ))}
           </ScrollView>
         </TourTarget>
-
-        <AvisoPendencias quantidade={perguntas.length} />
-        <AutomacoesDoInicio onAvisar={(mensagem, desfazer) => setAviso({ mensagem, desfazer })} />
-
-        <TourTarget id="saldo">
-          <Pressable onPress={() => router.push('/conta-bancaria')} style={{ marginHorizontal: 20 }}>
-            <Card style={{ backgroundColor: colors.brand, borderWidth: 0 }}>
-              <Text className="font-body-medium" style={{ color: '#E9F3EC', fontSize: 13 }}>
-                Saldo em contas
-              </Text>
-              <Text className="font-heading" style={{ color: '#FFFFFF', fontSize: 34, marginTop: 4 }}>
-                {formatarMoeda(saldoTotal)}
-              </Text>
-              <Text className="font-body" style={{ color: '#CFE3D6', fontSize: 11, marginTop: 2 }}>
-                {contas.length} conta{contas.length === 1 ? '' : 's'} bancária{contas.length === 1 ? '' : 's'} ativa
-                {contas.length === 1 ? '' : 's'}
-              </Text>
-            </Card>
-          </Pressable>
-        </TourTarget>
-
-        <View style={{ height: 12 }} />
-
-        <Card style={{ marginHorizontal: 20 }}>
-          <Text className="font-body-medium" style={{ color: colors.textMuted, fontSize: 13 }}>
-            Livre para gastar até o fim do mês
-          </Text>
-          <Text
-            className="font-heading"
-            style={{ color: livre.livre < 0 ? colors.danger : colors.text, fontSize: 28, marginTop: 4 }}
-          >
-            {formatarMoeda(livre.livre)}
-          </Text>
-          <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-            {livre.porDia > 0
-              ? `${formatarMoeda(livre.porDia)} por dia nos próximos ${livre.diasRestantes} ${livre.diasRestantes === 1 ? 'dia' : 'dias'}`
-              : livre.livre < 0
-                ? 'As saídas previstas do mês já passam das entradas.'
-                : 'Nada livre até o fim do mês.'}
-          </Text>
-          <View style={{ marginTop: 12, gap: 4 }}>
-            {[
-              { rotulo: 'Entradas do mês', valor: livre.receitas, sinal: '+' },
-              { rotulo: 'Contas fixas', valor: livre.contasFixas, sinal: '−' },
-              { rotulo: 'Faturas de cartão', valor: livre.faturas, sinal: '−' },
-              { rotulo: 'Gastos fora do cartão', valor: livre.gastos, sinal: '−' },
-              { rotulo: 'Guardado em metas', valor: livre.guardado, sinal: '−' },
-            ].map((linha) => (
-              <View key={linha.rotulo} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12 }}>
-                  {linha.rotulo}
-                </Text>
-                <Text className="font-body-medium" style={{ color: colors.text, fontSize: 12 }}>
-                  {linha.sinal} {formatarMoeda(linha.valor)}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </Card>
-
-        <View style={{ height: 12 }} />
-
-        <View style={{ flexDirection: 'row', gap: 12, marginHorizontal: 20 }}>
-          <Pressable onPress={() => router.push('/reserva-emergencia')} style={{ flex: 1 }}>
-            <Card>
-              <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12 }}>
-                Reservado
-              </Text>
-              <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 16, marginTop: 2 }}>
-                {formatarMoeda(reserva?.valorAtual ?? 0)}
-              </Text>
-            </Card>
-          </Pressable>
-          <Pressable onPress={() => router.push('/cofrinho')} style={{ flex: 1 }}>
-            <Card>
-              <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12 }}>
-                Cofrinhos ({cofrinhos.length})
-              </Text>
-              <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 16, marginTop: 2 }}>
-                {formatarMoeda(valorCofrinhos)}
-              </Text>
-            </Card>
-          </Pressable>
-        </View>
-
-        <View style={{ height: 12 }} />
 
         <TourTarget id="resumo-mes">
           <Pressable onPress={() => router.push('/relatorios')} style={{ marginHorizontal: 20 }}>
@@ -565,7 +764,8 @@ export default function DashboardScreen() {
           <EmptyState
             icon="inbox"
             titulo="Nenhum lançamento ainda"
-            descricao="Cadastre uma conta bancária e comece a registrar suas movimentações para ver o dashboard completo aqui."
+            descricao="Importe o extrato do seu banco: o app categoriza sozinho e só pergunta o que não souber."
+            acao={{ rotulo: 'Importar meu primeiro extrato', onPress: () => router.push('/importar-extrato') }}
           />
         ) : (
           <View style={{ paddingHorizontal: 20 }}>
@@ -615,7 +815,6 @@ export default function DashboardScreen() {
           </View>
         )}
       </ScrollView>
-      <FabButton tourId="fab" />
       <Snackbar
         mensagem={aviso?.mensagem ?? null}
         acao={aviso?.desfazer ? { rotulo: 'Desfazer', onPress: aviso.desfazer } : undefined}

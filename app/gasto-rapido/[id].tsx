@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { CurrencyInput } from '@/components/CurrencyInput';
@@ -10,6 +10,8 @@ import { TextField } from '@/components/TextField';
 import { PagamentoGastoPicker, type FormaPagamentoGasto } from '@/components/PagamentoGastoPicker';
 import { Button } from '@/components/Button';
 import { ComprovanteField } from '@/components/ComprovanteField';
+import { useAvisoStore } from '@/store/avisoStore';
+import { apagarComprovante } from '@/core/comprovantes/comprovantes';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { useCategoriasStore } from '@/store/categoriasStore';
 import { useGastosRapidosStore } from '@/store/gastosRapidosStore';
@@ -27,7 +29,8 @@ export default function EditarGastoRapidoScreen() {
   const { membros, carregar: carregarMembros } = useMembrosFamiliaStore();
   const { contas, carregar: carregarContas } = useContasBancariasStore();
   const { cartoes, carregar: carregarCartoes } = useCartoesStore();
-  const { gastos, carregar: carregarGastos, atualizar, remover } = useGastosRapidosStore();
+  const { gastos, carregar: carregarGastos, atualizar, remover, restaurar } = useGastosRapidosStore();
+  const mostrarAviso = useAvisoStore((s) => s.mostrar);
 
   const gasto = gastos.find((g) => g.id === gastoId);
 
@@ -104,18 +107,17 @@ export default function EditarGastoRapidoScreen() {
     }
   }
 
-  function handleRemover() {
-    Alert.alert('Remover gasto', 'Essa ação não pode ser desfeita. Deseja continuar?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Remover',
-        style: 'destructive',
-        onPress: async () => {
-          await remover(gastoId);
-          router.back();
-        },
+  async function handleRemover() {
+    const removido = await remover(gastoId);
+    router.back();
+    if (!removido) return;
+    mostrarAviso({
+      mensagem: 'Gasto removido',
+      desfazer: () => {
+        restaurar(removido).catch(() => {});
       },
-    ]);
+      aoExpirar: () => apagarComprovante(removido.comprovante),
+    });
   }
 
   return (

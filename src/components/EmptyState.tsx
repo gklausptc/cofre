@@ -2,15 +2,18 @@ import React from 'react';
 import { Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Card } from './Card';
+import { Button } from './Button';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
 
 type EmptyStateProps = {
   icon: React.ComponentProps<typeof Feather>['name'];
   titulo: string;
   descricao: string;
+  /** Estado vazio sempre que possível com uma ação ("Importe seu primeiro extrato"). */
+  acao?: { rotulo: string; onPress: () => void };
 };
 
-export function EmptyState({ icon, titulo, descricao }: EmptyStateProps) {
+export function EmptyState({ icon, titulo, descricao, acao }: EmptyStateProps) {
   const { colors } = useAppTheme();
   return (
     <Card style={{ alignItems: 'center', paddingVertical: 32, marginHorizontal: 20 }}>
@@ -36,6 +39,11 @@ export function EmptyState({ icon, titulo, descricao }: EmptyStateProps) {
       >
         {descricao}
       </Text>
+      {acao && (
+        <View style={{ marginTop: 16, alignSelf: 'stretch', paddingHorizontal: 24 }}>
+          <Button titulo={acao.rotulo} onPress={acao.onPress} />
+        </View>
+      )}
     </Card>
   );
 }

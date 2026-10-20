@@ -166,19 +166,25 @@ A fonte da verdade é `src/data/db/schema.ts`; toda mudança é uma migration no
 - **Fechamento do mês** (`fechamentoDoMes.ts`, tela `app/fechamento-mes`), **busca** (`busca.ts`, tela `app/busca`), **relatório e PDF** (`relatorio.ts` → HTML → `expo-print`, em Relatórios).
 - **Comprovante**: `src/core/comprovantes/comprovantes.ts` (expo-image-picker + expo-image-manipulator: 1280 px, JPEG 0,6) e `ComprovanteField` nas telas de editar gasto e movimentação.
 
-## 8. Rotas / telas a criar (Expo Router)
+## 8. Rotas / telas (Expo Router)
+
+Navegação do Cofre 2.0 (Fase 5): **5 abas — Início · Extrato · (+) · Agenda · Metas**. Nenhuma tela foi removida: Cartões, Planejamento e Mais viraram telas do Stack (abrem pelo Início — "Seu dinheiro", "Próximos meses" e o ícone de menu), e Pagamentos está inteira dentro da Agenda (`PainelDePagamentos`); a rota `/pagamentos` só redireciona para `/agenda` (links antigos de notificação).
 
 | Rota | Conteúdo |
 |---|---|
-| `(tabs)/dashboard.tsx` | Saldo atual, quanto posso gastar, contas a pagar/pagas, próximos vencimentos, gastos por categoria, valor reservado, valor dos cofrinhos, previsão próximo mês. Filtro opcional por membro da família. |
-| `(tabs)/lancamentos.tsx` | Lista de movimentações + gastos rápidos, filtrável por conta/cartão/categoria/membro |
-| `(tabs)/cartoes.tsx` | Lista de cartões com limite disponível e fatura atual |
-| `cartao/[id].tsx` | Detalhe: fatura atual, próxima fatura prevista, parcelas futuras agrupadas por mês |
-| `(tabs)/planejamento.tsx` | Projeção mês a mês (receita, despesa, saldo previsto) via `projetarFluxoCaixa` |
-| `(tabs)/mais.tsx` | Acesso a: contas fixas, contas bancárias, cofrinhos, reserva de emergência, relatórios, membros da família, configurações |
+| `(tabs)/dashboard.tsx` (Início) | Livre para gastar (com ritmo e "Ver a conta"), aviso de perguntas pendentes, automações (divisão do salário, fechamento do mês, insights), próximos 7 dias com "Paguei", Seu dinheiro (contas, faturas, guardado), gráfico dos próximos meses, atalhos, resumo do mês, gastos fixos, por categoria e últimos lançamentos. Filtro por membro. |
+| `(tabs)/lancamentos.tsx` (Extrato) | Lista única do mês (`obterLancamentosDoPeriodo`), agrupada por dia, filtros por tipo, conta/cartão, categoria e membro, busca |
+| `(tabs)/novo.tsx` (+) | Botão do meio: abre a folha `acoes.tsx` (gasto rápido, entrada, transferência, saída, compra parcelada, importar extrato, conta fixa, cofrinho) |
+| `(tabs)/agenda.tsx` | Calendário do mês com pontos (pago/pendente/atrasado/entrada), lista do dia, "Pago · Falta", menor saldo previsto e a tela de Pagamentos inteira |
+| `(tabs)/metas.tsx` | Reserva de emergência, cofrinhos, orçamento do mês (resumo) e assinaturas |
+| `cartoes.tsx`, `cartao/[id].tsx` | Cartões (limite, fatura prevista, melhor cartão para hoje) e detalhe |
+| `planejamento.tsx` | Projeção de 6 meses (cards + gráfico), "Dá para comprar?" e "Adiantar parcelas" |
+| `mais.tsx` | Cartões, planejamento, contas, importação, regras, orçamento, assinaturas, fechamento, busca, relatórios, membros, backup e configurações |
 | `gasto-rapido.tsx` (modal) | 3 campos: valor, categoria, descrição — salvar em menos de 10s |
 | `conta-fixa/novo.tsx` e `[id].tsx` | Form completo: nome, categoria, valor, vencimento, forma de pagamento, conta/cartão, recorrência, membro |
-| `cofrinho/novo.tsx` e `[id].tsx` | Nome, meta, ícone/cor, e tela de aportes com progresso visual |
+| `cofrinho/novo.tsx` e `[id].tsx` | Nome, meta, ícone/cor, rendimento e aportes com progresso |
+
+Excluir gasto, movimentação, regra ou contato mostra "Desfazer" por 5 s (`useAvisoStore` + `AvisoGlobal`) em vez de pedir confirmação. Estados vazios sempre com uma ação (`EmptyState` → `acao`).
 
 ## 9. Convenções de código
 

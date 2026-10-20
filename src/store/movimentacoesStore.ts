@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { repositorios } from '@/domain/repositories';
 import type { Movimentacao, NovaMovimentacao } from '@/domain/types/entities';
 import { pedirReagendamento } from '@/core/notifications/agendador';
-import { apagarComprovante } from '@/core/comprovantes/comprovantes';
 
 const repo = () => repositorios().movimentacoes;
 
@@ -12,7 +11,10 @@ type MovimentacoesState = {
   carregar: () => Promise<void>;
   criar: (dados: Omit<NovaMovimentacao, 'id'>) => Promise<void>;
   atualizar: (id: number, dados: Partial<Omit<NovaMovimentacao, 'id'>>) => Promise<void>;
-  remover: (id: number) => Promise<void>;
+  /** Remove e devolve a movimentação (para o "Desfazer"); a foto do comprovante fica até `esquecer`. */
+  remover: (id: number) => Promise<Movimentacao | null>;
+  /** "Desfazer": grava de novo a movimentação removida. */
+  restaurar: (movimentacao: Movimentacao) => Promise<void>;
 };
 
 export const useMovimentacoesStore = create<MovimentacoesState>((set, get) => ({
@@ -40,7 +42,15 @@ export const useMovimentacoesStore = create<MovimentacoesState>((set, get) => ({
   remover: async (id) => {
     const movimentacao = await repo().buscarMovimentacao(id);
     await repo().excluirMovimentacao(id);
-    apagarComprovante(movimentacao?.comprovante ?? null);
+    await get().carregar();
+    pedirReagendamento();
+    return movimentacao;
+  },
+
+  restaurar: async (movimentacao) => {
+    const { id: _id, ...dados } = movimentacao;
+    void _id;
+    await repo().criarMovimentacao(dados);
     await get().carregar();
     pedirReagendamento();
   },

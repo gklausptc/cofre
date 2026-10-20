@@ -18,6 +18,7 @@ import { useBloqueioStore } from '@/store/bloqueioStore';
 import { AppLockScreen } from '@/components/AppLockScreen';
 import { Button } from '@/components/Button';
 import { RespostasDeNotificacao } from '@/components/RespostasDeNotificacao';
+import { AvisoGlobal } from '@/components/AvisoGlobal';
 import {
   agendarLembretesDoDia,
   inicializarRepositorios,
@@ -159,7 +160,13 @@ function RootNavigator() {
         <Stack.Screen name="cartao/[id]" options={{ headerShown: true, title: 'Cartão' }} />
         <Stack.Screen name="compra-parcelada/novo" options={{ headerShown: true, title: 'Nova compra parcelada' }} />
         <Stack.Screen name="compra-parcelada/[id]" options={{ headerShown: true, title: 'Editar compra parcelada' }} />
-        <Stack.Screen name="metas/index" options={{ headerShown: true, title: 'Metas financeiras' }} />
+        <Stack.Screen name="cartoes" options={{ headerShown: true, title: 'Cartões' }} />
+        <Stack.Screen name="planejamento" options={{ headerShown: true, title: 'Planejamento' }} />
+        <Stack.Screen name="mais" options={{ headerShown: true, title: 'Mais' }} />
+        <Stack.Screen
+          name="acoes"
+          options={{ presentation: 'formSheet', headerShown: false, sheetAllowedDetents: [0.62, 0.95], sheetGrabberVisible: true }}
+        />
         <Stack.Screen name="cofrinho/index" options={{ headerShown: true, title: 'Cofrinhos' }} />
         <Stack.Screen name="cofrinho/novo" options={{ headerShown: true, title: 'Novo cofrinho' }} />
         <Stack.Screen name="cofrinho/[id]" options={{ headerShown: true, title: 'Cofrinho' }} />
@@ -185,6 +192,7 @@ function RootNavigator() {
         <Stack.Screen name="simulador/index" options={{ headerShown: true, title: 'Dá para comprar?' }} />
         <Stack.Screen name="simulador/quitacao" options={{ headerShown: true, title: 'Adiantar parcelas' }} />
       </Stack>
+      <AvisoGlobal />
     </>
   );
 }

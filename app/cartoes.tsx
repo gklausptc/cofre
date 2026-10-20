@@ -43,7 +43,7 @@ export default function CartoesScreen() {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <ScreenHeader title="Cartões" subtitle="Limite disponível e parcelas em aberto" />
 

@@ -73,7 +73,7 @@ describe('vencimentos', () => {
     expect(r[0]).toMatchObject({
       categoria: 'conta_fixa',
       parcelaId: 12,
-      url: '/pagamentos?mes=2026-10&item=parcela-12',
+      url: '/agenda?mes=2026-10&item=parcela-12',
       corpo: `${formatarMoeda(18240)}. Toque para marcar como paga.`,
     });
   });
@@ -130,8 +130,8 @@ describe('vencimentos', () => {
     );
     expect(r.map((n) => [n.tipo, local(n.data), n.titulo, n.url])).toEqual([
       ['fechamento_fatura', '2026-11-01 09h', 'Fatura do C6 fecha em 2 dias', '/cartao/10'],
-      ['vencimento_fatura', '2026-11-08 09h', 'Fatura C6 vence em 2 dias', '/pagamentos?mes=2026-11&item=fatura-10'],
-      ['vencimento_fatura', '2026-11-10 09h', 'Fatura C6 vence hoje', '/pagamentos?mes=2026-11&item=fatura-10'],
+      ['vencimento_fatura', '2026-11-08 09h', 'Fatura C6 vence em 2 dias', '/agenda?mes=2026-11&item=fatura-10'],
+      ['vencimento_fatura', '2026-11-10 09h', 'Fatura C6 vence hoje', '/agenda?mes=2026-11&item=fatura-10'],
     ]);
     expect(r[1].corpo).toBe(`${formatarMoeda(123456)} previstos.`);
   });

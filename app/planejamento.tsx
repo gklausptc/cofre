@@ -56,7 +56,7 @@ export default function PlanejamentoScreen() {
   const temDados = projecao.some((p) => p.despesaPrevista > 0 || p.receitaPrevista > 0);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <ScreenHeader title="Planejamento" subtitle={`Projeção dos próximos ${MESES_DA_PROJECAO} meses`} />
         <View style={{ paddingHorizontal: 20, flexDirection: 'row', gap: 8, marginBottom: 12 }}>

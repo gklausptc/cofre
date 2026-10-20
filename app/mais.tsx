@@ -14,6 +14,8 @@ type ItemMenu = {
 };
 
 const ITENS: ItemMenu[] = [
+  { icon: 'credit-card', titulo: 'Cartões', href: '/cartoes' },
+  { icon: 'trending-up', titulo: 'Planejamento', href: '/planejamento' },
   { icon: 'file-text', titulo: 'Contas fixas', href: '/conta-fixa' },
   { icon: 'dollar-sign', titulo: 'Contas bancárias', href: '/conta-bancaria' },
   { icon: 'upload', titulo: 'Importar extrato', href: '/importar-extrato' },
@@ -72,9 +74,9 @@ export default function MaisScreen() {
   const { colors } = useAppTheme();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        <ScreenHeader title="Mais" subtitle="Contas, cofrinhos, relatórios e configurações" />
+        <ScreenHeader title="Mais" subtitle="Cartões, contas, relatórios e configurações" />
         <Card style={{ marginHorizontal: 20, paddingVertical: 4 }}>
           {ITENS.map((item, index) => (
             <MenuRow key={item.titulo} item={item} ultimo={index === ITENS.length - 1} />

@@ -23,7 +23,7 @@ export function RespostasDeNotificacao() {
           return;
         }
         if (resposta.acao === ACAO_MARCAR_PAGA && resposta.parcelaId !== null) {
-          const url = resposta.url ? `${resposta.url}${resposta.url.includes('?') ? '&' : '?'}paga=1` : '/pagamentos';
+          const url = resposta.url ? `${resposta.url}${resposta.url.includes('?') ? '&' : '?'}paga=1` : '/agenda';
           marcarPaga(resposta.parcelaId)
             .catch(() => {})
             .finally(() => router.push(url as Href));

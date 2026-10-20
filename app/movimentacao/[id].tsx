@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { TextField } from '@/components/TextField';
@@ -15,6 +15,8 @@ import { useMovimentacoesStore } from '@/store/movimentacoesStore';
 import { useCategoriasStore } from '@/store/categoriasStore';
 import { useMembrosFamiliaStore } from '@/store/membrosFamiliaStore';
 import { ComprovanteField } from '@/components/ComprovanteField';
+import { useAvisoStore } from '@/store/avisoStore';
+import { apagarComprovante } from '@/core/comprovantes/comprovantes';
 
 type TipoMovimentacao = 'entrada' | 'saida' | 'transferencia';
 
@@ -71,7 +73,8 @@ export default function EditarMovimentacaoScreen() {
   const movimentacaoId = Number(id);
 
   const { contas, carregar: carregarContas } = useContasBancariasStore();
-  const { movimentacoes, carregar: carregarMovimentacoes, atualizar, remover } = useMovimentacoesStore();
+  const { movimentacoes, carregar: carregarMovimentacoes, atualizar, remover, restaurar } = useMovimentacoesStore();
+  const mostrarAviso = useAvisoStore((s) => s.mostrar);
   const { categorias, carregar: carregarCategorias } = useCategoriasStore();
   const { membros, carregar: carregarMembros } = useMembrosFamiliaStore();
 
@@ -159,18 +162,17 @@ export default function EditarMovimentacaoScreen() {
     }
   }
 
-  function handleRemover() {
-    Alert.alert('Remover movimentação', 'Essa ação não pode ser desfeita. Deseja continuar?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Remover',
-        style: 'destructive',
-        onPress: async () => {
-          await remover(movimentacaoId);
-          router.back();
-        },
+  async function handleRemover() {
+    const removida = await remover(movimentacaoId);
+    router.back();
+    if (!removida) return;
+    mostrarAviso({
+      mensagem: 'Movimentação removida',
+      desfazer: () => {
+        restaurar(removida).catch(() => {});
       },
-    ]);
+      aoExpirar: () => apagarComprovante(removida.comprovante),
+    });
   }
 
   // saída criada ao pagar uma fatura ou conta fixa (ver ehPagamentoDeCompromisso)

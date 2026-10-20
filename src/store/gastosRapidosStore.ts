@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { repositorios } from '@/domain/repositories';
 import type { GastoRapido, NovoGastoRapido } from '@/domain/types/entities';
 import { pedirReagendamento } from '@/core/notifications/agendador';
-import { apagarComprovante } from '@/core/comprovantes/comprovantes';
 
 const repo = () => repositorios().gastosRapidos;
 
@@ -12,7 +11,10 @@ type GastosRapidosState = {
   carregar: () => Promise<void>;
   criar: (dados: Omit<NovoGastoRapido, 'id'>) => Promise<void>;
   atualizar: (id: number, dados: Partial<Omit<NovoGastoRapido, 'id'>>) => Promise<void>;
-  remover: (id: number) => Promise<void>;
+  /** Remove e devolve o gasto (para o "Desfazer"); a foto do comprovante fica até `esquecer`. */
+  remover: (id: number) => Promise<GastoRapido | null>;
+  /** "Desfazer": grava de novo o gasto removido. */
+  restaurar: (gasto: GastoRapido) => Promise<void>;
   ajustarValor: (id: number, novoValor: number, justificativa: string) => Promise<void>;
 };
 
@@ -41,7 +43,15 @@ export const useGastosRapidosStore = create<GastosRapidosState>((set, get) => ({
   remover: async (id) => {
     const gasto = await repo().buscarGastoRapido(id);
     await repo().excluirGastoRapido(id);
-    apagarComprovante(gasto?.comprovante ?? null);
+    await get().carregar();
+    pedirReagendamento();
+    return gasto;
+  },
+
+  restaurar: async (gasto) => {
+    const { id: _id, ...dados } = gasto;
+    void _id;
+    await repo().criarGastoRapido(dados);
     await get().carregar();
     pedirReagendamento();
   },

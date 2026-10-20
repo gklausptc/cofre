@@ -14,6 +14,12 @@ import { useCofrinhosStore } from '@/store/cofrinhosStore';
 import { useAportesCofrinhoStore } from '@/store/aportesCofrinhoStore';
 import { legendaDoCofrinho, resumirMetasFinanceiras } from '@/domain/usecases/resumirMetasFinanceiras';
 import { descreverRendimento, type ConfigRendimento } from '@/domain/usecases/rendimento';
+import { useOrcamentosStore } from '@/store/orcamentosStore';
+import { useDadosFinanceiros } from '@/store/useDadosFinanceiros';
+import { obterLancamentosDoPeriodo } from '@/domain/usecases/obterLancamentosDoPeriodo';
+import { progressoDosOrcamentos } from '@/domain/usecases/automacoes/orcamento';
+import { dataNoMes } from '@/domain/usecases/mesDaFatura';
+import { hojeIso, mesAnterior, mesAtualIso } from '@/core/utils/date';
 
 /** "Previsão: 3 meses · rende 105% do CDI" */
 function juntarLegenda(...partes: (string | undefined)[]): string | undefined {
@@ -39,14 +45,24 @@ export default function MetasFinanceirasScreen() {
   const { reserva, carregar: carregarReserva } = useReservaEmergenciaStore();
   const { cofrinhos, carregar: carregarCofrinhos } = useCofrinhosStore();
   const { aportes, carregar: carregarAportes } = useAportesCofrinhoStore();
+  const { orcamentos, carregar: carregarOrcamentos } = useOrcamentosStore();
+  const { dados, categorias, carregarTudo } = useDadosFinanceiros();
 
   useFocusEffect(
     useCallback(() => {
       carregarReserva();
       carregarCofrinhos();
       carregarAportes();
-    }, [carregarReserva, carregarCofrinhos, carregarAportes])
+      carregarOrcamentos();
+      carregarTudo();
+    }, [carregarReserva, carregarCofrinhos, carregarAportes, carregarOrcamentos, carregarTudo])
   );
+
+  const mes = mesAtualIso();
+  const orcamentoDoMes = useMemo(() => {
+    const lancamentos = obterLancamentosDoPeriodo(`${mesAnterior(mesAnterior(mes))}-01`, dataNoMes(mes, 31), dados, hojeIso());
+    return progressoDosOrcamentos(orcamentos, categorias, lancamentos, mes);
+  }, [orcamentos, categorias, dados, mes]);
 
   const resumo = useMemo(() => resumirMetasFinanceiras(reserva, cofrinhos, aportes), [reserva, cofrinhos, aportes]);
   const temMetas = resumo.totalDasMetas > 0;
@@ -54,7 +70,7 @@ export default function MetasFinanceirasScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        <ScreenHeader title="Metas financeiras" subtitle="Reserva de emergência e cofrinhos" />
+        <ScreenHeader title="Metas" subtitle="Reserva, cofrinhos e orçamento do mês" />
 
         <View style={{ paddingHorizontal: 20, gap: 12 }}>
           {temMetas && (
@@ -99,6 +115,7 @@ export default function MetasFinanceirasScreen() {
                 icon="gift"
                 titulo="Nenhum cofrinho"
                 descricao="Crie um cofrinho para juntar dinheiro para uma viagem, compra ou objetivo."
+                acao={{ rotulo: 'Criar cofrinho', onPress: () => router.push('/cofrinho/novo') }}
               />
             </View>
           ) : (
@@ -117,18 +134,50 @@ export default function MetasFinanceirasScreen() {
           )}
           <Button titulo="Novo cofrinho" variante="secundaria" onPress={() => router.push('/cofrinho/novo')} />
 
-          <Pressable onPress={() => router.push('/orcamento')} accessibilityRole="button">
+          <TituloSecao>Orçamento do mês</TituloSecao>
+          <Card>
+            {orcamentoDoMes.itens.length === 0 ? (
+              <Text className="font-body" style={{ color: colors.textMuted, fontSize: 13, marginBottom: 12 }}>
+                Defina quanto cada categoria pode gastar. Com um mês de lançamentos, o app sugere os limites pela média.
+              </Text>
+            ) : (
+              <>
+                <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginBottom: 8 }}>
+                  Orçado {formatarMoeda(orcamentoDoMes.orcado)} · Gasto {formatarMoeda(orcamentoDoMes.gasto)}
+                </Text>
+                {orcamentoDoMes.itens.slice(0, 3).map((item) => {
+                  const cor = item.situacao === 'estourado' ? colors.danger : item.situacao === 'atencao' ? colors.warning : item.cor;
+                  return (
+                    <View key={item.categoriaId} style={{ marginBottom: 10 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <Text className="font-body-medium" style={{ color: colors.text, fontSize: 13 }}>
+                          {item.nome}
+                        </Text>
+                        <Text className="font-body" style={{ color: cor, fontSize: 12, fontVariant: ['tabular-nums'] }}>
+                          {formatarMoeda(item.gasto)} de {formatarMoeda(item.limite)}
+                        </Text>
+                      </View>
+                      <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.border, overflow: 'hidden' }}>
+                        <View style={{ width: `${Math.min(1, item.proporcao) * 100}%`, height: 6, backgroundColor: cor }} />
+                      </View>
+                    </View>
+                  );
+                })}
+              </>
+            )}
+            <Button
+              titulo={orcamentoDoMes.itens.length === 0 ? 'Definir orçamento' : 'Ver orçamento completo'}
+              variante="secundaria"
+              onPress={() => router.push('/orcamento')}
+            />
+          </Card>
+          <Pressable onPress={() => router.push('/assinaturas')} accessibilityRole="button">
             <Card style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{ flex: 1 }}>
-                <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15 }}>
-                  Orçamento do mês
-                </Text>
-                <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                  Quanto cada categoria pode gastar, com sugestão pela média.
-                </Text>
-              </View>
+              <Text className="font-body-medium" style={{ color: colors.text, fontSize: 14, flex: 1 }}>
+                Assinaturas
+              </Text>
               <Text className="font-body-medium" style={{ color: colors.brand, fontSize: 13 }}>
-                Abrir
+                Ver
               </Text>
             </Card>
           </Pressable>
