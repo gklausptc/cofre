@@ -14,6 +14,9 @@ import { definirPin, removerPin, tentarPin } from '@/core/auth/appLock';
 import { descreverEspera } from '@/domain/usecases/bloqueioPin';
 import { biometriaDisponivel } from '@/core/auth/biometria';
 import { repositorios } from '@/domain/repositories';
+import { usePerguntasStore } from '@/store/perguntasStore';
+import { apagarTodosOsComprovantes } from '@/core/comprovantes/comprovantes';
+import { pedirReagendamento } from '@/core/notifications/agendador';
 import type { Preferencias } from '@/domain/types/entities';
 
 const OPCOES_TEMA: { valor: Preferencias['tema']; rotulo: string }[] = [
@@ -132,7 +135,7 @@ export default function ConfiguracoesScreen() {
   function handleLimparDados() {
     Alert.alert(
       'Limpar todos os dados',
-      'Isso apaga permanentemente contas, movimentações, cartões, cofrinhos, contas fixas, reserva e membros da família. Não pode ser desfeito.',
+      'Isso apaga permanentemente contas, lançamentos, cartões, faturas, contas fixas, cofrinhos, reserva, metas, orçamentos, membros da família, importações, perguntas da Revisão, regras aprendidas, contatos PIX e fotos de comprovante. Os backups automáticos continuam guardados. Não pode ser desfeito.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -142,8 +145,12 @@ export default function ConfiguracoesScreen() {
             setLimpando(true);
             try {
               await repositorios().manutencao.limparTodosOsDados();
+              apagarTodosOsComprovantes();
               await removerPin();
               await carregar();
+              // o que estava em memória (perguntas, lançamentos) e as notificações agendadas
+              await usePerguntasStore.getState().carregar();
+              pedirReagendamento();
               router.replace('/(tabs)/dashboard');
             } finally {
               setLimpando(false);

@@ -56,6 +56,12 @@ export function apagarComprovante(caminho: string | null): void {
   if (arquivo.exists) arquivo.delete();
 }
 
+/** Apaga todas as fotos de comprovante (usado por "Limpar todos os dados"). */
+export function apagarTodosOsComprovantes(): void {
+  const dir = new Directory(Paths.document, PASTA);
+  if (dir.exists) dir.delete();
+}
+
 /** Quantas fotos e quantos bytes (para o aviso na tela de backup). */
 export function resumoDosComprovantes(): { quantidade: number; bytes: number } {
   const dir = new Directory(Paths.document, PASTA);

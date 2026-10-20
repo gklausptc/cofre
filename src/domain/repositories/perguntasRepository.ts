@@ -9,4 +9,9 @@ export interface PerguntasRepository {
   responder(perguntaId: number, plano: PlanoDeResposta): Promise<void>;
   /** Junta perguntas que agora têm a mesma chave (fica `manterId`, com as linhas de todas). */
   juntarPerguntas(juncao: JuncaoDePerguntas): Promise<void>;
+  /**
+   * Tira da fila as perguntas cujos lançamentos não existem mais (dados apagados, importação
+   * desfeita, lançamento excluído) e as linhas que sumiram das que ficam. Devolve quantas saíram.
+   */
+  limparOrfas(): Promise<number>;
 }

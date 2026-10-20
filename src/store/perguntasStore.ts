@@ -30,6 +30,8 @@ export const usePerguntasStore = create<PerguntasState>((set, get) => ({
   perguntas: [],
 
   carregar: async () => {
+    // pergunta de lançamento que não existe mais (dados limpos, importação desfeita) sai da fila
+    await repo().limparOrfas();
     set({ perguntas: await repo().listarPendentes() });
   },
 

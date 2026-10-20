@@ -1,37 +1,16 @@
 import { db } from './client';
-import * as schema from './schema';
+import { TABELAS_PARA_LIMPAR } from './tabelasParaLimpar';
 import { seedCategoriasPadrao } from './seed';
 
 /**
- * Apaga todos os dados do usuário (contas, movimentações, cartões, cofrinhos,
- * etc.) e recria o essencial (categorias padrão, preferências). Usado pela ação
- * "Limpar todos os dados" em Configurações — também serve pra corrigir qualquer
- * dado órfão que tenha ficado de versões anteriores do app.
+ * Apaga todos os dados do usuário (contas, lançamentos, cartões, cofrinhos, importações, perguntas
+ * da Revisão, regras aprendidas, contatos PIX, orçamentos...) e recria o essencial (categorias
+ * padrão; as preferências voltam ao padrão na próxima leitura). Usado pela ação "Limpar todos os
+ * dados" em Configurações. Os backups automáticos (documentDirectory/backups) ficam.
  */
 export async function limparTodosOsDados() {
-  const tabelas = [
-    schema.aportesCofrinho,
-    schema.movimentacoesReserva,
-    schema.movimentacoes,
-    schema.gastosRapidos,
-    schema.parcelas,
-    schema.comprasParceladas,
-    schema.faturas,
-    schema.contasFixas,
-    schema.cartoes,
-    schema.contasBancarias,
-    schema.cofrinhos,
-    schema.reservaEmergencia,
-    schema.metasFinanceiras,
-    schema.membrosFamilia,
-    schema.importacoes,
-    schema.categorias,
-    schema.preferencias,
-  ];
-
-  for (const tabela of tabelas) {
+  for (const tabela of TABELAS_PARA_LIMPAR) {
     await db.delete(tabela);
   }
-
   await seedCategoriasPadrao(db);
 }

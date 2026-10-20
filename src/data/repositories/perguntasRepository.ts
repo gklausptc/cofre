@@ -226,8 +226,57 @@ export async function juntarPerguntas(juncao: JuncaoDePerguntas) {
   });
 }
 
+export async function limparOrfas(): Promise<number> {
+  const pendentes = await listarPendentes();
+  if (pendentes.length === 0) return 0;
+  // o que ainda existe: (importação, id externo) das movimentações e dos gastos importados
+  const [movs, gastos] = await Promise.all([
+    db.select({ importacaoId: movimentacoes.importacaoId, idExterno: movimentacoes.idExterno }).from(movimentacoes),
+    db.select({ importacaoId: gastosRapidos.importacaoId, idExterno: gastosRapidos.idExterno }).from(gastosRapidos),
+  ]);
+  const existe = new Set([
+    ...movs.map((m) => `movimentacao|${m.importacaoId}|${m.idExterno}`),
+    ...gastos.map((g) => `gasto|${g.importacaoId}|${g.idExterno}`),
+  ]);
+  let removidas = 0;
+  await emTransacao(async () => {
+    for (const pergunta of pendentes) {
+      let dados: PerguntaNova['dados'];
+      try {
+        dados = JSON.parse(pergunta.dados) as PerguntaNova['dados'];
+      } catch {
+        await db.delete(perguntasPendentes).where(eq(perguntasPendentes.id, pergunta.id));
+        removidas++;
+        continue;
+      }
+      // a dúvida de duplicidade é sobre uma linha que NÃO entrou: vale enquanto a importação existir
+      if (dados.tipo === 'duplicidade') {
+        const importacaoId = dados.linhas[0]?.importacaoId ?? pergunta.importacaoId;
+        const [importacao] = importacaoId != null ? await db.select().from(importacoes).where(eq(importacoes.id, importacaoId)) : [];
+        if (!importacao) {
+          await db.delete(perguntasPendentes).where(eq(perguntasPendentes.id, pergunta.id));
+          removidas++;
+        }
+        continue;
+      }
+      const vivas = dados.linhas.filter((l) => existe.has(`${l.onde}|${l.importacaoId}|${l.idExterno}`));
+      if (vivas.length === 0) {
+        await db.delete(perguntasPendentes).where(eq(perguntasPendentes.id, pergunta.id));
+        removidas++;
+      } else if (vivas.length < dados.linhas.length) {
+        await db
+          .update(perguntasPendentes)
+          .set({ quantidade: vivas.length, dados: JSON.stringify({ ...dados, linhas: vivas }) })
+          .where(eq(perguntasPendentes.id, pergunta.id));
+      }
+    }
+  });
+  return removidas;
+}
+
 export const perguntasRepositorySqlite: PerguntasRepository = {
   listarPendentes,
   responder,
   juntarPerguntas,
+  limparOrfas,
 };
