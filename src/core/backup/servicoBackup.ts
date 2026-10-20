@@ -1,4 +1,3 @@
-import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 import { repositorios } from '@/domain/repositories';
 import {
@@ -10,6 +9,7 @@ import {
   type BackupCofre,
   type ItemResumoBackup,
 } from '@/domain/usecases/backup';
+import { abrirSeletorDeArquivos } from '@/core/arquivos/seletorDeArquivos';
 import { lerJson, salvarBackupAutomatico, salvarParaCompartilhar } from './arquivosBackup';
 
 const TIPOS_ACEITOS = ['application/json', 'text/json', 'text/plain', 'application/octet-stream'];
@@ -61,7 +61,7 @@ export async function lerBackupDoArquivo(uri: string): Promise<BackupLido> {
 
 /** Abre o seletor de arquivos; null se o usuário cancelou. */
 export async function escolherArquivoDeBackup(): Promise<BackupLido | null> {
-  const escolha = await DocumentPicker.getDocumentAsync({ type: TIPOS_ACEITOS, copyToCacheDirectory: true });
+  const escolha = await abrirSeletorDeArquivos(TIPOS_ACEITOS, false);
   if (escolha.canceled || escolha.assets.length === 0) return null;
   return lerBackupDoArquivo(escolha.assets[0].uri);
 }

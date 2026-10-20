@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import * as DocumentPicker from 'expo-document-picker';
 import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card } from '@/components/Card';
@@ -12,6 +11,7 @@ import { TextField } from '@/components/TextField';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { formatarMoeda } from '@/core/utils/currency';
 import { formatarData } from '@/core/utils/date';
+import { abrirSeletorDeArquivos } from '@/core/arquivos/seletorDeArquivos';
 import { detalheDoErro, lerArquivoDeExtrato, TIPOS_DE_ARQUIVO_DE_EXTRATO } from '@/core/importacao/lerArquivoDeExtrato';
 import { useContasBancariasStore } from '@/store/contasBancariasStore';
 import { useCartoesStore } from '@/store/cartoesStore';
@@ -177,7 +177,7 @@ export default function ImportarLoteScreen() {
   async function escolherArquivos() {
     setErro(null);
     try {
-      const resultado = await DocumentPicker.getDocumentAsync({ type: TIPOS_DE_ARQUIVO_DE_EXTRATO, copyToCacheDirectory: true, multiple: true });
+      const resultado = await abrirSeletorDeArquivos(TIPOS_DE_ARQUIVO_DE_EXTRATO, true);
       if (resultado.canceled || resultado.assets.length === 0) return;
       await lerArquivos(resultado.assets.map((a) => ({ uri: a.uri, nome: a.name })), senha);
     } catch {

@@ -2,7 +2,6 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import * as DocumentPicker from 'expo-document-picker';
 import * as Clipboard from 'expo-clipboard';
 import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -24,6 +23,7 @@ import { useFaturasStore } from '@/store/faturasStore';
 import { useRegrasStore } from '@/store/regrasStore';
 import { usePreferenciasStore } from '@/store/preferenciasStore';
 import { TextField } from '@/components/TextField';
+import { abrirSeletorDeArquivos } from '@/core/arquivos/seletorDeArquivos';
 import { detalheDoErro, lerArquivoDeExtrato, TIPOS_DE_ARQUIVO_DE_EXTRATO } from '@/core/importacao/lerArquivoDeExtrato';
 import { lerCsvComMapeamento, type TabelaCsv } from '@/domain/usecases/importacao/lerExtrato';
 import {
@@ -260,7 +260,7 @@ export default function ImportarExtratoScreen() {
   async function handleEscolherArquivo() {
     setErro(null);
     try {
-      const resultado = await DocumentPicker.getDocumentAsync({ type: TIPOS_DE_ARQUIVO_DE_EXTRATO, copyToCacheDirectory: true, multiple: true });
+      const resultado = await abrirSeletorDeArquivos(TIPOS_DE_ARQUIVO_DE_EXTRATO, true);
       if (resultado.canceled || resultado.assets.length === 0) return;
       if (resultado.assets.length > 1) {
         // vários de uma vez: a importação em lote cria as contas e importa tudo na ordem
