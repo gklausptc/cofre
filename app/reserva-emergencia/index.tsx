@@ -11,11 +11,14 @@ import { Button } from '@/components/Button';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { useReservaEmergenciaStore } from '@/store/reservaEmergenciaStore';
 import { formatarMoeda } from '@/core/utils/currency';
-import { formatarData } from '@/core/utils/date';
+import { formatarData, mesAtualIso } from '@/core/utils/date';
 import { ConfigRendimentoForm } from '@/components/ConfigRendimentoForm';
 import { PainelRendimento } from '@/components/PainelRendimento';
 import { usePreferenciasStore } from '@/store/preferenciasStore';
 import { descreverRendimento, type ConfigRendimento } from '@/domain/usecases/rendimento';
+import { custoFixoMensal, mesesCobertos, sugerirMetaDaReserva, MESES_DA_RESERVA } from '@/domain/usecases/automacoes/simuladores';
+import { useContasFixasStore } from '@/store/contasFixasStore';
+import { useParcelasStore } from '@/store/parcelasStore';
 
 type Modo = 'nenhum' | 'aportar' | 'retirar' | 'editar-meta' | 'editar-rendimento';
 
@@ -24,6 +27,10 @@ export default function ReservaEmergenciaScreen() {
   const { reserva, historico, carregar, definirMeta, definirRendimento, aportar, retirar, removerReserva } =
     useReservaEmergenciaStore();
   const { preferencias, carregar: carregarPreferencias } = usePreferenciasStore();
+  const { contas: contasFixas, carregar: carregarContasFixas } = useContasFixasStore();
+  const { parcelas, carregar: carregarParcelas } = useParcelasStore();
+  const custo = custoFixoMensal(contasFixas, parcelas, mesAtualIso());
+  const metaSugerida = sugerirMetaDaReserva(custo);
   const [rendimento, setRendimento] = useState<ConfigRendimento | null>(null);
 
   const [valorMeta, setValorMeta] = useState(0);
@@ -37,7 +44,9 @@ export default function ReservaEmergenciaScreen() {
     useCallback(() => {
       carregar();
       carregarPreferencias();
-    }, [carregar, carregarPreferencias])
+      carregarContasFixas();
+      carregarParcelas();
+    }, [carregar, carregarPreferencias, carregarContasFixas, carregarParcelas])
   );
 
   function iniciarEdicaoMeta() {
@@ -148,6 +157,11 @@ export default function ReservaEmergenciaScreen() {
                     : undefined
                 }
               />
+              {custo > 0 && (
+                <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginTop: 6 }}>
+                  {`Cobre ${String(mesesCobertos(reserva.valorAtual, custo) ?? 0).replace('.', ',')} meses do seu custo fixo (${formatarMoeda(custo)} por mês).`}
+                </Text>
+              )}
               <View style={{ flexDirection: 'row', gap: 24, marginTop: 4 }}>
                 <Pressable onPress={iniciarEdicaoMeta} style={{ minHeight: 44, justifyContent: 'center' }}>
                   <Text className="font-body-medium" style={{ color: colors.brand, fontSize: 12 }}>
@@ -276,6 +290,24 @@ export default function ReservaEmergenciaScreen() {
 
           {(!reserva || modo === 'editar-meta') && (
             <>
+              {metaSugerida > 0 && (
+                <Card style={{ marginBottom: 16 }}>
+                  <Text className="font-body" style={{ color: colors.text, fontSize: 13 }}>
+                    Sugestão: {formatarMoeda(metaSugerida)}, que são {MESES_DA_RESERVA} meses do seu custo fixo de{' '}
+                    {formatarMoeda(custo)} (contas fixas e parcelas).
+                  </Text>
+                  <View style={{ marginTop: 10 }}>
+                    <Button
+                      titulo={`Usar ${formatarMoeda(metaSugerida)}`}
+                      variante="secundaria"
+                      onPress={() => {
+                        setValorMeta(metaSugerida);
+                        setMeses(String(MESES_DA_RESERVA));
+                      }}
+                    />
+                  </View>
+                </Card>
+              )}
               <CurrencyInput label="Meta da reserva" valor={valorMeta} onChangeValor={setValorMeta} />
               <TextField
                 label="Meses de cobertura desejados (opcional)"

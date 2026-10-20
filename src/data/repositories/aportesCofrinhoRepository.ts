@@ -16,8 +16,13 @@ export async function criarAporte(cofrinhoId: number, valor: number, data: strin
   return aporte;
 }
 
+export async function excluirAporte(id: number) {
+  await db.delete(aportesCofrinho).where(eq(aportesCofrinho.id, id));
+}
+
 export const aportesCofrinhoRepositorySqlite: AportesCofrinhoRepository = {
   listarAportes,
   listarAportesPorCofrinho,
   criarAporte,
+  excluirAporte,
 };

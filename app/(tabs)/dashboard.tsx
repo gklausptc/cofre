@@ -6,6 +6,9 @@ import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card } from '@/components/Card';
 import { AvisoPendencias } from '@/components/AvisoPendencias';
+import { AutomacoesDoInicio } from '@/components/inicio/AutomacoesDoInicio';
+import { Snackbar } from '@/components/Snackbar';
+import { useOrcamentosStore } from '@/store/orcamentosStore';
 import { usePerguntasStore } from '@/store/perguntasStore';
 import { EmptyState } from '@/components/EmptyState';
 import { FabButton } from '@/components/FabButton';
@@ -75,6 +78,9 @@ export default function DashboardScreen() {
   const { faturas, carregar: carregarFaturas } = useFaturasStore();
   const { compras, carregar: carregarCompras } = useComprasParceladasStore();
   const { perguntas, carregar: carregarPerguntas } = usePerguntasStore();
+  const { carregar: carregarOrcamentos } = useOrcamentosStore();
+  const [aviso, setAviso] = useState<{ mensagem: string; desfazer: (() => void) | null } | null>(null);
+  const fecharAviso = useCallback(() => setAviso(null), []);
 
   const [membroSelecionadoId, setMembroSelecionadoId] = useState<number | null>(null);
 
@@ -94,6 +100,7 @@ export default function DashboardScreen() {
       carregarCompras();
       carregarFaturas();
       carregarPerguntas();
+      carregarOrcamentos();
     }, [
       carregarContas,
       carregarMovimentacoes,
@@ -109,6 +116,7 @@ export default function DashboardScreen() {
       carregarCompras,
       carregarFaturas,
       carregarPerguntas,
+      carregarOrcamentos,
     ])
   );
 
@@ -343,6 +351,7 @@ export default function DashboardScreen() {
         </TourTarget>
 
         <AvisoPendencias quantidade={perguntas.length} />
+        <AutomacoesDoInicio onAvisar={(mensagem, desfazer) => setAviso({ mensagem, desfazer })} />
 
         <TourTarget id="saldo">
           <Pressable onPress={() => router.push('/conta-bancaria')} style={{ marginHorizontal: 20 }}>
@@ -606,6 +615,11 @@ export default function DashboardScreen() {
         )}
       </ScrollView>
       <FabButton tourId="fab" />
+      <Snackbar
+        mensagem={aviso?.mensagem ?? null}
+        acao={aviso?.desfazer ? { rotulo: 'Desfazer', onPress: aviso.desfazer } : undefined}
+        onFechar={fecharAviso}
+      />
       <TourOverlay />
     </SafeAreaView>
   );

@@ -13,6 +13,7 @@ import type { ManutencaoRepository } from './manutencaoRepository';
 import type { MembrosFamiliaRepository } from './membrosFamiliaRepository';
 import type { MovimentacoesRepository } from './movimentacoesRepository';
 import type { MovimentacoesReservaRepository } from './movimentacoesReservaRepository';
+import type { OrcamentosRepository } from './orcamentosRepository';
 import type { ParcelasRepository } from './parcelasRepository';
 import type { PerguntasRepository } from './perguntasRepository';
 import type { PreferenciasRepository } from './preferenciasRepository';
@@ -41,6 +42,7 @@ export type Repositorios = {
   membrosFamilia: MembrosFamiliaRepository;
   movimentacoes: MovimentacoesRepository;
   movimentacoesReserva: MovimentacoesReservaRepository;
+  orcamentos: OrcamentosRepository;
   parcelas: ParcelasRepository;
   perguntas: PerguntasRepository;
   preferencias: PreferenciasRepository;

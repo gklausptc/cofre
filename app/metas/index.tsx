@@ -117,6 +117,22 @@ export default function MetasFinanceirasScreen() {
           )}
           <Button titulo="Novo cofrinho" variante="secundaria" onPress={() => router.push('/cofrinho/novo')} />
 
+          <Pressable onPress={() => router.push('/orcamento')} accessibilityRole="button">
+            <Card style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ flex: 1 }}>
+                <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15 }}>
+                  Orçamento do mês
+                </Text>
+                <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                  Quanto cada categoria pode gastar, com sugestão pela média.
+                </Text>
+              </View>
+              <Text className="font-body-medium" style={{ color: colors.brand, fontSize: 13 }}>
+                Abrir
+              </Text>
+            </Card>
+          </Pressable>
+
           {temMetas && (
             <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, textAlign: 'center' }}>
               Faltam {formatarMoeda(Math.max(resumo.totalDasMetas - resumo.totalGuardado, 0))} para completar todas as

@@ -14,6 +14,7 @@ import { useContasBancariasStore } from '@/store/contasBancariasStore';
 import { useMovimentacoesStore } from '@/store/movimentacoesStore';
 import { useCategoriasStore } from '@/store/categoriasStore';
 import { useMembrosFamiliaStore } from '@/store/membrosFamiliaStore';
+import { ComprovanteField } from '@/components/ComprovanteField';
 
 type TipoMovimentacao = 'entrada' | 'saida' | 'transferencia';
 
@@ -88,6 +89,7 @@ export default function EditarMovimentacaoScreen() {
   const [recorrente, setRecorrente] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [carregadoParaId, setCarregadoParaId] = useState<number | null>(null);
+  const [comprovante, setComprovante] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -113,6 +115,7 @@ export default function EditarMovimentacaoScreen() {
     setMembroId(movimentacao.membroId);
     setReservarProximoMes(Boolean(movimentacao.reservarProximoMes));
     setRecorrente(Boolean(movimentacao.recorrente));
+    setComprovante(movimentacao.comprovante);
   }
 
   if (!movimentacao) {
@@ -148,6 +151,7 @@ export default function EditarMovimentacaoScreen() {
         membroId,
         reservarProximoMes: tipo === 'entrada' ? reservarProximoMes : false,
         recorrente: tipo === 'entrada' && ehModelo ? recorrente : false,
+        comprovante,
       });
       router.back();
     } finally {
@@ -261,6 +265,13 @@ export default function EditarMovimentacaoScreen() {
         />
 
         <MemberPicker membros={membros} membroId={membroId} onSelecionar={setMembroId} />
+        <ComprovanteField
+          valor={comprovante}
+          onAlterar={(caminho) => {
+            setComprovante(caminho);
+            atualizar(movimentacaoId, { comprovante: caminho }).catch(() => {});
+          }}
+        />
 
         {tipo === 'entrada' && (
           <>

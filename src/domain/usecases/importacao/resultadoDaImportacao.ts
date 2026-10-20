@@ -69,7 +69,7 @@ const media = (valores: number[]) => valores.reduce((s, v) => s + v, 0) / valore
 
 /**
  * Gastos importados muito acima do normal: o mesmo comerciante 50% acima da média (e pelo
- * menos R$ 30 a mais), ou a mesma categoria com o triplo da média por lançamento (e pelo
+ * menos R$ 50 a mais), ou a mesma categoria com o triplo da média por lançamento (e pelo
  * menos R$ 100 a mais), olhando os 90 dias antes.
  */
 export function detectarForaDoPadrao(
@@ -88,7 +88,7 @@ export function detectarForaDoPadrao(
     const mesmoComerciante = texto === '' ? [] : antes.filter((h) => textoParaRegra(h.descricao) === texto);
     if (mesmoComerciante.length >= 2) {
       const m = media(mesmoComerciante.map((h) => h.valor));
-      if (l.valor >= m * 1.5 && l.valor - m >= 3000) {
+      if (l.valor >= m * 1.5 && l.valor - m >= 5000) {
         sinalizados.push({ id: l.id, descricao: l.descricao, valor: l.valor, media: Math.round(m), motivo: `${Math.round((l.valor / m - 1) * 100)}% acima do normal` });
       }
       continue;

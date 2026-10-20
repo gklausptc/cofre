@@ -48,6 +48,13 @@
           "icon": "./assets/android-icon-monochrome.png",
           "color": "#2A5CE0"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O Cofre usa suas fotos para anexar comprovantes aos lançamentos.",
+          "cameraPermission": "O Cofre usa a câmera para fotografar comprovantes."
+        }
       ]
     ],
     "extra": {

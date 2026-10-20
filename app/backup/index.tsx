@@ -20,6 +20,7 @@ import {
 } from '@/core/backup/servicoBackup';
 import { descreverIdadeBackup, type BackupCofre, type ItemResumoBackup } from '@/domain/usecases/backup';
 import { usePreferenciasStore } from '@/store/preferenciasStore';
+import { resumoDosComprovantes } from '@/core/comprovantes/comprovantes';
 
 type Ocupado = 'backup' | 'escolher' | 'restaurar' | null;
 
@@ -196,6 +197,16 @@ export default function BackupScreen() {
               WhatsApp ou e-mail). Se o Expo Go for apagado, os dados do app vão junto, menos o que estiver nesse
               arquivo. O PIN de bloqueio não vai no backup.
             </Text>
+            {(() => {
+              const fotos = resumoDosComprovantes();
+              if (fotos.quantidade === 0) return null;
+              const mb = (fotos.bytes / (1024 * 1024)).toFixed(1).replace('.', ',');
+              return (
+                <Text className="font-body" style={{ color: colors.warning, fontSize: 12, marginTop: -8, marginBottom: 16 }}>
+                  Fotos de comprovante não entram no backup ({fotos.quantidade} {fotos.quantidade === 1 ? 'foto' : 'fotos'}, {mb} MB).
+                </Text>
+              );
+            })()}
             <Button titulo="Fazer backup agora" onPress={handleFazerBackup} carregando={ocupado === 'backup'} />
           </Card>
 

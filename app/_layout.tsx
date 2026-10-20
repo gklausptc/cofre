@@ -177,6 +177,13 @@ function RootNavigator() {
         <Stack.Screen name="backup/index" options={{ headerShown: true, title: 'Backup e restauração' }} />
         <Stack.Screen name="configuracoes/taxas" options={{ headerShown: true, title: 'Taxas de referência' }} />
         <Stack.Screen name="configuracoes/notificacoes" options={{ headerShown: true, title: 'Notificações' }} />
+        <Stack.Screen name="configuracoes/divisao-salario" options={{ headerShown: true, title: 'Divisão do salário' }} />
+        <Stack.Screen name="orcamento/index" options={{ headerShown: true, title: 'Orçamento' }} />
+        <Stack.Screen name="assinaturas/index" options={{ headerShown: true, title: 'Assinaturas' }} />
+        <Stack.Screen name="fechamento-mes/index" options={{ headerShown: true, title: 'Fechamento do mês' }} />
+        <Stack.Screen name="busca/index" options={{ headerShown: true, title: 'Buscar' }} />
+        <Stack.Screen name="simulador/index" options={{ headerShown: true, title: 'Dá para comprar?' }} />
+        <Stack.Screen name="simulador/quitacao" options={{ headerShown: true, title: 'Adiantar parcelas' }} />
       </Stack>
     </>
   );

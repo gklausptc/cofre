@@ -43,6 +43,15 @@ export default function LancamentosScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 20 }}>
           <ScreenHeader title="Lançamentos" subtitle="Movimentações e gastos rápidos" />
           <Pressable
+            onPress={() => router.push('/busca')}
+            accessibilityRole="button"
+            accessibilityLabel="Buscar lançamentos"
+            hitSlop={8}
+            style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginLeft: 'auto', marginRight: 8 }}
+          >
+            <Feather name="search" size={20} color={colors.brand} />
+          </Pressable>
+          <Pressable
             onPress={() => router.push('/movimentacao/novo')}
             style={{
               width: 36,

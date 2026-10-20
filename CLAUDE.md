@@ -101,11 +101,12 @@ A fonte da verdade é `src/data/db/schema.ts`; toda mudança é uma migration no
 | `compras_parceladas` | compra no cartão em N vezes |
 | `parcelas` | parcelas de compra **e** ocorrências de conta fixa (exatamente um de `compra_parcelada_id`/`conta_fixa_id`); `valor_original` + `justificativa_alteracao` quando o valor é ajustado |
 | `contas_fixas` | recorrência mensal/quinzenal/semanal/anual/única, débito/pix/cartão/boleto |
-| `gastos_rapidos` | gasto em dinheiro/débito/pix/cartão sem passar por movimentação |
+| `gastos_rapidos` | gasto em dinheiro/débito/pix/cartão sem passar por movimentação. `comprovante` (também em `movimentacoes`): caminho relativo da foto em `documentDirectory/comprovantes` — as fotos não entram no backup |
 | `cofrinhos` + `aportes_cofrinho` | metas de economia; valor atual = soma dos aportes |
 | `reserva_emergencia` (singleton) + `movimentacoes_reserva` | reserva com histórico de aportes/retiradas; o valor guardado é **calculado** (aportes − retiradas, `saldoReserva.ts`) e não dá para retirar mais do que ele |
 | `metas_financeiras` | metas financeiras (nome, valor da meta, valor atual, data e categoria) — mantida; a tela Metas financeiras reúne reserva, cofrinhos e metas |
-| `preferencias` (singleton) | tema, bloqueio/biometria, tutorial, `ultimo_backup_em`, taxas CDI/Selic de referência |
+| `preferencias` (singleton) | tema, bloqueio/biometria, tutorial, `ultimo_backup_em`, taxas CDI/Selic de referência, configuração e adiamentos das notificações, divisão do salário (`divisao_salario`, `salarios_divididos`), insights dispensados e alertas de orçamento já enviados (JSON) |
+| `orcamentos` | limite por categoria: vale de `mes_inicio` em diante (o mais recente com mes_inicio ≤ mês) ou `apenas_no_mes`; limite 0 = sem orçamento a partir dali (`orcamentoDoMes`) |
 | `importacoes` | cada extrato importado (arquivo, banco, período, números). As linhas guardam `importacao_id` e `id_externo`; `efeitos` (JSON) guarda o que a importação mudou fora das linhas, com o estado de antes, para desfazer |
 | `regras_categorizacao` | regra aprendida: `padrao` (texto de `textoParaRegra`), `tipo_correspondencia` (exato/contem/comeca_com), `natureza` (despesa/receita/ambas), `acao` (categorizar/ignorar/transferencia_propria/conta_fixa/emprestimo), `vezes_usada` |
 | `perguntas_pendentes` | fila de dúvidas da importação (tela Revisão): `tipo` (categoria/pix_pessoa/parcelamento/recorrencia/duplicidade), `chave` que junta perguntas iguais entre importações, `valor` (impacto), `dados` em JSON (`DadosDaPergunta`, com as linhas afetadas por importação + id externo) |
@@ -154,6 +155,16 @@ A fonte da verdade é `src/data/db/schema.ts`; toda mudança é uma migration no
 - **`reagendarTodas()`** (`src/core/notifications/agendador.ts`) cancela e reagenda; roda ao abrir, ao voltar do segundo plano e, com `pedirReagendamento()` (debounce), depois de qualquer mutação nos stores. A permissão é pedida na primeira conta fixa (`pedirPermissaoNaPrimeiraVez`) ou em Configurações → Notificações, nunca na abertura.
 - Ações: "Marcar como paga" (conta fixa) e "Lembrar amanhã"; tocar abre a tela pelo `url` (ex.: `/pagamentos?mes=2026-10&item=parcela-12`, que já mostra o botão de marcar como paga). Tratado em `src/components/RespostasDeNotificacao.tsx`.
 - Marcos de cofrinho (25/50/75/100%) avisam na hora (`marcoAtingido`).
+
+**Cofre 2.0 — automações (Fase 4, `src/domain/usecases/automacoes/`):**
+
+- **Orçamento** (`orcamento.ts`): `orcamentoDoMes`, `progressoDosOrcamentos` (pela competência, só consumo; âmbar em 80%, vermelho em 100%), `sugerirOrcamentos` (média dos 3 meses fechados, categorias com gasto em ≥ 2 deles, para cima em R$ 10), `alertaDeOrcamento`. Tela `app/orcamento`. Aviso na hora em 80%/100% por `avisarOrcamentos` (`src/core/notifications/alertas.ts`), chamado junto do reagendamento.
+- **Assinaturas** (`assinaturas.ts`): tudo na categoria Assinaturas (contas fixas e cobranças repetidas); aumento = 5% e R$ 1 acima da maior das 3 anteriores. Tela `app/assinaturas`.
+- **Simuladores** (`simuladores.ts`): `simularCompra` ("Dá para comprar?", veredito pelo mês mais justo; apertado = sobra < 10% da renda), `simularQuitacao`, `melhorCartaoParaHoje`, `custoFixoMensal` / `sugerirMetaDaReserva` (6×) / `mesesCobertos`. Telas `app/simulador` e `app/simulador/quitacao`; fatura prevista e melhor cartão na aba Cartões.
+- **Divisão do salário** (`divisaoSalario.ts`): 10% reserva + 5% cofrinhos por padrão, nunca deixa o Livre para gastar negativo; card no Início com Guardar/Ajustar/Agora não e snackbar de Desfazer.
+- **Insights do Início** (`insights.ts`, `saldoProjetado.ts`): saldo negativo previsto por conta, orçamento estourado, assinatura que subiu, gasto fora do padrão, orçamento em 80%, melhor cartão; no máximo 3, com "Entendi" (`src/components/inicio/AutomacoesDoInicio.tsx`).
+- **Fechamento do mês** (`fechamentoDoMes.ts`, tela `app/fechamento-mes`), **busca** (`busca.ts`, tela `app/busca`), **relatório e PDF** (`relatorio.ts` → HTML → `expo-print`, em Relatórios).
+- **Comprovante**: `src/core/comprovantes/comprovantes.ts` (expo-image-picker + expo-image-manipulator: 1280 px, JPEG 0,6) e `ComprovanteField` nas telas de editar gasto e movimentação.
 
 ## 8. Rotas / telas a criar (Expo Router)
 

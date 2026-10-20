@@ -224,7 +224,7 @@ export function planejarNotificacoes(entrada: EntradaDoPlanejamento): Notificaca
       corpo: 'Veja como foi o mês: o que deu certo, as categorias que passaram do previsto e o saldo que ficou.',
       data: noHorario(primeiroDoProximo, config.fechamento_mes.hora),
       categoria: null,
-      url: '/relatorios',
+      url: '/fechamento-mes',
       parcelaId: null,
     });
   }

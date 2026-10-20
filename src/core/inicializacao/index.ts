@@ -18,6 +18,7 @@ import { manutencaoRepositorySqlite } from '@/data/repositories/manutencaoReposi
 import { membrosFamiliaRepositorySqlite } from '@/data/repositories/membrosFamiliaRepository';
 import { movimentacoesRepositorySqlite } from '@/data/repositories/movimentacoesRepository';
 import { movimentacoesReservaRepositorySqlite } from '@/data/repositories/movimentacoesReservaRepository';
+import { orcamentosRepositorySqlite } from '@/data/repositories/orcamentosRepository';
 import { parcelasRepositorySqlite } from '@/data/repositories/parcelasRepository';
 import { perguntasRepositorySqlite } from '@/data/repositories/perguntasRepository';
 import { preferenciasRepositorySqlite } from '@/data/repositories/preferenciasRepository';
@@ -45,6 +46,7 @@ export function inicializarRepositorios(): void {
     membrosFamilia: membrosFamiliaRepositorySqlite,
     movimentacoes: movimentacoesRepositorySqlite,
     movimentacoesReserva: movimentacoesReservaRepositorySqlite,
+    orcamentos: orcamentosRepositorySqlite,
     parcelas: parcelasRepositorySqlite,
     perguntas: perguntasRepositorySqlite,
     preferencias: preferenciasRepositorySqlite,

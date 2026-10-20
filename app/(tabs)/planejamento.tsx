@@ -1,11 +1,12 @@
 import React, { useCallback, useMemo } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
 import { GraficoProjecao } from '@/components/GraficoProjecao';
+import { Button } from '@/components/Button';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { useParcelasStore } from '@/store/parcelasStore';
 import { useContasFixasStore } from '@/store/contasFixasStore';
@@ -21,6 +22,7 @@ const MESES_DA_PROJECAO = 6;
 
 export default function PlanejamentoScreen() {
   const { colors } = useAppTheme();
+  const router = useRouter();
   const { parcelas, carregar: carregarParcelas } = useParcelasStore();
   const { movimentacoes, carregar: carregarMovimentacoes } = useMovimentacoesStore();
   const { gastos, carregar: carregarGastos } = useGastosRapidosStore();
@@ -57,6 +59,14 @@ export default function PlanejamentoScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <ScreenHeader title="Planejamento" subtitle={`Projeção dos próximos ${MESES_DA_PROJECAO} meses`} />
+        <View style={{ paddingHorizontal: 20, flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+          <View style={{ flex: 1 }}>
+            <Button titulo="Dá para comprar?" onPress={() => router.push('/simulador')} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button titulo="Adiantar parcelas" variante="secundaria" onPress={() => router.push('/simulador/quitacao')} />
+          </View>
+        </View>
 
         {!temDados ? (
           <EmptyState

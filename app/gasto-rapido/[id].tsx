@@ -9,6 +9,7 @@ import { MemberPicker } from '@/components/MemberPicker';
 import { TextField } from '@/components/TextField';
 import { PagamentoGastoPicker, type FormaPagamentoGasto } from '@/components/PagamentoGastoPicker';
 import { Button } from '@/components/Button';
+import { ComprovanteField } from '@/components/ComprovanteField';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { useCategoriasStore } from '@/store/categoriasStore';
 import { useGastosRapidosStore } from '@/store/gastosRapidosStore';
@@ -38,6 +39,7 @@ export default function EditarGastoRapidoScreen() {
   const [forma, setForma] = useState<FormaPagamentoGasto>('dinheiro');
   const [contaId, setContaId] = useState<number | null>(null);
   const [cartaoId, setCartaoId] = useState<number | null>(null);
+  const [comprovante, setComprovante] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [carregadoParaId, setCarregadoParaId] = useState<number | null>(null);
 
@@ -62,6 +64,7 @@ export default function EditarGastoRapidoScreen() {
     setForma(gasto.formaPagamento);
     setContaId(gasto.contaBancariaId);
     setCartaoId(gasto.cartaoId);
+    setComprovante(gasto.comprovante);
   }
 
   if (!gasto) {
@@ -93,6 +96,7 @@ export default function EditarGastoRapidoScreen() {
         formaPagamento: forma,
         contaBancariaId: usaConta ? contaSelecionada : null,
         cartaoId: forma === 'cartao' ? cartaoSelecionado : null,
+        comprovante,
       });
       router.back();
     } finally {
@@ -142,6 +146,14 @@ export default function EditarGastoRapidoScreen() {
           onCartaoChange={setCartaoId}
         />
         <MemberPicker membros={membros} membroId={membroId} onSelecionar={setMembroId} />
+        <ComprovanteField
+          valor={comprovante}
+          onAlterar={(caminho) => {
+            setComprovante(caminho);
+            // a foto vale na hora (não espera o "Salvar"), para não deixar arquivo solto
+            atualizar(gastoId, { comprovante: caminho }).catch(() => {});
+          }}
+        />
         <View style={{ gap: 12, marginTop: 8 }}>
           <Button titulo="Salvar alterações" onPress={handleSalvar} disabled={!valido} carregando={salvando} />
           <Button titulo="Remover gasto" variante="perigo" onPress={handleRemover} />

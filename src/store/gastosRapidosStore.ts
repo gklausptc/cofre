@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { repositorios } from '@/domain/repositories';
 import type { GastoRapido, NovoGastoRapido } from '@/domain/types/entities';
 import { pedirReagendamento } from '@/core/notifications/agendador';
+import { apagarComprovante } from '@/core/comprovantes/comprovantes';
 
 const repo = () => repositorios().gastosRapidos;
 
@@ -38,7 +39,9 @@ export const useGastosRapidosStore = create<GastosRapidosState>((set, get) => ({
   },
 
   remover: async (id) => {
+    const gasto = await repo().buscarGastoRapido(id);
     await repo().excluirGastoRapido(id);
+    apagarComprovante(gasto?.comprovante ?? null);
     await get().carregar();
     pedirReagendamento();
   },

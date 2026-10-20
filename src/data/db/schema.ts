@@ -58,6 +58,8 @@ export const movimentacoes = sqliteTable('movimentacoes', {
   // (FITID do OFX ou hash da linha do CSV), para nunca importar a mesma linha duas vezes.
   importacaoId: integer('importacao_id'),
   idExterno: text('id_externo'),
+  // foto do comprovante, guardada em documentDirectory/comprovantes (caminho relativo)
+  comprovante: text('comprovante'),
 });
 
 export const cartoes = sqliteTable('cartoes', {
@@ -145,6 +147,8 @@ export const gastosRapidos = sqliteTable('gastos_rapidos', {
   // (FITID do OFX ou hash da linha do CSV), para nunca importar a mesma linha duas vezes.
   importacaoId: integer('importacao_id'),
   idExterno: text('id_externo'),
+  // foto do comprovante, guardada em documentDirectory/comprovantes (caminho relativo)
+  comprovante: text('comprovante'),
 });
 
 export const cofrinhos = sqliteTable('cofrinhos', {
@@ -219,6 +223,25 @@ export const preferencias = sqliteTable('preferencias', {
   configNotificacoes: text('config_notificacoes'),
   adiamentosNotificacoes: text('adiamentos_notificacoes'),
   permissaoNotificacoesPedida: integer('permissao_notificacoes_pedida', { mode: 'boolean' }).notNull().default(false),
+  // Divisão automática do salário: JSON de DivisaoDoSalario (percentuais para reserva e
+  // cofrinhos; null = não configurada) e os ids das entradas de salário já divididas.
+  divisaoSalario: text('divisao_salario'),
+  salariosDivididos: text('salarios_divididos'),
+  // insights do Início dispensados com "Entendi" (JSON de chaves; voltam se a situação mudar)
+  insightsDispensados: text('insights_dispensados'),
+  // avisos de orçamento já mandados (JSON de chaves "categoria-mês-80/100"), para avisar uma vez
+  alertasEnviados: text('alertas_enviados'),
+});
+
+// Orçamento por categoria: limite mensal em centavos. Vale de `mes_inicio` em diante (o mais
+// recente com mes_inicio ≤ mês); com `apenas_no_mes`, só naquele mês e com prioridade. Assim,
+// mudar o limite a partir de um mês não reescreve os meses anteriores (ver orcamentoDoMes).
+export const orcamentos = sqliteTable('orcamentos', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  categoriaId: integer('categoria_id').notNull(),
+  mesInicio: text('mes_inicio').notNull(),
+  limite: integer('limite').notNull(),
+  apenasNoMes: integer('apenas_no_mes', { mode: 'boolean' }).notNull().default(false),
 });
 
 export const importacoes = sqliteTable('importacoes', {

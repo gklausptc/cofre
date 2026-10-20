@@ -13,7 +13,12 @@ import { useGastosRapidosStore } from '@/store/gastosRapidosStore';
 import { useFaturasStore } from '@/store/faturasStore';
 import { useParcelasStore } from '@/store/parcelasStore';
 import { calcularLimiteDisponivel } from '@/domain/usecases/calcularLimiteDisponivel';
+import { calcularPagamentosDoMes } from '@/domain/usecases/calcularPagamentosDoMes';
+import { dataFechamentoDaFatura, mesDeCobrancaDoGasto } from '@/domain/usecases/mesDaFatura';
+import { descreverCartaoParaHoje, melhorCartaoParaHoje } from '@/domain/usecases/automacoes/simuladores';
+import { useContasFixasStore } from '@/store/contasFixasStore';
 import { formatarMoeda } from '@/core/utils/currency';
+import { formatarData, formatarMesReferencia, hojeIso } from '@/core/utils/date';
 
 export default function CartoesScreen() {
   const { colors } = useAppTheme();
@@ -23,6 +28,8 @@ export default function CartoesScreen() {
   const { parcelas, carregar: carregarParcelas } = useParcelasStore();
   const { gastos, carregar: carregarGastos } = useGastosRapidosStore();
   const { faturas, carregar: carregarFaturas } = useFaturasStore();
+  const { contas: contasFixas, carregar: carregarContasFixas } = useContasFixasStore();
+  const hoje = hojeIso();
 
   useFocusEffect(
     useCallback(() => {
@@ -31,7 +38,8 @@ export default function CartoesScreen() {
       carregarParcelas();
       carregarGastos();
       carregarFaturas();
-    }, [carregarCartoes, carregarCompras, carregarParcelas, carregarGastos, carregarFaturas])
+      carregarContasFixas();
+    }, [carregarCartoes, carregarCompras, carregarParcelas, carregarGastos, carregarFaturas, carregarContasFixas])
   );
 
   return (
@@ -40,6 +48,24 @@ export default function CartoesScreen() {
         <ScreenHeader title="Cartões" subtitle="Limite disponível e parcelas em aberto" />
 
         <View style={{ paddingHorizontal: 20, gap: 12 }}>
+          {(() => {
+            const limites = new Map(cartoes.map((c) => [c.id, calcularLimiteDisponivel(c, compras, parcelas, gastos, faturas)]));
+            const ranking = melhorCartaoParaHoje(cartoes, hoje, limites);
+            if (ranking.length < 2) return null;
+            return (
+              <Card>
+                <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12 }}>
+                  Melhor cartão para comprar hoje
+                </Text>
+                <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15, marginTop: 2 }}>
+                  {descreverCartaoParaHoje(ranking[0])}
+                </Text>
+                <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                  É o que dá mais prazo até pagar uma compra feita hoje.
+                </Text>
+              </Card>
+            );
+          })()}
           {cartoes.length === 0 ? (
             <EmptyState
               icon="credit-card"
@@ -49,6 +75,11 @@ export default function CartoesScreen() {
           ) : (
             cartoes.map((cartao) => {
               const disponivel = calcularLimiteDisponivel(cartao, compras, parcelas, gastos, faturas);
+              // fatura que recebe as compras de hoje: o valor dela até agora é a fatura prevista
+              const mesDaFatura = mesDeCobrancaDoGasto({ data: hoje, formaPagamento: 'cartao', cartaoId: cartao.id }, new Map([[cartao.id, cartao]]));
+              const grupo = calcularPagamentosDoMes(contasFixas, parcelas, compras, cartoes, gastos, faturas, mesDaFatura).grupos.find(
+                (g) => g.cartao?.id === cartao.id
+              );
               return (
                 <Pressable key={cartao.id} onPress={() => router.push(`/cartao/${cartao.id}`)}>
                   <Card style={{ backgroundColor: cartao.cor, borderWidth: 0 }}>
@@ -60,6 +91,12 @@ export default function CartoesScreen() {
                     </Text>
                     <Text className="font-body" style={{ color: '#FFFFFF', fontSize: 11, opacity: 0.75, marginTop: 2 }}>
                       disponível de {formatarMoeda(cartao.limite)}
+                    </Text>
+                    <Text className="font-body-medium" style={{ color: '#FFFFFF', fontSize: 12, marginTop: 10 }}>
+                      Fatura de {formatarMesReferencia(mesDaFatura).split(' ')[0]} (prevista): {formatarMoeda(grupo?.total ?? 0)}
+                    </Text>
+                    <Text className="font-body" style={{ color: '#FFFFFF', fontSize: 11, opacity: 0.75 }}>
+                      Fecha {formatarData(dataFechamentoDaFatura(mesDaFatura, cartao), 'dd/MM')} · vence dia {cartao.diaVencimento}
                     </Text>
                   </Card>
                 </Pressable>

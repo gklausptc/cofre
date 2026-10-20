@@ -9,6 +9,7 @@ import {
 } from '@/domain/usecases/notificacoes/planejarNotificacoes';
 import type { EfeitosDaImportacao } from '@/domain/repositories/importacoesRepository';
 import { agendarTodas, pedirPermissao, situacaoDaPermissao } from './notificationService';
+import { avisarOrcamentos } from './alertas';
 
 const iso = (d: Date) => format(d, 'yyyy-MM-dd');
 
@@ -100,6 +101,7 @@ export function pedirReagendamento(): void {
   espera = setTimeout(() => {
     espera = null;
     reagendarTodas().catch((erro: unknown) => console.warn('Falha ao reagendar notificações', erro));
+    avisarOrcamentos().catch((erro: unknown) => console.warn('Falha ao conferir orçamentos', erro));
   }, 1500);
 }
 
