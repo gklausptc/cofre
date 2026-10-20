@@ -31,7 +31,10 @@ import { unificarLancamentos } from '@/domain/usecases/unificarLancamentos';
 import { calcularResumoMensal } from '@/domain/usecases/calcularResumoMensal';
 import { calcularGastosPorCategoria } from '@/domain/usecases/calcularGastosPorCategoria';
 import { calcularGastosFixosDoMes } from '@/domain/usecases/calcularGastosFixosDoMes';
-import { mesAtualIso } from '@/core/utils/date';
+import { obterLancamentosDoPeriodo } from '@/domain/usecases/obterLancamentosDoPeriodo';
+import { calcularLivreParaGastar } from '@/domain/usecases/calcularLivreParaGastar';
+import { dataNoMes } from '@/domain/usecases/mesDaFatura';
+import { hojeIso, mesAnterior, mesAtualIso } from '@/core/utils/date';
 
 const MES_ATUAL = mesAtualIso();
 
@@ -60,7 +63,7 @@ export default function DashboardScreen() {
   const { movimentacoes, carregar: carregarMovimentacoes } = useMovimentacoesStore();
   const { gastos, carregar: carregarGastos } = useGastosRapidosStore();
   const { categorias, carregar: carregarCategorias } = useCategoriasStore();
-  const { reserva, carregar: carregarReserva } = useReservaEmergenciaStore();
+  const { reserva, historico: historicoReserva, carregar: carregarReserva } = useReservaEmergenciaStore();
   const { cofrinhos, carregar: carregarCofrinhos } = useCofrinhosStore();
   const { aportes, carregar: carregarAportes } = useAportesCofrinhoStore();
   const { membros, carregar: carregarMembros } = useMembrosFamiliaStore();
@@ -138,6 +141,43 @@ export default function DashboardScreen() {
         (p.compraParceladaId !== null && idsCompras.has(p.compraParceladaId))
     );
   }, [parcelas, membroSelecionadoId, contasFixasFiltradas, comprasFiltradas]);
+
+  // Livre para gastar: calculado da lista unificada de lançamentos (do mês passado até o
+  // fim deste, porque entrada reservada no mês anterior pesa neste). Com filtro de membro,
+  // só entram os lançamentos dele; cofrinhos e reserva são da casa toda.
+  const livre = useMemo(() => {
+    const semFiltro = membroSelecionadoId === null;
+    const lancamentos = obterLancamentosDoPeriodo(
+      `${mesAnterior(MES_ATUAL)}-01`,
+      dataNoMes(MES_ATUAL, 31),
+      {
+        movimentacoes: movimentacoesFiltradas,
+        gastos: gastosFiltrados,
+        parcelas: parcelasFiltradas,
+        contasFixas: contasFixasFiltradas,
+        comprasParceladas: comprasFiltradas,
+        cartoes,
+        faturas,
+        cofrinhos: semFiltro ? cofrinhos : [],
+        aportesCofrinho: semFiltro ? aportes : [],
+        movimentacoesReserva: semFiltro ? historicoReserva : [],
+      },
+      hojeIso()
+    );
+    return calcularLivreParaGastar(lancamentos, MES_ATUAL, hojeIso());
+  }, [
+    membroSelecionadoId,
+    movimentacoesFiltradas,
+    gastosFiltrados,
+    parcelasFiltradas,
+    contasFixasFiltradas,
+    comprasFiltradas,
+    cartoes,
+    faturas,
+    cofrinhos,
+    aportes,
+    historicoReserva,
+  ]);
 
   const saldoTotal = useMemo(
     () => calcularSaldoTotal(contas, movimentacoes, gastos),
@@ -313,6 +353,45 @@ export default function DashboardScreen() {
             </Card>
           </Pressable>
         </TourTarget>
+
+        <View style={{ height: 12 }} />
+
+        <Card style={{ marginHorizontal: 20 }}>
+          <Text className="font-body-medium" style={{ color: colors.textMuted, fontSize: 13 }}>
+            Livre para gastar até o fim do mês
+          </Text>
+          <Text
+            className="font-heading"
+            style={{ color: livre.livre < 0 ? colors.danger : colors.text, fontSize: 28, marginTop: 4 }}
+          >
+            {formatarMoeda(livre.livre)}
+          </Text>
+          <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+            {livre.porDia > 0
+              ? `${formatarMoeda(livre.porDia)} por dia nos próximos ${livre.diasRestantes} ${livre.diasRestantes === 1 ? 'dia' : 'dias'}`
+              : livre.livre < 0
+                ? 'As saídas previstas do mês já passam das entradas.'
+                : 'Nada livre até o fim do mês.'}
+          </Text>
+          <View style={{ marginTop: 12, gap: 4 }}>
+            {[
+              { rotulo: 'Entradas do mês', valor: livre.receitas, sinal: '+' },
+              { rotulo: 'Contas fixas', valor: livre.contasFixas, sinal: '−' },
+              { rotulo: 'Faturas de cartão', valor: livre.faturas, sinal: '−' },
+              { rotulo: 'Gastos fora do cartão', valor: livre.gastos, sinal: '−' },
+              { rotulo: 'Guardado em metas', valor: livre.guardado, sinal: '−' },
+            ].map((linha) => (
+              <View key={linha.rotulo} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12 }}>
+                  {linha.rotulo}
+                </Text>
+                <Text className="font-body-medium" style={{ color: colors.text, fontSize: 12 }}>
+                  {linha.sinal} {formatarMoeda(linha.valor)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </Card>
 
         <View style={{ height: 12 }} />
 

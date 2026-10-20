@@ -124,6 +124,15 @@ A fonte da verdade é `src/data/db/schema.ts`; toda mudança é uma migration no
 7. **`calcularProgressoCofrinho(cofrinhoId)`** — soma `aportes_cofrinho`, calcula percentual (`valorAtual / valorMeta`), e projeta data de conclusão com base na média de aportes dos últimos meses (regra simples: se não houver histórico suficiente, não mostrar previsão).
 8. **`calcularSaldoConta(contaBancariaId)`** — `saldoInicial + soma(entradas) - soma(saidas) +/- transferencias`.
 
+**Cofre 2.0 — modelo integrado (Fase 1):**
+
+- **`obterLancamentosDoPeriodo(inicio, fim, dados, hoje)`**: fonte única. Junta movimentações, gastos rápidos, parcelas, ocorrências de contas fixas, faturas (uma por cartão/mês de vencimento, somando o que é cobrado nela), aportes de cofrinho e movimentos da reserva num `LancamentoDoPeriodo` (`src/domain/types/lancamento.ts`) com `tipo`, `natureza` (receita/despesa/fatura/pagamento/transferencia/guardado/resgate), `status` (pago/previsto/atrasado), `competencia` (mês em que pesa: compra no cartão pesa no mês da fatura), `noCartao` e `link` para a tela. Agenda, Início, previsão, gráficos e notificações devem ler daqui.
+- **`calcularLivreParaGastar(lancamentos, mes, hoje)`**: receitas − contas fixas fora do cartão − faturas − gastos fora do cartão − guardado; devolve também o valor por dia restante. Card no Início.
+- **Pagamentos (`pagarFatura.ts`)**: `planejarPagamentoFatura` e `planejarPagamentoContaFixa` dão baixa e criam a saída ligada (`registrarPagamentoVinculado`, nunca duplica), tudo dentro de `emTransacao`.
+- **`ehPagamentoDeCompromisso` / `ehDespesa`**: a saída que paga fatura/conta fixa conta no saldo, não nos relatórios. Transferência nunca é receita nem despesa.
+- **`calcularLimiteDisponivel`**: compra à vista no cartão libera o limite quando a fatura dela é paga.
+- Testes das regras de integração em `src/domain/usecases/__tests__/integracao.test.ts`.
+
 ## 8. Rotas / telas a criar (Expo Router)
 
 | Rota | Conteúdo |
