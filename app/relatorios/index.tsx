@@ -2,19 +2,14 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { PieChart } from 'react-native-gifted-charts';
 import { addMonths, format } from 'date-fns';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { MonthSelector } from '@/components/MonthSelector';
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
+import { GraficoProjecao } from '@/components/GraficoProjecao';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
-import { useMovimentacoesStore } from '@/store/movimentacoesStore';
-import { useParcelasStore } from '@/store/parcelasStore';
-import { useGastosRapidosStore } from '@/store/gastosRapidosStore';
 import { useCategoriasStore } from '@/store/categoriasStore';
-import { calcularGastosPorCategoria } from '@/domain/usecases/calcularGastosPorCategoria';
-import { calcularResumoMensal } from '@/domain/usecases/calcularResumoMensal';
 import { formatarMoeda } from '@/core/utils/currency';
 import { formatarMesReferencia, hojeIso, mesAnterior } from '@/core/utils/date';
 import { Button } from '@/components/Button';
@@ -33,14 +28,18 @@ import { NOME_DO_APP } from '@/core/marca';
 
 const TODOS = 'todos';
 
+/** "12% a mais" / "8% a menos" / "igual". */
+function variacaoTexto(atual: number, anterior: number): string {
+  const pct = Math.round((atual / anterior - 1) * 100);
+  if (pct === 0) return 'igual';
+  return pct > 0 ? `${pct}% a mais` : `${-pct}% a menos`;
+}
+
 export default function RelatoriosScreen() {
   const { colors } = useAppTheme();
   const router = useRouter();
   const [mesReferencia, setMesReferencia] = useState(() => format(new Date(), 'yyyy-MM'));
 
-  const { movimentacoes, carregar: carregarMovimentacoes } = useMovimentacoesStore();
-  const { gastos, carregar: carregarGastos } = useGastosRapidosStore();
-  const { parcelas, carregar: carregarParcelas } = useParcelasStore();
   const { categorias, carregar: carregarCategorias } = useCategoriasStore();
 
   const { dados, contas, carregarTudo } = useDadosFinanceiros();
@@ -52,14 +51,11 @@ export default function RelatoriosScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      carregarMovimentacoes();
-      carregarGastos();
-      carregarParcelas();
       carregarCategorias();
       carregarTudo();
       carregarOrcamentos();
       carregarMembros();
-    }, [carregarMovimentacoes, carregarGastos, carregarCategorias, carregarParcelas, carregarTudo, carregarOrcamentos, carregarMembros])
+    }, [carregarCategorias, carregarTudo, carregarOrcamentos, carregarMembros])
   );
 
   const relatorio = useMemo(() => {
@@ -109,21 +105,6 @@ export default function RelatoriosScreen() {
     }
   }
 
-  const gastosPorCategoria = useMemo(
-    () => calcularGastosPorCategoria(movimentacoes, gastos, categorias, mesReferencia),
-    [movimentacoes, gastos, categorias, mesReferencia]
-  );
-  const resumo = useMemo(
-    () => calcularResumoMensal(movimentacoes, gastos, mesReferencia, parcelas),
-    [movimentacoes, gastos, mesReferencia, parcelas]
-  );
-
-  const dadosGrafico = gastosPorCategoria.map((item) => ({
-    value: item.total,
-    color: item.cor,
-    text: '',
-  }));
-
   function mudarMes(delta: number) {
     setMesReferencia((atual) => format(addMonths(new Date(`${atual}-01`), delta), 'yyyy-MM'));
   }
@@ -141,80 +122,105 @@ export default function RelatoriosScreen() {
         </View>
         <MonthSelector mesReferencia={mesReferencia} onAnterior={() => mudarMes(-1)} onProximo={() => mudarMes(1)} />
 
-        {gastosPorCategoria.length === 0 ? (
+        {relatorio.categorias.length === 0 && relatorio.resumo.receitas === 0 ? (
           <EmptyState
-            icon="pie-chart"
-            titulo="Sem gastos neste mês"
-            descricao="Lance movimentações ou gastos rápidos para ver o relatório por categoria."
+            icon="bar-chart-2"
+            titulo="Nada neste mês"
+            descricao="Lance gastos e entradas (ou importe o extrato) para ver o relatório do mês."
           />
         ) : (
-          <View style={{ paddingHorizontal: 20 }}>
-            <Card style={{ alignItems: 'center' }}>
-              <PieChart
-                data={dadosGrafico}
-                radius={90}
-                donut
-                innerRadius={56}
-                centerLabelComponent={() => (
-                  <View style={{ alignItems: 'center' }}>
-                    <Text className="font-body" style={{ color: colors.textMuted, fontSize: 11 }}>
-                      Total gasto
-                    </Text>
-                    <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15 }}>
-                      {formatarMoeda(resumo.despesas)}
-                    </Text>
-                  </View>
-                )}
-              />
-            </Card>
-
-            <View style={{ height: 16 }} />
-
-            <Card style={{ paddingVertical: 4 }}>
-              {gastosPorCategoria.map((item, index) => (
-                <View
-                  key={item.categoriaId ?? 'sem-categoria'}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    paddingVertical: 10,
-                    borderTopWidth: index === 0 ? 0 : 1,
-                    borderTopColor: colors.border,
-                  }}
-                >
-                  <View
-                    style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: item.cor, marginRight: 10 }}
-                  />
-                  <Text className="font-body-medium" style={{ color: colors.text, fontSize: 13, flex: 1 }}>
-                    {item.nome}
+          <View style={{ paddingHorizontal: 20, gap: 12 }}>
+            <Card>
+              {(
+                [
+                  ['Receitas', relatorio.resumo.receitas, relatorio.anterior.receitas, colors.success],
+                  ['Despesas', relatorio.resumo.despesas, relatorio.anterior.despesas, colors.danger],
+                ] as const
+              ).map(([rotulo, valor, antes, cor]) => (
+                <View key={rotulo} style={{ flexDirection: 'row', alignItems: 'baseline', paddingVertical: 4 }}>
+                  <Text className="font-body" style={{ color: colors.textMuted, fontSize: 13, flex: 1 }}>
+                    {rotulo}
+                    {antes > 0 && (
+                      <Text style={{ fontSize: 11 }}>{` · ${variacaoTexto(valor, antes)} que o mês anterior`}</Text>
+                    )}
                   </Text>
-                  <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginRight: 8 }}>
-                    {resumo.despesas > 0 ? Math.round((item.total / resumo.despesas) * 100) : 0}%
-                  </Text>
-                  <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 13 }}>
-                    {formatarMoeda(item.total)}
+                  <Text className="font-heading-medium" style={{ color: cor, fontSize: 15, fontVariant: ['tabular-nums'] }}>
+                    {formatarMoeda(valor)}
                   </Text>
                 </View>
               ))}
+              {relatorio.resumo.guardado !== 0 && (
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', paddingVertical: 4 }}>
+                  <Text className="font-body" style={{ color: colors.textMuted, fontSize: 13, flex: 1 }}>
+                    Guardado
+                  </Text>
+                  <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15, fontVariant: ['tabular-nums'] }}>
+                    {formatarMoeda(relatorio.resumo.guardado)}
+                  </Text>
+                </View>
+              )}
+              <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 6 }} />
+              <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                <Text className="font-body-medium" style={{ color: colors.text, fontSize: 13, flex: 1 }}>
+                  Sobrou
+                </Text>
+                <Text
+                  className="font-heading"
+                  style={{ color: relatorio.resumo.sobra >= 0 ? colors.text : colors.danger, fontSize: 18, fontVariant: ['tabular-nums'] }}
+                >
+                  {formatarMoeda(relatorio.resumo.sobra)}
+                </Text>
+              </View>
             </Card>
+
+            {relatorio.categorias.length > 0 && (
+              <Card>
+                <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15, marginBottom: 8 }}>
+                  Para onde foi o dinheiro
+                </Text>
+                {relatorio.categorias.map((c) => {
+                  const maior = Math.max(1, ...relatorio.categorias.map((x) => Math.max(x.total, x.orcamento ?? 0)));
+                  const parte = relatorio.resumo.despesas > 0 ? Math.round((c.total / relatorio.resumo.despesas) * 100) : 0;
+                  return (
+                    <View key={c.nome} style={{ marginBottom: 10 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text className="font-body-medium" style={{ color: colors.text, fontSize: 13, flex: 1 }} numberOfLines={1}>
+                          {c.nome} · {parte}%
+                        </Text>
+                        <Text className="font-body-medium" style={{ color: colors.text, fontSize: 13, fontVariant: ['tabular-nums'] }}>
+                          {formatarMoeda(c.total)}
+                        </Text>
+                      </View>
+                      <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.border, marginTop: 4, overflow: 'hidden' }}>
+                        <View style={{ height: 6, width: `${Math.max(2, Math.round((c.total / maior) * 100))}%`, backgroundColor: c.cor }} />
+                      </View>
+                      <Text className="font-body" style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                        {c.media > 0 ? `Média de 3 meses: ${formatarMoeda(c.media)}` : 'Sem média dos meses anteriores'}
+                        {c.orcamento !== null ? ` · orçamento ${formatarMoeda(c.orcamento)}` : ''}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </Card>
+            )}
           </View>
         )}
 
-        <View style={{ paddingHorizontal: 20, gap: 12, marginTop: 16 }}>
+        <View style={{ paddingHorizontal: 20, gap: 12, marginTop: 12 }}>
           <Card>
             <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15, marginBottom: 8 }}>
               Últimos 6 meses
             </Text>
-            {relatorio.ultimosMeses.map((m) => (
-              <View key={m.mes} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
-                <Text className="font-body" style={{ color: colors.text, fontSize: 13, textTransform: 'capitalize' }}>
-                  {formatarMesReferencia(m.mes).split(' ')[0]}
-                </Text>
-                <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, fontVariant: ['tabular-nums'] }}>
-                  {`entrou ${formatarMoeda(m.receitas)} · saiu ${formatarMoeda(m.despesas)}`}
-                </Text>
-              </View>
-            ))}
+            <GraficoProjecao
+              projecao={relatorio.ultimosMeses.map((m) => ({
+                mes: m.mes,
+                receitaPrevista: m.receitas,
+                despesaPrevista: m.despesas,
+                saldoPrevisto: m.receitas - m.despesas,
+              }))}
+              mesAtual={mesReferencia}
+              rotuloDaLinha="Sobra do mês"
+            />
           </Card>
 
           {relatorio.contas.length > 0 && (

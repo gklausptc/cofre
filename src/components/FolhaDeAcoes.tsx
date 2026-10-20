@@ -7,55 +7,118 @@ import { useAppTheme } from '@/core/theme/ThemeProvider';
 
 type Acao = { icone: React.ComponentProps<typeof Feather>['name']; titulo: string; descricao: string; href: Href };
 
-export const ACOES: Acao[] = [
-  { icone: 'zap', titulo: 'Gasto rápido', descricao: 'Valor, categoria e pronto', href: '/gasto-rapido' },
+/** O mais usado, em destaque no topo. */
+const PRINCIPAL: Acao = { icone: 'zap', titulo: 'Gasto rápido', descricao: 'Valor, categoria e pronto', href: '/gasto-rapido' };
+
+/** A grade do meio: lançamentos de conta e de cartão. */
+const GRADE: Acao[] = [
   { icone: 'arrow-down-left', titulo: 'Entrada', descricao: 'Salário, PIX recebido, reembolso', href: '/movimentacao/novo?tipo=entrada' },
-  { icone: 'repeat', titulo: 'Transferência', descricao: 'Entre contas suas', href: '/movimentacao/novo?tipo=transferencia' },
   { icone: 'arrow-up-right', titulo: 'Saída', descricao: 'Débito, pix ou boleto de uma conta', href: '/movimentacao/novo?tipo=saida' },
-  { icone: 'credit-card', titulo: 'Compra parcelada', descricao: 'No cartão, em várias vezes', href: '/compra-parcelada/novo' },
-  { icone: 'upload', titulo: 'Importar extratos', descricao: 'CSV, OFX ou PDF, um ou vários de uma vez', href: '/importar-extrato' },
+  { icone: 'repeat', titulo: 'Transferência', descricao: 'Entre contas suas', href: '/movimentacao/novo?tipo=transferencia' },
+  { icone: 'credit-card', titulo: 'Parcelada', descricao: 'Compra no cartão em várias vezes', href: '/compra-parcelada/novo' },
   { icone: 'file-text', titulo: 'Conta fixa', descricao: 'Aluguel, luz, internet, escola', href: '/conta-fixa/novo' },
   { icone: 'gift', titulo: 'Cofrinho', descricao: 'Guardar para um objetivo', href: '/cofrinho/novo' },
 ];
 
-/** A lista do botão (+): tudo o que dá para lançar, num lugar só. */
+/** Embaixo: trazer do banco. */
+const IMPORTAR: Acao = { icone: 'upload', titulo: 'Importar extratos', descricao: 'CSV, OFX ou PDF, um ou vários de uma vez', href: '/importar-extrato' };
+
+export const ACOES: Acao[] = [PRINCIPAL, ...GRADE, IMPORTAR];
+
+/** As ações do botão (+): gasto rápido em destaque, uma grade com o resto e a importação. */
 export function ListaDeAcoes({ onEscolher }: { onEscolher: (href: Href) => void }) {
   const { colors } = useAppTheme();
   return (
-    <View style={{ gap: 8 }}>
-      {ACOES.map((acao) => (
-        <Pressable
-          key={acao.titulo}
-          onPress={() => onEscolher(acao.href)}
-          accessibilityRole="button"
-          accessibilityLabel={`${acao.titulo}: ${acao.descricao}`}
-          style={({ pressed }) => ({
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 12,
-            padding: 12,
-            minHeight: 56,
-            borderRadius: 14,
-            borderWidth: 1,
-            borderColor: colors.border,
-            backgroundColor: colors.card,
-            opacity: pressed ? 0.7 : 1,
-          })}
-        >
-          <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' }}>
-            <Feather name={acao.icone} size={18} color="#FFFFFF" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text className="font-body-medium" style={{ color: colors.text, fontSize: 15 }}>
+    <View style={{ gap: 10 }}>
+      <Pressable
+        onPress={() => onEscolher(PRINCIPAL.href)}
+        accessibilityRole="button"
+        accessibilityLabel={`${PRINCIPAL.titulo}: ${PRINCIPAL.descricao}`}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          padding: 14,
+          minHeight: 64,
+          borderRadius: 16,
+          backgroundColor: colors.brand,
+          opacity: pressed ? 0.85 : 1,
+        })}
+      >
+        <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
+          <Feather name={PRINCIPAL.icone} size={20} color="#FFFFFF" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text className="font-heading-medium" style={{ color: '#FFFFFF', fontSize: 16 }}>
+            {PRINCIPAL.titulo}
+          </Text>
+          <Text className="font-body" style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12 }}>
+            {PRINCIPAL.descricao}
+          </Text>
+        </View>
+        <Feather name="chevron-right" size={18} color="#FFFFFF" />
+      </Pressable>
+
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 }}>
+        {GRADE.map((acao) => (
+          <Pressable
+            key={acao.titulo}
+            onPress={() => onEscolher(acao.href)}
+            accessibilityRole="button"
+            accessibilityLabel={`${acao.titulo}: ${acao.descricao}`}
+            style={({ pressed }) => ({
+              width: '31.5%',
+              minHeight: 92,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.card,
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingVertical: 12,
+              paddingHorizontal: 6,
+              gap: 8,
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
+            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
+              <Feather name={acao.icone} size={18} color={colors.brand} />
+            </View>
+            <Text className="font-body-medium" style={{ color: colors.text, fontSize: 13, textAlign: 'center' }} numberOfLines={1}>
               {acao.titulo}
             </Text>
-            <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12 }}>
-              {acao.descricao}
-            </Text>
-          </View>
-          <Feather name="chevron-right" size={18} color={colors.textMuted} />
-        </Pressable>
-      ))}
+          </Pressable>
+        ))}
+      </View>
+
+      <Pressable
+        onPress={() => onEscolher(IMPORTAR.href)}
+        accessibilityRole="button"
+        accessibilityLabel={`${IMPORTAR.titulo}: ${IMPORTAR.descricao}`}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          padding: 12,
+          minHeight: 56,
+          borderRadius: 14,
+          borderWidth: 1,
+          borderStyle: 'dashed',
+          borderColor: colors.brand,
+          opacity: pressed ? 0.7 : 1,
+        })}
+      >
+        <Feather name={IMPORTAR.icone} size={18} color={colors.brand} />
+        <View style={{ flex: 1 }}>
+          <Text className="font-body-medium" style={{ color: colors.text, fontSize: 14 }}>
+            {IMPORTAR.titulo}
+          </Text>
+          <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12 }}>
+            {IMPORTAR.descricao}
+          </Text>
+        </View>
+        <Feather name="chevron-right" size={18} color={colors.textMuted} />
+      </Pressable>
     </View>
   );
 }
@@ -96,8 +159,8 @@ export function FolhaDeAcoes({ visivel, onFechar, onEscolher, onFechada }: Props
             <View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border }} />
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 }}>
-            <Text className="font-heading" style={{ color: colors.text, fontSize: 20, flex: 1 }}>
-              O que você quer lançar?
+            <Text className="font-heading" style={{ color: colors.text, fontSize: 18, flex: 1 }}>
+              Lançar
             </Text>
             <Pressable onPress={onFechar} hitSlop={12} accessibilityRole="button" accessibilityLabel="Fechar" style={{ minHeight: 44, minWidth: 44, alignItems: 'flex-end', justifyContent: 'center' }}>
               <Feather name="x" size={22} color={colors.textMuted} />

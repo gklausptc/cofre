@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, format, parseISO, subDays } from 'date-fns';
+import { format, parseISO, subDays } from 'date-fns';
 import { mesAnterior } from '@/core/utils/date';
 import { ehDespesa, ehPagamentoDeCompromisso } from '@/domain/usecases/naturezaMovimentacao';
 import { textoParaRegra } from './categorizar';
