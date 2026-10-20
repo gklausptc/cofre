@@ -163,10 +163,7 @@ function RootNavigator() {
         <Stack.Screen name="cartoes" options={{ headerShown: true, title: 'Cartões' }} />
         <Stack.Screen name="planejamento" options={{ headerShown: true, title: 'Planejamento' }} />
         <Stack.Screen name="mais" options={{ headerShown: true, title: 'Mais' }} />
-        <Stack.Screen
-          name="acoes"
-          options={{ presentation: 'formSheet', headerShown: false, sheetAllowedDetents: [0.62, 0.95], sheetGrabberVisible: true }}
-        />
+        <Stack.Screen name="acoes" options={{ presentation: 'modal', headerShown: true, title: 'Lançar' }} />
         <Stack.Screen name="cofrinho/index" options={{ headerShown: true, title: 'Cofrinhos' }} />
         <Stack.Screen name="cofrinho/novo" options={{ headerShown: true, title: 'Novo cofrinho' }} />
         <Stack.Screen name="cofrinho/[id]" options={{ headerShown: true, title: 'Cofrinho' }} />
@@ -174,9 +171,11 @@ function RootNavigator() {
         <Stack.Screen name="membro/novo" options={{ headerShown: true, title: 'Novo membro' }} />
         <Stack.Screen name="reserva-emergencia/index" options={{ headerShown: true, title: 'Reserva de emergência' }} />
         <Stack.Screen name="relatorios/index" options={{ headerShown: true, title: 'Relatórios' }} />
+        <Stack.Screen name="relatorios/anual" options={{ headerShown: true, title: 'Relatório do ano' }} />
         <Stack.Screen name="importar-extrato/index" options={{ headerShown: true, title: 'Importar extrato' }} />
         <Stack.Screen name="importar-extrato/resultado" options={{ headerShown: true, title: 'Resultado' }} />
         <Stack.Screen name="importar-extrato/historico" options={{ headerShown: true, title: 'Importações' }} />
+        <Stack.Screen name="importar-extrato/lote" options={{ headerShown: true, title: 'Importar vários' }} />
         <Stack.Screen name="regras/index" options={{ headerShown: true, title: 'Regras aprendidas' }} />
         <Stack.Screen name="revisao/index" options={{ headerShown: true, title: 'Revisão' }} />
         <Stack.Screen name="exportar-extrato/index" options={{ headerShown: true, title: 'Exportar extrato' }} />

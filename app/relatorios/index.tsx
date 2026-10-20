@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { PieChart } from 'react-native-gifted-charts';
 import { addMonths, format } from 'date-fns';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -35,6 +35,7 @@ const TODOS = 'todos';
 
 export default function RelatoriosScreen() {
   const { colors } = useAppTheme();
+  const router = useRouter();
   const [mesReferencia, setMesReferencia] = useState(() => format(new Date(), 'yyyy-MM'));
 
   const { movimentacoes, carregar: carregarMovimentacoes } = useMovimentacoesStore();
@@ -131,6 +132,13 @@ export default function RelatoriosScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <ScreenHeader title="Relatórios" subtitle="Para onde seu dinheiro está indo" />
+        <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
+          <Button
+            titulo={`Ver o ano de ${mesReferencia.slice(0, 4)} inteiro`}
+            variante="secundaria"
+            onPress={() => router.push({ pathname: '/relatorios/anual', params: { ano: mesReferencia.slice(0, 4) } })}
+          />
+        </View>
         <MonthSelector mesReferencia={mesReferencia} onAnterior={() => mudarMes(-1)} onProximo={() => mudarMes(1)} />
 
         {gastosPorCategoria.length === 0 ? (

@@ -103,7 +103,7 @@ export function montarRelatorio(params: {
   };
 }
 
-const escapar = (texto: string) =>
+export const escapar = (texto: string) =>
   texto.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 function variacao(atual: number, anterior: number): string {
@@ -112,7 +112,7 @@ function variacao(atual: number, anterior: number): string {
   return pct === 0 ? ' (igual ao mês anterior)' : ` (${pct > 0 ? '+' : ''}${pct}% sobre o mês anterior)`;
 }
 
-function barra(valor: number, maximo: number, cor: string): string {
+export function barra(valor: number, maximo: number, cor: string): string {
   const largura = maximo > 0 ? Math.max(1, Math.round((valor / maximo) * 100)) : 0;
   return `<div class="trilho"><div class="barra" style="width:${largura}%;background:${cor}"></div></div>`;
 }
@@ -126,6 +126,23 @@ const NATUREZA: Record<LancamentoDoPeriodo['natureza'], string> = {
   guardado: 'Guardado',
   resgate: 'Resgate',
 };
+
+/** CSS dos relatórios em PDF (mês e ano). */
+export const ESTILO_DO_RELATORIO = `  @page { margin: 18mm 14mm; }
+  body { font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; color: #0F1320; font-size: 11px; }
+  h1 { font-size: 18px; margin: 0; color: #2A5CE0; }
+  h2 { font-size: 13px; margin: 18px 0 6px; border-bottom: 1px solid #CBD2E0; padding-bottom: 4px; }
+  .sub { color: #666E7E; margin: 4px 0 0; }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { padding: 4px 6px; border-bottom: 1px solid #E4E8EF; text-align: left; }
+  th { color: #666E7E; font-weight: 600; }
+  .valor { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .nota { color: #666E7E; font-size: 10px; }
+  .categoria { margin-bottom: 8px; page-break-inside: avoid; }
+  .topo { display: flex; justify-content: space-between; margin-bottom: 2px; }
+  .trilho { height: 7px; background: #E4E8EF; border-radius: 4px; margin: 2px 0; overflow: hidden; }
+  .barra { height: 7px; border-radius: 4px; }
+`;
 
 /** HTML do relatório para o expo-print (A4, cores da marca, sem imagens externas). */
 export function relatorioEmHtml(r: Relatorio): string {
@@ -187,21 +204,7 @@ export function relatorioEmHtml(r: Relatorio): string {
 
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8" /><title>${escapar(r.titulo)}</title>
 <style>
-  @page { margin: 18mm 14mm; }
-  body { font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; color: #0F1320; font-size: 11px; }
-  h1 { font-size: 18px; margin: 0; color: #2A5CE0; }
-  h2 { font-size: 13px; margin: 18px 0 6px; border-bottom: 1px solid #CBD2E0; padding-bottom: 4px; }
-  .sub { color: #666E7E; margin: 4px 0 0; }
-  table { width: 100%; border-collapse: collapse; }
-  td, th { padding: 4px 6px; border-bottom: 1px solid #E4E8EF; text-align: left; }
-  th { color: #666E7E; font-weight: 600; }
-  .valor { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .nota { color: #666E7E; font-size: 10px; }
-  .categoria { margin-bottom: 8px; page-break-inside: avoid; }
-  .topo { display: flex; justify-content: space-between; margin-bottom: 2px; }
-  .trilho { height: 7px; background: #E4E8EF; border-radius: 4px; margin: 2px 0; overflow: hidden; }
-  .barra { height: 7px; border-radius: 4px; }
-</style></head><body>
+${ESTILO_DO_RELATORIO}</style></head><body>
 <h1>${escapar(r.titulo)}</h1>
 <p class="sub">${escapar(formatarMesReferencia(r.mes))}${r.membro ? ` · ${escapar(r.membro)}` : ''} · gerado em ${escapar(r.geradoEm)}</p>
 ${secoes.join('\n')}

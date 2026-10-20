@@ -11,6 +11,8 @@ type Props = {
   /** Mês atual ('YYYY-MM'), em destaque; os seguintes aparecem como previsão. */
   mesAtual?: string;
   altura?: number;
+  /** Nome da linha (padrão "Saldo previsto"; no relatório do ano, "Sobra acumulada"). */
+  rotuloDaLinha?: string;
 };
 
 const MARGEM = { topo: 12, base: 30, esquerda: 4, direita: 4 };
@@ -40,7 +42,7 @@ function Legenda({ cor, rotulo, linha }: { cor: string; rotulo: string; linha?: 
  * saldo previsto (que pode ficar negativo). O mês atual fica em destaque; os seguintes,
  * mais claros, são previsão.
  */
-export function GraficoProjecao({ projecao, mesAtual = mesAtualIso(), altura = 190 }: Props) {
+export function GraficoProjecao({ projecao, mesAtual = mesAtualIso(), altura = 190, rotuloDaLinha = 'Saldo previsto' }: Props) {
   const { colors } = useAppTheme();
   const [largura, setLargura] = useState(0);
   const aoMedir = (e: LayoutChangeEvent) => setLargura(e.nativeEvent.layout.width);
@@ -151,7 +153,7 @@ export function GraficoProjecao({ projecao, mesAtual = mesAtualIso(), altura = 1
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 }}>
         <Legenda cor={colors.success} rotulo="Receita" />
         <Legenda cor={colors.danger} rotulo="Despesa" />
-        <Legenda cor={colors.brand} rotulo="Saldo previsto" linha />
+        <Legenda cor={colors.brand} rotulo={rotuloDaLinha} linha />
       </View>
     </View>
   );
