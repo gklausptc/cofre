@@ -1,5 +1,6 @@
 import { Inflate, unzlibSync } from 'fflate';
-import { aesCbcDecifrar, md5, rc4 } from './criptografia';
+import { aesCbcCifrarSemPreenchimento, aesCbcDecifrar, aesCbcDecifrarSemPreenchimento, md5, rc4 } from './criptografia';
+import { sha256, sha384, sha512 } from './hash';
 import { criarFonte, type Fonte } from './fontes';
 import {
   ESPACO,
@@ -149,7 +150,7 @@ function senhaPreenchida(senha: Uint8Array): Uint8Array {
   return juntar(senha.subarray(0, 32), PREENCHIMENTO).subarray(0, 32);
 }
 
-type Metodo = 'rc4' | 'aes' | 'nenhum';
+type Metodo = 'rc4' | 'aes' | 'aes256' | 'nenhum';
 type Protecao = { chave: Uint8Array; fluxos: Metodo; textos: Metodo };
 type ParametrosProtecao = { r: number; tamanho: number; o: Uint8Array; u: Uint8Array; p: number; id: Uint8Array; metadados: boolean };
 
@@ -182,6 +183,56 @@ function senhaDoUsuarioPelaDoDono(senhaDono: Uint8Array, prm: ParametrosProtecao
   let x = prm.o.subarray(0, 32);
   for (let i = 19; i >= 0; i--) x = rc4(chave.map((b) => b ^ i), x);
   return x;
+}
+
+// ---------------------------------------------------------------- AES-256 (revisões 5 e 6)
+
+/** Senha em UTF-8, no máximo 127 bytes (sem depender de TextEncoder). */
+function senhaUtf8(senha: string): Uint8Array {
+  const bytes: number[] = [];
+  for (const caractere of senha) {
+    const c = caractere.codePointAt(0) ?? 0;
+    if (c < 0x80) bytes.push(c);
+    else if (c < 0x800) bytes.push(0xc0 | (c >> 6), 0x80 | (c & 63));
+    else if (c < 0x10000) bytes.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+    else bytes.push(0xf0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+  }
+  return Uint8Array.from(bytes.slice(0, 127));
+}
+
+/** Algoritmo 2.B (revisão 6) ou o SHA-256 simples (revisão 5). */
+function hashDaSenha(senha: Uint8Array, sal: Uint8Array, extra: Uint8Array, revisao: number): Uint8Array {
+  let k: Uint8Array = sha256(juntar(senha, sal, extra));
+  if (revisao < 6) return k;
+  let e: Uint8Array = new Uint8Array([0]);
+  for (let i = 0; i < 64 || e[e.length - 1] > i - 32; i++) {
+    const uma = juntar(senha, k, extra);
+    const repetida = new Uint8Array(uma.length * 64);
+    for (let j = 0; j < 64; j++) repetida.set(uma, j * uma.length);
+    e = aesCbcCifrarSemPreenchimento(k.subarray(0, 16), k.subarray(16, 32), repetida);
+    let soma = 0;
+    for (let j = 0; j < 16; j++) soma += e[j];
+    k = soma % 3 === 0 ? sha256(e) : soma % 3 === 1 ? sha384(e) : sha512(e);
+  }
+  return k.subarray(0, 32);
+}
+
+const iguais = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((v, i) => v === b[i]);
+
+/** Chave do arquivo com AES-256: pela senha do usuário ou do dono (null = senha errada). */
+function chaveAes256(senha: string, o: Uint8Array, u: Uint8Array, oe: Uint8Array, ue: Uint8Array, revisao: number): Uint8Array | null {
+  const bytes = senhaUtf8(senha);
+  const zeros = new Uint8Array(16);
+  if (u.length >= 48 && iguais(hashDaSenha(bytes, u.subarray(32, 40), new Uint8Array(0), revisao), u.subarray(0, 32))) {
+    const intermediaria = hashDaSenha(bytes, u.subarray(40, 48), new Uint8Array(0), revisao);
+    return aesCbcDecifrarSemPreenchimento(intermediaria, zeros, ue.subarray(0, 32));
+  }
+  const u48 = u.subarray(0, 48);
+  if (o.length >= 48 && iguais(hashDaSenha(bytes, o.subarray(32, 40), u48, revisao), o.subarray(0, 32))) {
+    const intermediaria = hashDaSenha(bytes, o.subarray(40, 48), u48, revisao);
+    return aesCbcDecifrarSemPreenchimento(intermediaria, zeros, oe.subarray(0, 32));
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------- documento
@@ -272,7 +323,28 @@ export class DocumentoPdf {
     if (nome('Filter') !== 'Standard') return 'nao_suportado';
     const versao = numero('V', 0);
     const r = numero('R', 2);
-    if (versao >= 5 || r >= 5) return 'nao_suportado';
+    if (versao >= 5 || r >= 5) {
+      // AES-256: a chave do arquivo vem de UE/OE, sem MD5 nem chave por objeto
+      if (r !== 5 && r !== 6) return 'nao_suportado';
+      const filtros = this.resolver(enc.v.get('CF'));
+      const metodoDe = (filtro: string | null): Metodo => {
+        if (filtro === 'Identity' || filtro === null) return 'nenhum';
+        const cf = ehDic(filtros) ? this.resolver(filtros.v.get(filtro)) : null;
+        const cfm = ehDic(cf) ? cf.v.get('CFM') : undefined;
+        return ehNome(cfm) && cfm.v === 'None' ? 'nenhum' : 'aes256';
+      };
+      const fluxos256 = metodoDe(nome('StmF'));
+      const textos256 = metodoDe(nome('StrF'));
+      for (const tentativa of senha === '' ? [''] : ['', senha]) {
+        const chave = chaveAes256(tentativa, bytes('O'), bytes('U'), bytes('OE'), bytes('UE'), r);
+        if (chave) {
+          this.protecao = { chave, fluxos: fluxos256, textos: textos256 };
+          this.cache.clear();
+          return 'ok';
+        }
+      }
+      return 'senha';
+    }
 
     let fluxos: Metodo = 'rc4';
     let textos: Metodo = 'rc4';
@@ -325,6 +397,7 @@ export class DocumentoPdf {
 
   private decifrar(dados: Uint8Array, num: number, gen: number, metodo: Metodo): Uint8Array {
     if (!this.protecao || metodo === 'nenhum' || num === this.numeroDaProtecao) return dados;
+    if (metodo === 'aes256') return aesCbcDecifrar(this.protecao.chave, dados);
     const sufixo = [num & 255, (num >> 8) & 255, (num >> 16) & 255, gen & 255, (gen >> 8) & 255];
     const sal = metodo === 'aes' ? [0x73, 0x41, 0x6c, 0x54] : [];
     const chave = md5(juntar(this.protecao.chave, Uint8Array.from([...sufixo, ...sal]))).subarray(
@@ -720,7 +793,12 @@ export function lerTextoDoPdf(bytes: Uint8Array, senha = ''): ResultadoPdf {
   } catch {
     return { ok: false, motivo: 'invalido' };
   }
-  const aberto = doc.abrir(senha);
+  let aberto: ReturnType<DocumentoPdf['abrir']>;
+  try {
+    aberto = doc.abrir(senha);
+  } catch {
+    return { ok: false, motivo: 'protecao_nao_suportada' };
+  }
   if (aberto === 'nao_suportado') return { ok: false, motivo: 'protecao_nao_suportada' };
   if (aberto === 'senha') return { ok: false, motivo: senha === '' ? 'precisa_senha' : 'senha_errada' };
   try {

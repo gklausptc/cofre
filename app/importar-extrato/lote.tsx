@@ -12,7 +12,7 @@ import { TextField } from '@/components/TextField';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { formatarMoeda } from '@/core/utils/currency';
 import { formatarData } from '@/core/utils/date';
-import { lerArquivoDeExtrato, TIPOS_DE_ARQUIVO_DE_EXTRATO } from '@/core/importacao/lerArquivoDeExtrato';
+import { detalheDoErro, lerArquivoDeExtrato, TIPOS_DE_ARQUIVO_DE_EXTRATO } from '@/core/importacao/lerArquivoDeExtrato';
 import { useContasBancariasStore } from '@/store/contasBancariasStore';
 import { useCartoesStore } from '@/store/cartoesStore';
 import { useMovimentacoesStore } from '@/store/movimentacoesStore';
@@ -154,8 +154,8 @@ export default function ImportarLoteScreen() {
         else if (lido.motivo === 'precisa_mapear') {
           atualizacao = { estado: 'erro', mensagem: 'CSV num formato que o app não conhece: importe este sozinho para dizer qual coluna é qual.' };
         } else atualizacao = { estado: 'erro', mensagem: lido.mensagem };
-      } catch {
-        atualizacao = { estado: 'erro', mensagem: 'Não consegui abrir esse arquivo.' };
+      } catch (falha) {
+        atualizacao = { estado: 'erro', mensagem: `Não consegui abrir esse arquivo. Detalhe técnico: ${detalheDoErro(falha)}` };
       }
       setItens((atuais) => atuais.map((i) => (i.chave === arquivo.uri ? { ...i, ...atualizacao } : i)));
     }

@@ -24,7 +24,7 @@ import { useFaturasStore } from '@/store/faturasStore';
 import { useRegrasStore } from '@/store/regrasStore';
 import { usePreferenciasStore } from '@/store/preferenciasStore';
 import { TextField } from '@/components/TextField';
-import { lerArquivoDeExtrato, TIPOS_DE_ARQUIVO_DE_EXTRATO } from '@/core/importacao/lerArquivoDeExtrato';
+import { detalheDoErro, lerArquivoDeExtrato, TIPOS_DE_ARQUIVO_DE_EXTRATO } from '@/core/importacao/lerArquivoDeExtrato';
 import { lerCsvComMapeamento, type TabelaCsv } from '@/domain/usecases/importacao/lerExtrato';
 import {
   analisarImportacao,
@@ -228,8 +228,8 @@ export default function ImportarExtratoScreen() {
     let leitura: Awaited<ReturnType<typeof lerArquivoDeExtrato>>;
     try {
       leitura = await lerArquivoDeExtrato(uri, nome, senhaDoPdf);
-    } catch {
-      setErro('Não consegui abrir esse arquivo.');
+    } catch (falha) {
+      setErro(`Não consegui abrir esse arquivo. Detalhe técnico: ${detalheDoErro(falha)}`);
       return;
     } finally {
       setAbrindo(false);

@@ -100,3 +100,48 @@ describe('dados do cabeçalho', () => {
     expect(nomeDaContaNova('bb', 'Banco do Brasil', { agencia: '1', numero: '99887-6', tipo: 'poupanca' })).toBe('Banco do Brasil · Poupança 9887');
   });
 });
+
+describe('lerExtratoDoPdf: tabela por colunas (layout da InfinitePay, dados inventados)', () => {
+  const cabecalho = (y: number) =>
+    linha(y, [13, 'Data'], [96, 'Hora'], [164, 'Tipo de transação'], [299, 'Nome'], [568, 'Detalhe'], [788, 'Valor (R$)']);
+  const paginas: LinhaDePdf[][] = [
+    [
+      linha(560, [16, 'Relatório de movimentações']),
+      linha(555, [600, 'FULANA DE TAL - CPF: 000.000.000-00']),
+      linha(545, [650, 'CLOUDWALK - 0001 - 1234567-8']),
+      linha(520, [420, 'Saldo inicial'], [800, '+ 100,00']),
+      cabecalho(500),
+      linha(486, [13, '05 Mai, 2026'], [96, '14:09'], [164, 'Pix'], [299, 'Pix FULANO SILVA'], [568, 'Recebido'], [815, '+20,00']),
+      linha(470, [96, '17:04'], [164, 'Pix'], [299, 'Pix MERCADO BOM'], [568, 'Enviado'], [818, '-7,60']),
+      linha(456, [164, 'Saldo do dia'], [805, '+ 112,40']),
+      cabecalho(440),
+      linha(428, [13, '09 Mai, 2026'], [299, 'Pix SHPP BRASIL INSTITUICAO DE PAGAMENTO E']),
+      linha(422, [96, '17:20'], [164, 'Pix'], [568, 'Enviado'], [815, '-18,90']),
+      linha(416, [299, 'SERVICOS DE PAGAMENTOS LTDA']),
+      linha(404, [96, '17:25'], [164, 'Cartão'], [299, 'SONDA VILA ROMANA'], [568, 'fulanadetal'], [815, '-69,37']),
+      linha(390, [96, '18:00'], [164, 'Boleto'], [299, 'SABESP'], [568, 'Pagamento efetuado'], [815, '-73,20']),
+      linha(376, [96, '18:10'], [164, 'Depósito de vendas'], [299, 'Vendas'], [568, 'Depósito InfinitePay'], [800, '+1.065,35']),
+      linha(362, [164, 'Saldo do dia'], [800, '+ 1.016,28']),
+      linha(30, [10, 'A Central de Ajuda está disponível todos os dias'], [780, 'Página 1 de 2']),
+    ],
+  ];
+
+  it('data só na primeira linha do dia, nome em duas linhas, sinal de + e -', () => {
+    const extrato = lerExtratoDoPdf(paginas, 'relatório.pdf');
+    expect(extrato?.transacoes.map((t) => [t.data, t.valor, t.descricao])).toEqual([
+      ['2026-05-05', 2000, 'Pix Recebido FULANO SILVA'],
+      ['2026-05-05', -760, 'Pix Enviado MERCADO BOM'],
+      ['2026-05-09', -1890, 'Pix Enviado SHPP BRASIL INSTITUICAO DE PAGAMENTO E SERVICOS DE PAGAMENTOS LTDA'],
+      ['2026-05-09', -6937, 'Compra no cartão SONDA VILA ROMANA'],
+      ['2026-05-09', -7320, 'Pagamento de boleto SABESP'],
+      ['2026-05-09', 106535, 'Depósito de vendas Depósito InfinitePay'],
+    ]);
+    expect(extrato).toMatchObject({
+      banco: 'infinitepay',
+      origem: 'conta',
+      titular: 'FULANA DE TAL',
+      conta: { agencia: '0001', numero: '1234567-8' },
+      saldoAnterior: 10000,
+    });
+  });
+});

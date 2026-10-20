@@ -7,9 +7,20 @@ import { lerExtratoDoPdf } from '@/domain/usecases/importacao/lerPdf';
 /** Leitura de um arquivo de extrato: o mesmo que `lerExtrato`, mais o PDF que pede senha. */
 export type ResultadoDoArquivo = ResultadoLeitura | { ok: false; motivo: 'precisa_senha' | 'senha_errada'; mensagem: string };
 
+/** Texto curto do erro, para a mensagem dizer onde parou (ajuda a corrigir o leitor). */
+export function detalheDoErro(erro: unknown): string {
+  if (erro instanceof Error) return `${erro.name}: ${erro.message}`.slice(0, 160);
+  return String(erro).slice(0, 160);
+}
+
 /** PDF → extrato, abrindo com a senha quando o arquivo tem. */
 export function lerPdfDeExtrato(bytes: Uint8Array, nome: string, senha = ''): ResultadoDoArquivo {
-  const pdf = lerTextoDoPdf(bytes, senha);
+  let pdf: ReturnType<typeof lerTextoDoPdf>;
+  try {
+    pdf = lerTextoDoPdf(bytes, senha);
+  } catch (erro) {
+    return { ok: false, motivo: 'nao_suportado', mensagem: `Não consegui ler esse PDF. Detalhe técnico: ${detalheDoErro(erro)}` };
+  }
   if (!pdf.ok) {
     if (pdf.motivo === 'precisa_senha') {
       return { ok: false, motivo: 'precisa_senha', mensagem: 'Esse PDF tem senha. Digite a senha do arquivo (o banco costuma usar parte do seu CPF).' };
@@ -22,9 +33,18 @@ export function lerPdfDeExtrato(bytes: Uint8Array, nome: string, senha = ''): Re
         mensagem: 'Esse PDF usa uma proteção que o app ainda não abre. Exporte em CSV ou OFX, ou baixe o PDF sem senha.',
       };
     }
-    return { ok: false, motivo: 'nao_suportado', mensagem: 'Não consegui ler esse PDF.' };
+    return { ok: false, motivo: 'nao_suportado', mensagem: 'Não consegui ler esse PDF (a estrutura do arquivo não foi reconhecida).' };
   }
-  const extrato = lerExtratoDoPdf(pdf.paginas, nome);
+  let extrato: ReturnType<typeof lerExtratoDoPdf>;
+  try {
+    extrato = lerExtratoDoPdf(pdf.paginas, nome);
+  } catch (erro) {
+    return {
+      ok: false,
+      motivo: 'nao_suportado',
+      mensagem: `Abri o PDF, mas não consegui montar os lançamentos. Detalhe técnico: ${detalheDoErro(erro)}`,
+    };
+  }
   if (!extrato) {
     const temTexto = pdf.paginas.some((p) => p.length > 0);
     return {
@@ -46,7 +66,11 @@ export async function lerArquivoDeExtrato(uri: string, nome: string, senha = '')
   const arquivo = new File(uri);
   let bytes: Uint8Array | null = null;
   if (/\.pdf$/i.test(nome)) {
-    bytes = await arquivo.bytes();
+    try {
+      bytes = await arquivo.bytes();
+    } catch (erro) {
+      return { ok: false, motivo: 'nao_suportado', mensagem: `Não consegui abrir o arquivo no aparelho. Detalhe técnico: ${detalheDoErro(erro)}` };
+    }
     if (ehPdf(bytes)) return lerPdfDeExtrato(bytes, nome, senha);
   }
   let texto: string | null = null;

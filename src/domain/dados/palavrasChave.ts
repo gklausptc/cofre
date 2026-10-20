@@ -128,7 +128,11 @@ export const PALAVRAS_CHAVE_RECEITA: { categoria: string; palavras: string[] }[]
   },
   {
     categoria: 'Reembolsos e estornos',
-    palavras: ['CASHBACK', 'REEMBOLSO', 'ESTORNO', 'DEVOLUCAO', 'DEVOLUC', 'CREDITO DE COMPRA', 'CANCELAMENTO'],
+    palavras: ['CASHBACK', 'REEMBOLSO', 'ESTORNO', 'DEVOLUCAO', 'DEVOLUC', 'DEVOLVID', 'CREDITO DE COMPRA', 'CANCELAMENTO'],
+  },
+  {
+    categoria: 'Outras receitas',
+    palavras: ['DEPOSITO DE VENDAS', 'VENDAS ', 'VENDA ', 'RECEBIMENTO DE VENDAS', 'ANTECIPACAO DE VENDAS'],
   },
 ];
 

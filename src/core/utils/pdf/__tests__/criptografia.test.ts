@@ -1,5 +1,13 @@
 import { describe, expect, it } from '@jest/globals';
-import { aesCbcDecifrar, aesDecifrarBloco, md5, rc4 } from '@/core/utils/pdf/criptografia';
+import {
+  aesCbcCifrarSemPreenchimento,
+  aesCbcDecifrar,
+  aesCbcDecifrarSemPreenchimento,
+  aesCifrarBloco,
+  aesDecifrarBloco,
+  md5,
+  rc4,
+} from '@/core/utils/pdf/criptografia';
 
 const hex = (bytes: Uint8Array) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 const deHex = (texto: string) => Uint8Array.from(texto.match(/../g) ?? [], (h) => parseInt(h, 16));
@@ -42,5 +50,20 @@ describe('aes', () => {
     const chave = deHex('2b7e151628aed2a6abf7158809cf4f3c');
     const dados = deHex('000102030405060708090a0b0c0d0e0f' + '7649abac8119b246cee98e9b12e9197d' + '5086cb9b507219ee95db113a917678b2');
     expect(hex(aesCbcDecifrar(chave, dados))).toBe('6bc1bee22e409f96e93d7e117393172a' + 'ae2d8a571e03ac9c9eb76fac45af8e51');
+  });
+});
+
+describe('aes para cifrar', () => {
+  it('FIPS-197 e ida e volta no CBC', () => {
+    expect(hex(aesCifrarBloco(deHex('000102030405060708090a0b0c0d0e0f'), deHex('00112233445566778899aabbccddeeff')))).toBe(
+      '69c4e0d86a7b0430d8cdb78070b4c55a'
+    );
+    // NIST SP 800-38A F.2.1 (CBC-AES128.Encrypt)
+    const chave = deHex('2b7e151628aed2a6abf7158809cf4f3c');
+    const iv = deHex('000102030405060708090a0b0c0d0e0f');
+    const claro = deHex('6bc1bee22e409f96e93d7e117393172a' + 'ae2d8a571e03ac9c9eb76fac45af8e51');
+    const cifrado = aesCbcCifrarSemPreenchimento(chave, iv, claro);
+    expect(hex(cifrado)).toBe('7649abac8119b246cee98e9b12e9197d' + '5086cb9b507219ee95db113a917678b2');
+    expect(hex(aesCbcDecifrarSemPreenchimento(chave, iv, cifrado))).toBe(hex(claro));
   });
 });

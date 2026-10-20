@@ -217,3 +217,74 @@ export function aesCbcDecifrar(chave: Uint8Array, dados: Uint8Array): Uint8Array
   const preenchimento = saida[saida.length - 1];
   return preenchimento >= 1 && preenchimento <= 16 ? saida.subarray(0, saida.length - preenchimento) : saida;
 }
+
+// ---------------------------------------------------------------- AES para cifrar (o "hash 2.B" do AES-256 usa)
+
+function cifrarBloco(w: Uint8Array, rodadas: number, bloco: Uint8Array): Uint8Array {
+  const s = bloco.slice(0, 16);
+  const somarChave = (rodada: number) => {
+    for (let i = 0; i < 16; i++) s[i] ^= w[rodada * 16 + i];
+  };
+  const substituir = () => {
+    for (let i = 0; i < 16; i++) s[i] = SBOX[s[i]];
+  };
+  const deslocar = () => {
+    const copia = s.slice();
+    for (let linha = 1; linha < 4; linha++) {
+      for (let coluna = 0; coluna < 4; coluna++) s[linha + 4 * coluna] = copia[linha + 4 * ((coluna + linha) % 4)];
+    }
+  };
+  const misturar = () => {
+    for (let c = 0; c < 4; c++) {
+      const [a0, a1, a2, a3] = [s[4 * c], s[4 * c + 1], s[4 * c + 2], s[4 * c + 3]];
+      s[4 * c] = multiplicar(a0, 2) ^ multiplicar(a1, 3) ^ a2 ^ a3;
+      s[4 * c + 1] = a0 ^ multiplicar(a1, 2) ^ multiplicar(a2, 3) ^ a3;
+      s[4 * c + 2] = a0 ^ a1 ^ multiplicar(a2, 2) ^ multiplicar(a3, 3);
+      s[4 * c + 3] = multiplicar(a0, 3) ^ a1 ^ a2 ^ multiplicar(a3, 2);
+    }
+  };
+  somarChave(0);
+  for (let rodada = 1; rodada < rodadas; rodada++) {
+    substituir();
+    deslocar();
+    misturar();
+    somarChave(rodada);
+  }
+  substituir();
+  deslocar();
+  somarChave(rodadas);
+  return s;
+}
+
+export function aesCifrarBloco(chave: Uint8Array, bloco: Uint8Array): Uint8Array {
+  const { w, rodadas } = expandirChave(chave);
+  return cifrarBloco(w, rodadas, bloco);
+}
+
+/** AES-CBC para cifrar, sem preenchimento (o tamanho já é múltiplo de 16). */
+export function aesCbcCifrarSemPreenchimento(chave: Uint8Array, iv: Uint8Array, dados: Uint8Array): Uint8Array {
+  const { w, rodadas } = expandirChave(chave);
+  const saida = new Uint8Array(dados.length);
+  let anterior: Uint8Array = iv.slice(0, 16);
+  const bloco = new Uint8Array(16);
+  for (let inicio = 0; inicio + 16 <= dados.length; inicio += 16) {
+    for (let i = 0; i < 16; i++) bloco[i] = dados[inicio + i] ^ anterior[i];
+    anterior = cifrarBloco(w, rodadas, bloco);
+    saida.set(anterior, inicio);
+  }
+  return saida;
+}
+
+/** AES-CBC para decifrar, com o vetor inicial à parte e sem tirar preenchimento (chaves UE/OE do PDF). */
+export function aesCbcDecifrarSemPreenchimento(chave: Uint8Array, iv: Uint8Array, dados: Uint8Array): Uint8Array {
+  const { w, rodadas } = expandirChave(chave);
+  const saida = new Uint8Array(dados.length);
+  let anterior: Uint8Array = iv.slice(0, 16);
+  for (let inicio = 0; inicio + 16 <= dados.length; inicio += 16) {
+    const bloco = dados.subarray(inicio, inicio + 16);
+    const claro = decifrarBloco(w, rodadas, bloco);
+    for (let i = 0; i < 16; i++) saida[inicio + i] = claro[i] ^ anterior[i];
+    anterior = bloco;
+  }
+  return saida;
+}
