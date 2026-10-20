@@ -23,10 +23,11 @@ export const useFaturasStore = create<FaturasState>((set, get) => ({
   pagarFatura: async (pedido) => {
     const plano = planejarPagamentoFatura(pedido, hojeIso());
     const repos = repositorios();
-    // baixa nas parcelas e registro da fatura juntos: ou grava os dois, ou nenhum
+    // baixa nas parcelas, registro da fatura e saída na conta juntos: ou grava tudo, ou nada
     await repos.manutencao.emTransacao(async () => {
       await repos.parcelas.marcarParcelasPagas(plano.parcelasAPagar, plano.dataPagamento);
-      await repo().registrarPagamentoFatura(plano.registro);
+      const faturaId = await repo().registrarPagamentoFatura(plano.registro);
+      await repos.movimentacoes.registrarPagamentoVinculado({ faturaId }, plano.saida);
     });
     await get().carregar();
   },

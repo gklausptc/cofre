@@ -1,4 +1,5 @@
 import { mesAnterior } from '@/core/utils/date';
+import { ehDespesa } from '@/domain/usecases/naturezaMovimentacao';
 import type { GastoRapido, Movimentacao, Parcela } from '@/domain/types/entities';
 
 export type ResumoMensal = {
@@ -15,6 +16,8 @@ export type ResumoMensal = {
  *
  * Também entram em "saiu" as contas fixas e parcelas de cartão já marcadas como
  * pagas (no mês do pagamento) — assim o resumo acompanha o que você realmente pagou.
+ * A saída que paga a fatura ou a conta fixa (origem 'fatura'/'conta_fixa') não entra de
+ * novo: a despesa já é contada pelas compras, parcelas e pela própria conta fixa.
  *
  * Entradas marcadas com `reservarProximoMes` (ex.: salário recebido no fim do mês
  * mas destinado a cobrir o mês seguinte) não entram no resumo do mês em que
@@ -39,7 +42,7 @@ export function calcularResumoMensal(
   const receitas = receitasDoMes + reservadoParaEsteMes;
 
   const despesasMovimentacoes = movimentacoes
-    .filter((m) => m.tipo === 'saida' && m.data.startsWith(mesReferencia))
+    .filter((m) => ehDespesa(m) && m.data.startsWith(mesReferencia))
     .reduce((soma, m) => soma + m.valor, 0);
 
   const despesasGastosRapidos = gastos

@@ -85,6 +85,86 @@ describe('validarBackup', () => {
     expect(resultado.ok && resultado.backup.tabelas.movimentacoes).toEqual([{ id: 1, valor: 1007 }]);
   });
 
+  it('backup de antes da versão 7 ganha as saídas dos pagamentos de conta fixa e de fatura', () => {
+    const antigo = montarBackup(
+      {
+        categorias: [],
+        cartoes: [{ id: 1, nome: 'Nubank' }],
+        contas_fixas: [
+          { id: 10, nome: 'Internet', forma_pagamento: 'debito', conta_bancaria_id: 1, categoria_id: 5, membro_id: null },
+          { id: 11, nome: 'Streaming', forma_pagamento: 'cartao', conta_bancaria_id: null, categoria_id: null, membro_id: null },
+        ],
+        parcelas: [
+          { id: 1, conta_fixa_id: 10, valor: 9990, status: 'paga', data_pagamento: '2026-03-20', mes_referencia: '2026-03' },
+          { id: 2, conta_fixa_id: 10, valor: 9990, status: 'pendente', data_pagamento: null, mes_referencia: '2026-04' },
+          { id: 3, conta_fixa_id: 11, valor: 1500, status: 'paga', data_pagamento: '2026-03-20', mes_referencia: '2026-03' },
+        ],
+        faturas: [
+          {
+            id: 7,
+            cartao_id: 1,
+            status: 'paga',
+            conta_bancaria_id: 1,
+            valor_pago: 45000,
+            data_pagamento: '2026-04-04',
+            data_vencimento: '2026-04-05',
+          },
+          {
+            id: 8,
+            cartao_id: 1,
+            status: 'paga',
+            conta_bancaria_id: null,
+            valor_pago: 1000,
+            data_pagamento: '2026-03-04',
+            data_vencimento: '2026-03-05',
+          },
+        ],
+        movimentacoes: [{ id: 41, tipo: 'entrada', valor: 100000, conta_bancaria_id: 1 }],
+      },
+      6,
+      agora
+    );
+    const resultado = validarBackup(comoArquivo(antigo), 7);
+    if (!resultado.ok) throw new Error(resultado.erro);
+
+    const camposPadrao = {
+      tipo: 'saida',
+      conta_destino_id: null,
+      reservar_proximo_mes: 0,
+      recorrente: 0,
+      recorrente_origem_id: null,
+    };
+    expect(resultado.backup.tabelas.movimentacoes).toEqual([
+      { id: 41, tipo: 'entrada', valor: 100000, conta_bancaria_id: 1 },
+      {
+        ...camposPadrao,
+        id: 42,
+        fatura_id: null,
+        parcela_id: 1,
+        conta_bancaria_id: 1,
+        valor: 9990,
+        data: '2026-03-20',
+        descricao: 'Internet',
+        categoria_id: 5,
+        membro_id: null,
+        origem: 'conta_fixa',
+      },
+      {
+        ...camposPadrao,
+        id: 43,
+        fatura_id: 7,
+        parcela_id: null,
+        conta_bancaria_id: 1,
+        valor: 45000,
+        data: '2026-04-04',
+        descricao: 'Fatura Nubank',
+        categoria_id: null,
+        membro_id: null,
+        origem: 'fatura',
+      },
+    ]);
+  });
+
   it('recusa backup de uma versão mais nova do app', () => {
     const resultado = validarBackup(comoArquivo(montarBackup(tabelasValidas, 6, agora)), 5);
     expect(resultado).toEqual({ ok: false, erro: expect.stringContaining('mais nova') });

@@ -47,24 +47,24 @@ function nomeCategoria(categoriaId: number | null, categoriasPorId: CategoriasPo
 
 // ---------- conta bancária ----------
 
-function rotuloTipoMovimentacao(contaId: number, mov: Pick<Movimentacao, 'tipo' | 'contaBancariaId'>): string {
+function rotuloTipoMovimentacao(contaId: number, mov: Pick<Movimentacao, 'tipo' | 'contaBancariaId' | 'origem'>): string {
   if (mov.tipo === 'entrada') return 'entrada';
-  if (mov.tipo === 'saida') return 'saída';
+  if (mov.tipo === 'saida') {
+    if (mov.origem === 'fatura') return 'pagamento de fatura';
+    if (mov.origem === 'conta_fixa') return 'conta fixa paga';
+    return 'saída';
+  }
   return mov.contaBancariaId === contaId ? 'transferência enviada' : 'transferência recebida';
 }
 
-/** Tudo, além das movimentações, que mexe no saldo da conta (mesmas regras de `calcularSaldoConta`). */
+/** O que, além das movimentações, mexe no saldo da conta (mesmas regras de `calcularSaldoConta`). */
 export type OutrosLancamentosDaConta = {
   gastos?: GastoRapido[];
-  parcelas?: Parcela[];
-  contasFixas?: ContaFixa[];
-  faturas?: Fatura[];
-  cartoes?: Pick<Cartao, 'id' | 'nome'>[];
 };
 
 type LinhaExtratoConta = {
   data: string;
-  /** Desempate dentro do mesmo dia: movimentações, gastos, contas fixas, faturas. */
+  /** Desempate dentro do mesmo dia: movimentações antes dos gastos rápidos. */
   ordem: number;
   id: number;
   tipo: string;
@@ -75,8 +75,8 @@ type LinhaExtratoConta = {
 
 /**
  * Extrato de uma conta: colunas data;tipo;descricao;categoria;valor;saldo_apos.
- * Entram as movimentações e tudo o que o app desconta da conta: gastos em débito/pix,
- * contas fixas pagas e faturas pagas por ela — assim o saldo final bate com `calcularSaldoConta`.
+ * Entram as movimentações (inclusive os pagamentos de conta fixa e de fatura, que são saídas
+ * de verdade) e os gastos em débito/pix — assim o saldo final bate com `calcularSaldoConta`.
  * O saldo acumulado parte de `saldoInicial` e percorre TODO o histórico em ordem de data,
  * mas só as linhas do período entram no CSV.
  */
@@ -87,9 +87,7 @@ export function gerarExtratoContaCSV(
   periodo: PeriodoExtrato,
   outros: OutrosLancamentosDaConta = {}
 ): string {
-  const { gastos = [], parcelas = [], contasFixas = [], faturas = [], cartoes = [] } = outros;
-  const contasFixasPorId = new Map(contasFixas.map((c) => [c.id, c]));
-  const cartoesPorId = new Map(cartoes.map((c) => [c.id, c]));
+  const { gastos = [] } = outros;
   const itens: LinhaExtratoConta[] = [];
 
   for (const mov of movimentacoes) {
@@ -117,35 +115,6 @@ export function gerarExtratoContaCSV(
       descricao: g.descricao || 'Gasto rápido',
       categoria: nomeCategoria(g.categoriaId, categoriasPorId),
       efeito: -g.valor,
-    });
-  }
-
-  for (const p of parcelas) {
-    if (p.status !== 'paga' || p.contaFixaId === null) continue;
-    const fixa = contasFixasPorId.get(p.contaFixaId);
-    if (!fixa || fixa.formaPagamento === 'cartao' || fixa.contaBancariaId !== conta.id) continue;
-    itens.push({
-      data: p.dataPagamento ?? dataNoMes(p.mesReferencia, fixa.diaVencimento),
-      ordem: 2,
-      id: p.id,
-      tipo: 'conta fixa paga',
-      descricao: fixa.nome,
-      categoria: nomeCategoria(fixa.categoriaId, categoriasPorId),
-      efeito: -p.valor,
-    });
-  }
-
-  for (const f of faturas) {
-    if (f.status !== 'paga' || f.contaBancariaId !== conta.id) continue;
-    const cartao = cartoesPorId.get(f.cartaoId);
-    itens.push({
-      data: f.dataPagamento ?? f.dataVencimento,
-      ordem: 3,
-      id: f.id,
-      tipo: 'pagamento de fatura',
-      descricao: cartao ? `Fatura ${cartao.nome}` : 'Fatura do cartão',
-      categoria: '',
-      efeito: -(f.valorPago ?? 0),
     });
   }
 

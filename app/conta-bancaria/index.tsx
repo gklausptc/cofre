@@ -11,9 +11,6 @@ import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { useContasBancariasStore } from '@/store/contasBancariasStore';
 import { useMovimentacoesStore } from '@/store/movimentacoesStore';
 import { useGastosRapidosStore } from '@/store/gastosRapidosStore';
-import { useFaturasStore } from '@/store/faturasStore';
-import { useParcelasStore } from '@/store/parcelasStore';
-import { useContasFixasStore } from '@/store/contasFixasStore';
 import { calcularSaldoConta } from '@/domain/usecases/calcularSaldoConta';
 import { formatarMoeda } from '@/core/utils/currency';
 
@@ -23,19 +20,13 @@ export default function ContasBancariasScreen() {
   const { contas, carregar: carregarContas } = useContasBancariasStore();
   const { movimentacoes, carregar: carregarMovimentacoes } = useMovimentacoesStore();
   const { gastos, carregar: carregarGastos } = useGastosRapidosStore();
-  const { parcelas, carregar: carregarParcelas } = useParcelasStore();
-  const { faturas, carregar: carregarFaturas } = useFaturasStore();
-  const { contas: contasFixas, carregar: carregarContasFixas } = useContasFixasStore();
 
   useFocusEffect(
     useCallback(() => {
       carregarContas();
       carregarMovimentacoes();
       carregarGastos();
-      carregarParcelas();
-      carregarFaturas();
-      carregarContasFixas();
-    }, [carregarContas, carregarMovimentacoes, carregarGastos, carregarParcelas, carregarContasFixas, carregarFaturas])
+    }, [carregarContas, carregarMovimentacoes, carregarGastos])
   );
 
   return (
@@ -52,7 +43,7 @@ export default function ContasBancariasScreen() {
             />
           ) : (
             contas.map((conta) => {
-              const saldo = calcularSaldoConta(conta, movimentacoes, gastos, parcelas, contasFixas, faturas);
+              const saldo = calcularSaldoConta(conta, movimentacoes, gastos);
               return (
                 <Pressable key={conta.id} onPress={() => router.push(`/conta-bancaria/${conta.id}`)}>
                   <Card style={{ flexDirection: 'row', alignItems: 'center' }}>

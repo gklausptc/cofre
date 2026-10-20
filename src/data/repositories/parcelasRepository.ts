@@ -8,6 +8,11 @@ export async function listarParcelas() {
   return db.select().from(parcelas);
 }
 
+export async function buscarParcela(id: number) {
+  const [parcela] = await db.select().from(parcelas).where(eq(parcelas.id, id));
+  return parcela ?? null;
+}
+
 export async function listarParcelasPorContaFixa(contaFixaId: number) {
   return db.select().from(parcelas).where(eq(parcelas.contaFixaId, contaFixaId));
 }
@@ -47,6 +52,7 @@ export async function ajustarValorParcela(id: number, novoValor: number, justifi
 
 export const parcelasRepositorySqlite: ParcelasRepository = {
   listarParcelas,
+  buscarParcela,
   listarParcelasPorContaFixa,
   listarParcelasPorCompra,
   inserirParcelas,

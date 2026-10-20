@@ -95,7 +95,7 @@ A fonte da verdade é `src/data/db/schema.ts`; toda mudança é uma migration no
 | `membros_familia` | pessoas da família (nome, cor, ícone) — `membro_id` opcional nos lançamentos |
 | `categorias` | receita/despesa; seed com as padrão |
 | `contas_bancarias` | `saldo_inicial`; saldo atual é sempre calculado |
-| `movimentacoes` | entrada/saída/transferência em conta; `recorrente` + `recorrente_origem_id` (salário), `reservar_proximo_mes` |
+| `movimentacoes` | entrada/saída/transferência em conta; `recorrente` + `recorrente_origem_id` (salário), `reservar_proximo_mes`. Pagar fatura/conta fixa com uma conta cria uma saída aqui (`origem` 'fatura'/'conta_fixa', ligada por `fatura_id`/`parcela_id`): conta no saldo, mas **não** como despesa nos relatórios (`ehPagamentoDeCompromisso`) |
 | `cartoes` | limite, dia de fechamento e de vencimento |
 | `faturas` | por cartão/mês de vencimento; quando paga guarda `conta_bancaria_id`, `valor_pago`, `data_pagamento` |
 | `compras_parceladas` | compra no cartão em N vezes |

@@ -140,8 +140,8 @@ export default function DashboardScreen() {
   }, [parcelas, membroSelecionadoId, contasFixasFiltradas, comprasFiltradas]);
 
   const saldoTotal = useMemo(
-    () => calcularSaldoTotal(contas, movimentacoes, gastos, parcelas, contasFixas, faturas),
-    [contas, movimentacoes, gastos, parcelas, contasFixas, faturas]
+    () => calcularSaldoTotal(contas, movimentacoes, gastos),
+    [contas, movimentacoes, gastos]
   );
   const resumoMensal = useMemo(
     () => calcularResumoMensal(movimentacoesFiltradas, gastosFiltrados, MES_ATUAL, parcelasFiltradas),

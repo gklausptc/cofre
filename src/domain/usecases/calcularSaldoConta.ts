@@ -1,16 +1,7 @@
-import type { ContaBancaria, ContaFixa, Fatura, GastoRapido, Movimentacao, Parcela } from '@/domain/types/entities';
+import type { ContaBancaria, GastoRapido, Movimentacao } from '@/domain/types/entities';
 
 type ContaSaldo = Pick<ContaBancaria, 'id' | 'saldoInicial'>;
 
-/**
- * saldo = saldoInicial + entradas - saídas + transferências recebidas - transferências enviadas
- *         - gastos rápidos pagos em débito/pix dessa conta
- *         - contas fixas já pagas (não-cartão) debitadas dessa conta
- *
- *         - faturas de cartão pagas com essa conta
- *
- * Gastos no cartão não descontam na compra: só saem da conta quando a fatura é paga.
- */
 /**
  * Quanto uma movimentação soma (+) ou tira (-) do saldo de uma conta:
  * entrada soma, saída e transferência enviada tiram, transferência recebida soma.
@@ -29,14 +20,15 @@ export function efeitoMovimentacaoNaConta(
   return 0;
 }
 
-export function calcularSaldoConta(
-  conta: ContaSaldo,
-  movimentacoes: Movimentacao[],
-  gastos: GastoRapido[] = [],
-  parcelas: Parcela[] = [],
-  contasFixas: ContaFixa[] = [],
-  faturas: Fatura[] = []
-): number {
+/**
+ * saldo = saldoInicial + entradas − saídas + transferências recebidas − transferências enviadas
+ *         − gastos rápidos pagos em débito/pix dessa conta
+ *
+ * Pagar uma conta fixa ou uma fatura com a conta gera uma saída de verdade (origem
+ * 'conta_fixa'/'fatura'), então ela já entra aqui como movimentação. Gastos no cartão não
+ * descontam na compra: só saem da conta quando a fatura é paga.
+ */
+export function calcularSaldoConta(conta: ContaSaldo, movimentacoes: Movimentacao[], gastos: GastoRapido[] = []): number {
   const saldoMovimentacoes = movimentacoes.reduce(
     (saldo, mov) => saldo + efeitoMovimentacaoNaConta(conta.id, mov),
     conta.saldoInicial
@@ -48,32 +40,9 @@ export function calcularSaldoConta(
     )
     .reduce((soma, g) => soma + g.valor, 0);
 
-  const contasFixasPorId = new Map(contasFixas.map((c) => [c.id, c]));
-  const fixasPagas = parcelas
-    .filter((p) => {
-      if (p.status !== 'paga' || p.contaFixaId === null) return false;
-      const fixa = contasFixasPorId.get(p.contaFixaId);
-      return fixa !== undefined && fixa.formaPagamento !== 'cartao' && fixa.contaBancariaId === conta.id;
-    })
-    .reduce((soma, p) => soma + p.valor, 0);
-
-  const faturasPagas = faturas
-    .filter((f) => f.status === 'paga' && f.contaBancariaId === conta.id)
-    .reduce((soma, f) => soma + (f.valorPago ?? 0), 0);
-
-  return saldoMovimentacoes - gastosDebitados - fixasPagas - faturasPagas;
+  return saldoMovimentacoes - gastosDebitados;
 }
 
-export function calcularSaldoTotal(
-  contas: ContaSaldo[],
-  movimentacoes: Movimentacao[],
-  gastos: GastoRapido[] = [],
-  parcelas: Parcela[] = [],
-  contasFixas: ContaFixa[] = [],
-  faturas: Fatura[] = []
-): number {
-  return contas.reduce(
-    (total, conta) => total + calcularSaldoConta(conta, movimentacoes, gastos, parcelas, contasFixas, faturas),
-    0
-  );
+export function calcularSaldoTotal(contas: ContaSaldo[], movimentacoes: Movimentacao[], gastos: GastoRapido[] = []): number {
+  return contas.reduce((total, conta) => total + calcularSaldoConta(conta, movimentacoes, gastos), 0);
 }

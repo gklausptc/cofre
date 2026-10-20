@@ -9,14 +9,10 @@ import {
 import { calcularSaldoConta } from '@/domain/usecases/calcularSaldoConta';
 import { umaFatura } from '@/test/fabricas';
 import {
-  cartoesDoCenario,
   contaPrincipal,
   contaSecundaria,
-  contasFixasDoCenario,
-  faturasDoCenario,
   gastosDoCenario,
   movimentacoesDoCenario,
-  parcelasDoCenario,
 } from '@/test/cenarioConta';
 import { gastosDoMes, luz, nubank, parcelasDoMes, streaming, tv } from '@/test/cenarioMes';
 
@@ -34,13 +30,7 @@ function linhasDoCSV(csv: string): string[][] {
     .map((linha) => linha.split(';'));
 }
 
-const outrosDoCenario = {
-  gastos: gastosDoCenario,
-  parcelas: parcelasDoCenario,
-  contasFixas: contasFixasDoCenario,
-  faturas: faturasDoCenario,
-  cartoes: cartoesDoCenario,
-};
+const outrosDoCenario = { gastos: gastosDoCenario };
 
 describe('formatação CSV', () => {
   it('põe aspas só quando precisa', () => {
@@ -65,7 +55,7 @@ describe('formatação CSV', () => {
 });
 
 describe('gerarExtratoContaCSV', () => {
-  it('inclui tudo que mexe no saldo, em ordem de data, com o saldo acumulado', () => {
+  it('inclui tudo que mexe no saldo (pagamentos com rótulo próprio), em ordem de data, com o saldo acumulado', () => {
     const csv = gerarExtratoContaCSV(contaPrincipal, movimentacoesDoCenario, semCategorias, null, outrosDoCenario);
 
     expect(linhasDoCSV(csv)).toEqual([
@@ -83,14 +73,7 @@ describe('gerarExtratoContaCSV', () => {
   it('o último saldo_apos bate com calcularSaldoConta nas duas contas', () => {
     for (const conta of [contaPrincipal, contaSecundaria]) {
       const linhas = linhasDoCSV(gerarExtratoContaCSV(conta, movimentacoesDoCenario, semCategorias, null, outrosDoCenario));
-      const saldo = calcularSaldoConta(
-        conta,
-        movimentacoesDoCenario,
-        gastosDoCenario,
-        parcelasDoCenario,
-        contasFixasDoCenario,
-        faturasDoCenario
-      );
+      const saldo = calcularSaldoConta(conta, movimentacoesDoCenario, gastosDoCenario);
       expect(linhas[linhas.length - 1][5]).toBe(formatarValorCSV(saldo));
     }
   });

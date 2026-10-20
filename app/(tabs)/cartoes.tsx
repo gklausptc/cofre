@@ -10,6 +10,7 @@ import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { useCartoesStore } from '@/store/cartoesStore';
 import { useComprasParceladasStore } from '@/store/comprasParceladasStore';
 import { useGastosRapidosStore } from '@/store/gastosRapidosStore';
+import { useFaturasStore } from '@/store/faturasStore';
 import { useParcelasStore } from '@/store/parcelasStore';
 import { calcularLimiteDisponivel } from '@/domain/usecases/calcularLimiteDisponivel';
 import { formatarMoeda } from '@/core/utils/currency';
@@ -21,6 +22,7 @@ export default function CartoesScreen() {
   const { compras, carregar: carregarCompras } = useComprasParceladasStore();
   const { parcelas, carregar: carregarParcelas } = useParcelasStore();
   const { gastos, carregar: carregarGastos } = useGastosRapidosStore();
+  const { faturas, carregar: carregarFaturas } = useFaturasStore();
 
   useFocusEffect(
     useCallback(() => {
@@ -28,7 +30,8 @@ export default function CartoesScreen() {
       carregarCompras();
       carregarParcelas();
       carregarGastos();
-    }, [carregarCartoes, carregarCompras, carregarParcelas, carregarGastos])
+      carregarFaturas();
+    }, [carregarCartoes, carregarCompras, carregarParcelas, carregarGastos, carregarFaturas])
   );
 
   return (
@@ -45,7 +48,7 @@ export default function CartoesScreen() {
             />
           ) : (
             cartoes.map((cartao) => {
-              const disponivel = calcularLimiteDisponivel(cartao, compras, parcelas, gastos);
+              const disponivel = calcularLimiteDisponivel(cartao, compras, parcelas, gastos, faturas);
               return (
                 <Pressable key={cartao.id} onPress={() => router.push(`/cartao/${cartao.id}`)}>
                   <Card style={{ backgroundColor: cartao.cor, borderWidth: 0 }}>

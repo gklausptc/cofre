@@ -4,11 +4,9 @@ import { umaMovimentacao } from '@/test/fabricas';
 import {
   contaPrincipal,
   contaSecundaria,
-  contasFixasDoCenario,
-  faturasDoCenario,
   gastosDoCenario,
   movimentacoesDoCenario,
-  parcelasDoCenario,
+  movimentacoesManuaisDoCenario,
   SALDO_ESPERADO_PRINCIPAL,
   SALDO_ESPERADO_SECUNDARIA,
 } from '@/test/cenarioConta';
@@ -35,17 +33,13 @@ describe('calcularSaldoConta', () => {
     expect(calcularSaldoConta(contaPrincipal, [])).toBe(100000);
   });
 
-  it('considera movimentações, débito/pix, contas fixas pagas e faturas pagas pela conta', () => {
-    expect(
-      calcularSaldoConta(
-        contaPrincipal,
-        movimentacoesDoCenario,
-        gastosDoCenario,
-        parcelasDoCenario,
-        contasFixasDoCenario,
-        faturasDoCenario
-      )
-    ).toBe(SALDO_ESPERADO_PRINCIPAL);
+  it('considera movimentações (inclusive as saídas que pagam conta fixa e fatura) e débito/pix', () => {
+    expect(calcularSaldoConta(contaPrincipal, movimentacoesDoCenario, gastosDoCenario)).toBe(SALDO_ESPERADO_PRINCIPAL);
+  });
+
+  it('pagar uma fatura ou conta fixa com a conta tira do saldo dela', () => {
+    const semPagamentos = calcularSaldoConta(contaPrincipal, movimentacoesManuaisDoCenario, gastosDoCenario);
+    expect(semPagamentos - SALDO_ESPERADO_PRINCIPAL).toBe(7000 + 30000);
   });
 
   it('gasto no cartão não desconta da conta na compra', () => {
@@ -53,23 +47,21 @@ describe('calcularSaldoConta', () => {
     expect(calcularSaldoConta(contaPrincipal, [], soCartao)).toBe(100000);
   });
 
-  it('conta fixa pendente não desconta', () => {
-    const soPendentes = parcelasDoCenario.filter((p) => p.status === 'pendente');
-    expect(calcularSaldoConta(contaPrincipal, [], [], soPendentes, contasFixasDoCenario)).toBe(100000);
+  it('gasto em dinheiro não mexe em conta nenhuma', () => {
+    const soDinheiro = gastosDoCenario.filter((g) => g.formaPagamento === 'dinheiro');
+    expect(calcularSaldoConta(contaPrincipal, [], soDinheiro)).toBe(100000);
   });
 });
 
 describe('calcularSaldoTotal', () => {
   it('soma o saldo de todas as contas', () => {
-    expect(
-      calcularSaldoTotal(
-        [contaPrincipal, contaSecundaria],
-        movimentacoesDoCenario,
-        gastosDoCenario,
-        parcelasDoCenario,
-        contasFixasDoCenario,
-        faturasDoCenario
-      )
-    ).toBe(SALDO_ESPERADO_PRINCIPAL + SALDO_ESPERADO_SECUNDARIA);
+    expect(calcularSaldoTotal([contaPrincipal, contaSecundaria], movimentacoesDoCenario, gastosDoCenario)).toBe(
+      SALDO_ESPERADO_PRINCIPAL + SALDO_ESPERADO_SECUNDARIA
+    );
+  });
+
+  it('transferência entre contas próprias não muda o total', () => {
+    const transferencias = movimentacoesManuaisDoCenario.filter((m) => m.tipo === 'transferencia');
+    expect(calcularSaldoTotal([contaPrincipal, contaSecundaria], transferencias)).toBe(100000);
   });
 });

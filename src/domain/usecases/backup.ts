@@ -46,6 +46,77 @@ export function nomeArquivoBackup(agora: Date): string {
 
 // ---------- validação de um arquivo escolhido pelo usuário ----------
 
+function numero(valor: ValorCelula | undefined): number | null {
+  return typeof valor === 'number' ? valor : null;
+}
+
+/**
+ * Backup feito antes da 0007: pagar conta fixa ou fatura só mudava o status, e o saldo
+ * descontava isso por fora. Agora o pagamento é uma saída na conta, então o backup antigo
+ * ganha as mesmas saídas que a migration 0007 cria (mesmas regras).
+ */
+function converterPagamentosEmSaidas(tabelas: TabelasBackup): TabelasBackup {
+  const movimentacoes = [...(tabelas.movimentacoes ?? [])];
+  let proximoId = movimentacoes.reduce((maior, m) => Math.max(maior, numero(m.id) ?? 0), 0) + 1;
+  const parcelasComSaida = new Set(movimentacoes.map((m) => numero(m.parcela_id)).filter((id) => id !== null));
+  const faturasComSaida = new Set(movimentacoes.map((m) => numero(m.fatura_id)).filter((id) => id !== null));
+  const contasFixas = new Map((tabelas.contas_fixas ?? []).map((cf) => [numero(cf.id), cf]));
+  const cartoes = new Map((tabelas.cartoes ?? []).map((c) => [numero(c.id), c]));
+
+  const saida = (dados: LinhaBackup): LinhaBackup => ({
+    id: proximoId++,
+    tipo: 'saida',
+    conta_destino_id: null,
+    reservar_proximo_mes: 0,
+    recorrente: 0,
+    recorrente_origem_id: null,
+    fatura_id: null,
+    parcela_id: null,
+    ...dados,
+  });
+
+  for (const parcela of tabelas.parcelas ?? []) {
+    const id = numero(parcela.id);
+    if (parcela.status !== 'paga' || id === null || parcelasComSaida.has(id)) continue;
+    const fixa = contasFixas.get(numero(parcela.conta_fixa_id));
+    if (!fixa || fixa.forma_pagamento === 'cartao' || numero(fixa.conta_bancaria_id) === null) continue;
+    movimentacoes.push(
+      saida({
+        conta_bancaria_id: fixa.conta_bancaria_id,
+        valor: parcela.valor,
+        data: parcela.data_pagamento ?? `${String(parcela.mes_referencia)}-01`,
+        descricao: fixa.nome,
+        categoria_id: fixa.categoria_id ?? null,
+        membro_id: fixa.membro_id ?? null,
+        origem: 'conta_fixa',
+        parcela_id: id,
+      })
+    );
+  }
+
+  for (const fatura of tabelas.faturas ?? []) {
+    const id = numero(fatura.id);
+    const valorPago = numero(fatura.valor_pago) ?? 0;
+    if (fatura.status !== 'paga' || id === null || faturasComSaida.has(id)) continue;
+    if (numero(fatura.conta_bancaria_id) === null || valorPago <= 0) continue;
+    const cartao = cartoes.get(numero(fatura.cartao_id));
+    movimentacoes.push(
+      saida({
+        conta_bancaria_id: fatura.conta_bancaria_id,
+        valor: valorPago,
+        data: fatura.data_pagamento ?? fatura.data_vencimento,
+        descricao: `Fatura ${cartao ? String(cartao.nome) : 'do cartão'}`,
+        categoria_id: null,
+        membro_id: null,
+        origem: 'fatura',
+        fatura_id: id,
+      })
+    );
+  }
+
+  return { ...tabelas, movimentacoes };
+}
+
 /**
  * Conversores de backups antigos: a chave é a versão do schema que o conversor produz.
  * Só migrations que mudam o significado dos dados precisam de um (ex.: reais → centavos);
@@ -53,6 +124,7 @@ export function nomeArquivoBackup(agora: Date): string {
  */
 const CONVERSORES: Record<number, (tabelas: TabelasBackup) => TabelasBackup> = {
   6: converterReaisParaCentavos,
+  7: converterPagamentosEmSaidas,
 };
 
 /** Colunas de dinheiro que a migration 0006 passou de reais para centavos inteiros. */

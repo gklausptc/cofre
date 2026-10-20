@@ -169,9 +169,33 @@ export default function EditarMovimentacaoScreen() {
     ]);
   }
 
+  // saída criada ao pagar uma fatura ou conta fixa (ver ehPagamentoDeCompromisso)
+  const avisoPagamento =
+    movimentacao.origem === 'fatura'
+      ? 'Esta saída foi lançada ao pagar a fatura do cartão. Alterar ou remover aqui muda só o saldo da conta: a fatura continua paga.'
+      : movimentacao.origem === 'conta_fixa'
+        ? 'Esta saída foi lançada ao marcar a conta fixa como paga. Alterar ou remover aqui muda só o saldo da conta: a conta fixa continua paga.'
+        : null;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
       <ScrollView contentContainerStyle={{ padding: 20 }}>
+        {avisoPagamento && (
+          <View
+            style={{
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.surface,
+              borderRadius: 12,
+              padding: 12,
+              marginBottom: 16,
+            }}
+          >
+            <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12 }}>
+              {avisoPagamento}
+            </Text>
+          </View>
+        )}
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
           {OPCOES_TIPO.map((opcao) => {
             const ativo = opcao.valor === tipo;

@@ -4,6 +4,7 @@ export type DadosParcela = Omit<NovaParcela, 'id'>;
 
 export interface ParcelasRepository {
   listarParcelas(): Promise<Parcela[]>;
+  buscarParcela(id: number): Promise<Parcela | null>;
   listarParcelasPorContaFixa(contaFixaId: number): Promise<Parcela[]>;
   listarParcelasPorCompra(compraParceladaId: number): Promise<Parcela[]>;
   inserirParcelas(dados: DadosParcela[]): Promise<Parcela[]>;

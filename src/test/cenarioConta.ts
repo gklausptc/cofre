@@ -1,7 +1,10 @@
 /**
  * Cenário de duas contas usado nos testes de saldo e de extrato exportado: tem de tudo
- * que mexe no saldo (entradas, saídas, transferências, gastos em débito/pix, contas fixas
- * pagas e faturas pagas) e também o que NÃO deve mexer (cartão, dinheiro, pendentes, outra conta).
+ * que mexe no saldo (entradas, saídas, transferências, gastos em débito/pix e as saídas
+ * que pagam conta fixa e fatura) e também o que NÃO deve mexer (cartão, dinheiro, outra conta).
+ *
+ * As contas fixas, parcelas e faturas abaixo são os compromissos que essas saídas pagaram —
+ * do jeito que ficavam antes da migration 0007, quando só o status mudava.
  */
 import { umaConta, umaContaFixa, umaFatura, umaMovimentacao, umaParcela, umCartao, umGasto } from './fabricas';
 
@@ -9,22 +12,6 @@ export const contaPrincipal = umaConta({ id: 1, nomeConta: 'Principal', saldoIni
 export const contaSecundaria = umaConta({ id: 2, nomeConta: 'Secundária', saldoInicial: 0 });
 
 export const cartoesDoCenario = [umCartao({ id: 1, nome: 'Nubank', diaFechamento: 25, diaVencimento: 5 })];
-
-export const movimentacoesDoCenario = [
-  umaMovimentacao({ id: 1, contaBancariaId: 1, tipo: 'entrada', valor: 50000, data: '2026-03-05', descricao: 'Salário' }),
-  umaMovimentacao({ id: 2, contaBancariaId: 1, tipo: 'saida', valor: 20000, data: '2026-03-10', descricao: 'Aluguel' }),
-  umaMovimentacao({ id: 3, contaBancariaId: 1, tipo: 'transferencia', valor: 10000, data: '2026-03-12', contaDestinoId: 2 }),
-  umaMovimentacao({ id: 4, contaBancariaId: 2, tipo: 'transferencia', valor: 5000, data: '2026-04-02', contaDestinoId: 1 }),
-  umaMovimentacao({ id: 5, contaBancariaId: 2, tipo: 'entrada', valor: 99900, data: '2026-04-03' }),
-];
-
-export const gastosDoCenario = [
-  umGasto({ id: 1, valor: 3000, formaPagamento: 'debito', contaBancariaId: 1, data: '2026-03-15', descricao: 'Padaria' }),
-  umGasto({ id: 2, valor: 2000, formaPagamento: 'pix', contaBancariaId: 1, data: '2026-04-01' }),
-  umGasto({ id: 3, valor: 1000, formaPagamento: 'dinheiro', data: '2026-04-01' }),
-  umGasto({ id: 4, valor: 4000, formaPagamento: 'cartao', cartaoId: 1, data: '2026-04-01' }),
-  umGasto({ id: 5, valor: 500, formaPagamento: 'debito', contaBancariaId: 2, data: '2026-04-01' }),
-];
 
 export const contasFixasDoCenario = [
   umaContaFixa({ id: 10, nome: 'Internet', formaPagamento: 'debito', contaBancariaId: 1, diaVencimento: 20 }),
@@ -43,6 +30,33 @@ export const faturasDoCenario = [
   umaFatura({ id: 1, cartaoId: 1, status: 'paga', contaBancariaId: 1, valorPago: 30000, dataPagamento: '2026-04-05' }),
   umaFatura({ id: 2, cartaoId: 1, status: 'paga', contaBancariaId: 2, valorPago: 4000, dataPagamento: '2026-04-05' }),
   umaFatura({ id: 3, cartaoId: 1, status: 'aberta', contaBancariaId: 1 }),
+];
+
+/** Movimentações do dia a dia (sem os pagamentos de compromisso). */
+export const movimentacoesManuaisDoCenario = [
+  umaMovimentacao({ id: 1, contaBancariaId: 1, tipo: 'entrada', valor: 50000, data: '2026-03-05', descricao: 'Salário' }),
+  umaMovimentacao({ id: 2, contaBancariaId: 1, tipo: 'saida', valor: 20000, data: '2026-03-10', descricao: 'Aluguel' }),
+  umaMovimentacao({ id: 3, contaBancariaId: 1, tipo: 'transferencia', valor: 10000, data: '2026-03-12', contaDestinoId: 2 }),
+  umaMovimentacao({ id: 4, contaBancariaId: 2, tipo: 'transferencia', valor: 5000, data: '2026-04-02', contaDestinoId: 1 }),
+  umaMovimentacao({ id: 5, contaBancariaId: 2, tipo: 'entrada', valor: 99900, data: '2026-04-03' }),
+];
+
+/** As saídas que pagaram as contas fixas (débito/boleto) e as faturas acima. */
+export const pagamentosDoCenario = [
+  umaMovimentacao({ id: 6, contaBancariaId: 1, tipo: 'saida', valor: 7000, data: '2026-03-20', descricao: 'Internet', origem: 'conta_fixa', parcelaId: 1 }),
+  umaMovimentacao({ id: 7, contaBancariaId: 2, tipo: 'saida', valor: 900, data: '2026-03-20', descricao: 'Escola', origem: 'conta_fixa', parcelaId: 4 }),
+  umaMovimentacao({ id: 8, contaBancariaId: 1, tipo: 'saida', valor: 30000, data: '2026-04-05', descricao: 'Fatura Nubank', origem: 'fatura', faturaId: 1 }),
+  umaMovimentacao({ id: 9, contaBancariaId: 2, tipo: 'saida', valor: 4000, data: '2026-04-05', descricao: 'Fatura Nubank', origem: 'fatura', faturaId: 2 }),
+];
+
+export const movimentacoesDoCenario = [...movimentacoesManuaisDoCenario, ...pagamentosDoCenario];
+
+export const gastosDoCenario = [
+  umGasto({ id: 1, valor: 3000, formaPagamento: 'debito', contaBancariaId: 1, data: '2026-03-15', descricao: 'Padaria' }),
+  umGasto({ id: 2, valor: 2000, formaPagamento: 'pix', contaBancariaId: 1, data: '2026-04-01' }),
+  umGasto({ id: 3, valor: 1000, formaPagamento: 'dinheiro', data: '2026-04-01' }),
+  umGasto({ id: 4, valor: 4000, formaPagamento: 'cartao', cartaoId: 1, data: '2026-04-01' }),
+  umGasto({ id: 5, valor: 500, formaPagamento: 'debito', contaBancariaId: 2, data: '2026-04-01' }),
 ];
 
 /**

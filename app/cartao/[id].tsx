@@ -12,6 +12,7 @@ import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { useCartoesStore } from '@/store/cartoesStore';
 import { useComprasParceladasStore } from '@/store/comprasParceladasStore';
 import { useGastosRapidosStore } from '@/store/gastosRapidosStore';
+import { useFaturasStore } from '@/store/faturasStore';
 import { useParcelasStore } from '@/store/parcelasStore';
 import { calcularLimiteDisponivel } from '@/domain/usecases/calcularLimiteDisponivel';
 import { formatarMoeda } from '@/core/utils/currency';
@@ -27,6 +28,7 @@ export default function DetalheCartaoScreen() {
   const { compras, carregar: carregarCompras } = useComprasParceladasStore();
   const { parcelas, carregar: carregarParcelas } = useParcelasStore();
   const { gastos, carregar: carregarGastos } = useGastosRapidosStore();
+  const { faturas, carregar: carregarFaturas } = useFaturasStore();
 
   const cartao = cartoes.find((c) => c.id === cartaoId);
 
@@ -44,7 +46,8 @@ export default function DetalheCartaoScreen() {
       carregarCompras();
       carregarParcelas();
       carregarGastos();
-    }, [carregarCartoes, carregarCompras, carregarParcelas, carregarGastos])
+      carregarFaturas();
+    }, [carregarCartoes, carregarCompras, carregarParcelas, carregarGastos, carregarFaturas])
   );
 
   if (cartao && carregadoParaId !== cartaoId) {
@@ -80,7 +83,7 @@ export default function DetalheCartaoScreen() {
     );
   }
 
-  const disponivel = calcularLimiteDisponivel(cartao, compras, parcelas, gastos);
+  const disponivel = calcularLimiteDisponivel(cartao, compras, parcelas, gastos, faturas);
 
   const fechamento = parseInt(diaFechamento, 10);
   const vencimento = parseInt(diaVencimento, 10);

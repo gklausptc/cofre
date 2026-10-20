@@ -41,7 +41,7 @@ export const movimentacoes = sqliteTable('movimentacoes', {
   descricao: text('descricao'),
   categoriaId: integer('categoria_id'),
   contaDestinoId: integer('conta_destino_id'), // só para transferencia
-  origem: text('origem', { enum: ['manual', 'conta_fixa', 'gasto', 'parcela'] }).default('manual'),
+  origem: text('origem', { enum: ['manual', 'conta_fixa', 'gasto', 'parcela', 'fatura'] }).default('manual'),
   membroId: integer('membro_id'),
   // só se aplica a entradas: exclui o valor do resumo do mês em que caiu e soma no mês seguinte
   reservarProximoMes: integer('reservar_proximo_mes', { mode: 'boolean' }).default(false),
@@ -49,6 +49,11 @@ export const movimentacoes = sqliteTable('movimentacoes', {
   // é o "modelo"; as cópias geradas automaticamente apontam pra ela via recorrenteOrigemId
   recorrente: integer('recorrente', { mode: 'boolean' }).default(false),
   recorrenteOrigemId: integer('recorrente_origem_id'),
+  // Pagamento de um compromisso: a fatura paga (origem 'fatura') ou a ocorrência de conta
+  // fixa paga (origem 'conta_fixa', ligada à parcela). Desconta do saldo da conta, mas não
+  // entra como despesa nos relatórios: a despesa já é contada pela fatura/conta fixa.
+  faturaId: integer('fatura_id'),
+  parcelaId: integer('parcela_id'),
 });
 
 export const cartoes = sqliteTable('cartoes', {

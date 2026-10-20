@@ -12,6 +12,6 @@ export type PagamentoFatura = {
 
 export interface FaturasRepository {
   listarFaturas(): Promise<Fatura[]>;
-  /** Registra (ou atualiza) a fatura do cartão/mês como paga. */
-  registrarPagamentoFatura(dados: PagamentoFatura): Promise<void>;
+  /** Registra (ou atualiza) a fatura do cartão/mês como paga e devolve o id dela. */
+  registrarPagamentoFatura(dados: PagamentoFatura): Promise<number>;
 }

@@ -1,3 +1,4 @@
+import { ehDespesa } from '@/domain/usecases/naturezaMovimentacao';
 import type { Categoria, GastoRapido, Movimentacao } from '@/domain/types/entities';
 
 export type GastoPorCategoria = {
@@ -16,7 +17,8 @@ export function calcularGastosPorCategoria(
   const totais = new Map<number | null, number>();
 
   for (const mov of movimentacoes) {
-    if (mov.tipo !== 'saida' || !mov.data.startsWith(mesReferencia)) continue;
+    // pagamento de fatura/conta fixa não é gasto de categoria (as compras já contam)
+    if (!ehDespesa(mov) || !mov.data.startsWith(mesReferencia)) continue;
     totais.set(mov.categoriaId, (totais.get(mov.categoriaId) ?? 0) + mov.valor);
   }
 

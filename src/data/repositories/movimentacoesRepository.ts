@@ -1,4 +1,4 @@
-import type { MovimentacoesRepository } from '@/domain/repositories/movimentacoesRepository';
+import type { MovimentacoesRepository, VinculoPagamento } from '@/domain/repositories/movimentacoesRepository';
 import { desc, eq } from 'drizzle-orm';
 import { db } from '@/data/db/client';
 import { movimentacoes } from '@/data/db/schema';
@@ -40,6 +40,15 @@ export async function excluirMovimentacao(id: number) {
   await db.delete(movimentacoes).where(eq(movimentacoes.id, id));
 }
 
+export async function registrarPagamentoVinculado(vinculo: VinculoPagamento, dados: Omit<NovaMovimentacao, 'id'> | null) {
+  const ligadaA =
+    'faturaId' in vinculo ? eq(movimentacoes.faturaId, vinculo.faturaId) : eq(movimentacoes.parcelaId, vinculo.parcelaId);
+  await db.delete(movimentacoes).where(ligadaA);
+  if (dados === null) return;
+  const ligacao = 'faturaId' in vinculo ? { faturaId: vinculo.faturaId, parcelaId: null } : { faturaId: null, parcelaId: vinculo.parcelaId };
+  await db.insert(movimentacoes).values({ ...dados, ...ligacao });
+}
+
 export const movimentacoesRepositorySqlite: MovimentacoesRepository = {
   listarMovimentacoes,
   listarMovimentacoesPorConta,
@@ -48,4 +57,5 @@ export const movimentacoesRepositorySqlite: MovimentacoesRepository = {
   inserirMovimentacoes,
   atualizarMovimentacao,
   excluirMovimentacao,
+  registrarPagamentoVinculado,
 };

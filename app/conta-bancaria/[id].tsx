@@ -10,9 +10,6 @@ import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { useContasBancariasStore } from '@/store/contasBancariasStore';
 import { useMovimentacoesStore } from '@/store/movimentacoesStore';
 import { useGastosRapidosStore } from '@/store/gastosRapidosStore';
-import { useFaturasStore } from '@/store/faturasStore';
-import { useParcelasStore } from '@/store/parcelasStore';
-import { useContasFixasStore } from '@/store/contasFixasStore';
 import { calcularSaldoConta } from '@/domain/usecases/calcularSaldoConta';
 import { formatarMoeda } from '@/core/utils/currency';
 
@@ -25,9 +22,6 @@ export default function DetalheContaBancariaScreen() {
   const { contas, atualizar, remover } = useContasBancariasStore();
   const { movimentacoes, carregar: carregarMovimentacoes } = useMovimentacoesStore();
   const { gastos, carregar: carregarGastos } = useGastosRapidosStore();
-  const { parcelas, carregar: carregarParcelas } = useParcelasStore();
-  const { faturas, carregar: carregarFaturas } = useFaturasStore();
-  const { contas: contasFixas, carregar: carregarContasFixas } = useContasFixasStore();
   const conta = contas.find((c) => c.id === contaId);
 
   const [banco, setBanco] = useState(conta?.banco ?? '');
@@ -39,10 +33,7 @@ export default function DetalheContaBancariaScreen() {
     useCallback(() => {
       carregarMovimentacoes();
       carregarGastos();
-      carregarParcelas();
-      carregarFaturas();
-      carregarContasFixas();
-    }, [carregarMovimentacoes, carregarGastos, carregarParcelas, carregarContasFixas, carregarFaturas])
+    }, [carregarMovimentacoes, carregarGastos])
   );
 
   if (!conta) {
@@ -53,7 +44,7 @@ export default function DetalheContaBancariaScreen() {
     );
   }
 
-  const saldo = calcularSaldoConta(conta, movimentacoes, gastos, parcelas, contasFixas, faturas);
+  const saldo = calcularSaldoConta(conta, movimentacoes, gastos);
 
   async function handleSalvar() {
     setSalvando(true);

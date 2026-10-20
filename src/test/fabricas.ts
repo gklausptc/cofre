@@ -47,6 +47,8 @@ export function umaMovimentacao(dados: Partial<Movimentacao> = {}): Movimentacao
     reservarProximoMes: false,
     recorrente: false,
     recorrenteOrigemId: null,
+    faturaId: null,
+    parcelaId: null,
     ...dados,
   };
 }
