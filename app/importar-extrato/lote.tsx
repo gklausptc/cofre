@@ -288,7 +288,8 @@ export default function ImportarLoteScreen() {
         return null;
       };
       const pedacos = ordenarLote(paraImportar.flatMap(dividirPorMes));
-      const destinoDoPedaco = (chave: string) => destinoDe(chave.split('#')[0]);
+      // pedaço de um extrato dividido por mês: "uri#2026-10" (a uri pode ter "#" no nome)
+      const destinoDoPedaco = (chave: string) => destinoDe(chave.replace(/#\d{4}-\d{2}$/, ''));
       setProgresso({ feitos: 0, total: pedacos.length, atual: '' });
       for (const [indice, pedaco] of pedacos.entries()) {
         setProgresso({ feitos: indice, total: pedacos.length, atual: pedaco.nome });
