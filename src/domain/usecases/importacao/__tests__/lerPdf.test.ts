@@ -145,3 +145,70 @@ describe('lerExtratoDoPdf: tabela por colunas (layout da InfinitePay, dados inve
     });
   });
 });
+
+describe('lerExtratoDoPdf: poupança do BB (dados inventados)', () => {
+  // só a saída traz sinal ("-R$"); a descrição vem na linha de baixo
+  const paginas: LinhaDePdf[][] = [
+    [
+      linha(1476, [32, 'Extrato de Poupança']),
+      linha(1439, [32, 'Fulano de Tal']),
+      linha(1361, [32, 'Agência'], [356, '1234-5']),
+      linha(1337, [32, 'Conta'], [310, '510001234-5']),
+      linha(1313, [32, 'Saldo em 31/12/2025'], [345, 'R$ 20,00']),
+      linha(1289, [32, 'Saldo Atual'], [355, 'R$ 0,00']),
+      linha(1258, [32, 'Lançamentos']),
+      linha(1236, [32, '02/01/2026'], [350, '-R$ 61,30']),
+      linha(1215, [32, 'Transferencia Para Conta']),
+      linha(1188, [32, '02/01/2026'], [333, 'R$ 2.400,00']),
+      linha(1167, [32, 'Pix - Recebido']),
+      linha(1141, [32, '05/01/2026'], [350, '-R$ 27,77']),
+      linha(1120, [32, 'Pix - Enviado']),
+      linha(183, [32, 'Saldos por data-base']),
+    ],
+  ];
+
+  it('valor sem sinal é entrada, guarda o saldo de antes e reconhece o BB', () => {
+    const extrato = lerExtratoDoPdf(paginas, 'Comprovante_20-10-2026.pdf');
+    expect(extrato?.transacoes.map((t) => [t.data, t.valor, t.descricao])).toEqual([
+      ['2026-01-02', -6130, 'Transferencia Para Conta'],
+      ['2026-01-02', 240000, 'Pix - Recebido'],
+      ['2026-01-05', -2777, 'Pix - Enviado'],
+    ]);
+    expect(extrato).toMatchObject({ banco: 'bb', origem: 'conta', saldoAnterior: 2000, conta: { agencia: '1234-5', numero: '510001234-5', tipo: 'poupanca' } });
+  });
+});
+
+describe('lerExtratoDoPdf: fatura com duas tabelas lado a lado (layout do PicPay, dados inventados)', () => {
+  const paginas: LinhaDePdf[][] = [
+    [
+      linha(789, [382, 'Vencimento: 10/08/2026 | Fechamento: 04/08/2026']),
+      linha(779, [468, 'Cartão Mastercard GOLD']),
+      linha(733, [24, 'Esta é a sua fatura de Agosto.']),
+      linha(686, [81, 'Total da sua fatura'], [270, 'Vencimento'], [448, 'Limite total']),
+      linha(666, [74, 'R$ 120,00'], [249, '10/08/2026'], [423, 'R$ 2.000,00']),
+    ],
+    [
+      linha(731, [24, 'Cartão Exemplo'], [301, 'FULANO DE TAL']),
+      linha(721, [301, 'Cartão final 1234']),
+      linha(706, [24, 'Transações Nacionais'], [301, 'Transações Nacionais']),
+      linha(682, [24, 'Data'], [64, 'Estabelecimento'], [244, 'Valor (R$)']),
+      linha(670, [301, 'Data'], [341, 'Estabelecimento'], [522, 'Valor (R$)']),
+      linha(662, [24, '03/07'], [64, 'PADARIA BOA'], [276, '12,66']),
+      linha(651, [301, '03/05'], [341, 'LOJA ONLINE PARC03/03'], [551, '50,64']),
+      linha(602, [24, '08/07'], [64, 'PAGAMENTO DE FATURA'], [267, '-96,75'], [301, '05/07'], [341, 'POSTO CENTRAL'], [551, '56,70']),
+      linha(568, [30, 'Subtotal dos lançamentos'], [254, '12,66'], [301, '06/07'], [341, 'MERCADO DO BAIRRO'], [548, '0,00']),
+    ],
+  ];
+
+  it('cada coluna é uma tabela: a linha não junta o lançamento da esquerda com o da direita', () => {
+    const extrato = lerExtratoDoPdf(paginas, 'Fatura_082026.pdf');
+    expect(extrato?.origem).toBe('cartao');
+    expect(extrato?.vencimentoFatura).toBe('2026-08-10');
+    expect(extrato?.transacoes.map((t) => [t.data, t.valor, t.descricao])).toEqual([
+      ['2026-07-03', 1266, 'PADARIA BOA'],
+      ['2026-07-08', -9675, 'PAGAMENTO DE FATURA'],
+      ['2026-05-03', 5064, 'LOJA ONLINE PARC03/03'],
+      ['2026-07-05', 5670, 'POSTO CENTRAL'],
+    ]);
+  });
+});

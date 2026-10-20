@@ -24,6 +24,10 @@ const VALOR_NO_FIM = /([+-]\s*)?(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})\s*(\(\+\)
 const CABECALHO = /\b(HISTORICO|DESCRICAO|LANCAMENTO|ESTABELECIMENTO)\b.*\bVALOR\b|\bDIA\b.*\bLOTE\b/;
 const SALDO = /^(SALDO|S A L D O|TOTAL|SUBTOTAL|SALDO ANTERIOR|SALDO DO DIA|SALDO FINAL)\b/;
 const PAGAMENTO_NA_FATURA = /\b(PAGAMENTO|PAGTO|INCLUSAO DE PAGAMENTO|ESTORNO|CREDITO DE|DEVOLUCAO)\b/;
+/** Título da tabela, sozinho na linha: não é parte da descrição do primeiro lançamento. */
+const TITULO_DA_SECAO = /^(LANCAMENTOS|LANCAMENTOS DO PERIODO|MOVIMENTACOES|DETALHAMENTO)$/;
+/** "Saldo em 31/12/2025 R$ 20,00": saldo antes do primeiro lançamento (poupança do BB). */
+const SALDO_EM_DATA = /SALDO EM (\d{2})\/(\d{2})\/(\d{4})\s*(-)?\s*R\$\s*(-)?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/g;
 
 type Ancora = {
   y: number;
@@ -53,7 +57,14 @@ function lerDataDoComeco(texto: string): { data: Ancora['data']; resto: string }
   return { data: { dia, mes, ano: null }, resto };
 }
 
-function lerValorDoFim(texto: string, origem: OrigemExtrato): { valor: number; resto: string } | null {
+type ValorDoFim = {
+  absoluto: number;
+  /** -1/1 quando o texto diz o sinal ("-R$", "(+)", "D"); 0 quando não diz. */
+  explicito: -1 | 0 | 1;
+  resto: string;
+};
+
+function lerValorDoFim(texto: string): ValorDoFim | null {
   const achado = texto.match(VALOR_NO_FIM);
   if (!achado || achado.index === undefined) return null;
   // "R$ 1.000,00" no fim de uma frase não é lançamento: precisa estar separado do texto
@@ -65,9 +76,17 @@ function lerValorDoFim(texto: string, origem: OrigemExtrato): { valor: number; r
   const sinal = achado[1]?.trim();
   const negativo = sinal === '-' || marca === '(-)' || marca === '-' || marca === 'D';
   const positivo = sinal === '+' || marca === '(+)' || marca === '+' || marca === 'C';
-  // fatura: compra é positiva; conta: sem marca, é saída
-  const valor = origem === 'cartao' ? (negativo ? -absoluto : absoluto) : positivo ? absoluto : -absoluto;
-  return { valor, resto: antes.trim() };
+  return { absoluto, explicito: negativo ? -1 : positivo ? 1 : 0, resto: antes.trim() };
+}
+
+/**
+ * Valor sem sinal no texto: na fatura é compra (positivo). No extrato de conta depende do banco:
+ * o BB (corrente) marca "(+)" e "(-)" e o que vem sem marca é saída; a poupança do BB só marca a
+ * saída ("-R$ 61,30") e a entrada vem sem sinal ("R$ 36,00"). `semSinal` é decidido pelo documento.
+ */
+function comSinal(v: ValorDoFim, origem: OrigemExtrato, semSinal: -1 | 1): number {
+  if (v.explicito !== 0) return v.explicito * v.absoluto;
+  return origem === 'cartao' ? v.absoluto : semSinal * v.absoluto;
 }
 
 /** Tira do meio da linha os números de controle (lote, documento) que vêm em colunas próprias. */
@@ -271,6 +290,52 @@ function lerPorColunas(
   return { lidas, ignoradas, saldoAnterior, foraDaTabela };
 }
 
+/**
+ * Página com duas tabelas lado a lado (fatura do PicPay: "Data | Estabelecimento | Valor" à
+ * esquerda e à direita): cada cabeçalho "Data" em outra posição começa uma coluna, e cada
+ * coluna vira uma página à parte. Sem isso, a linha juntava o lançamento da esquerda com o da
+ * direita ("10/09 PAGAMENTO DE FATURA -945,64 15/09 GRAN COFFEE 4,50").
+ */
+export function separarColunas(pagina: LinhaDePdf[]): LinhaDePdf[][] {
+  const xs = [
+    ...new Set(pagina.flatMap((l) => l.pedacos.filter((p) => /^data$/i.test(p.texto.trim())).map((p) => Math.round(p.x)))),
+  ].sort((a, b) => a - b);
+  const colunas: number[] = [];
+  for (const x of xs) if (colunas.length === 0 || x - colunas[colunas.length - 1] > 150) colunas.push(x);
+  if (colunas.length < 2) return [pagina];
+  const limites = colunas.slice(1).map((x) => x - 8);
+  const porColuna: LinhaDePdf[][] = colunas.map(() => []);
+  for (const linha of pagina) {
+    const grupos: PedacoDePdf[][] = colunas.map(() => []);
+    for (const p of linha.pedacos) grupos[limites.filter((limite) => p.x >= limite).length].push(p);
+    grupos.forEach((pedacos, i) => {
+      if (pedacos.length > 0) porColuna[i].push({ y: linha.y, texto: pedacos.map((p) => p.texto).join(' '), pedacos });
+    });
+  }
+  return porColuna;
+}
+
+/** O saldo "em" uma data antes do primeiro lançamento (o mais recente deles). */
+function saldoAntesDoPrimeiro(foraDaTabela: string[], lidas: { data: string }[]): number | null {
+  const primeiro = lidas.map((l) => l.data).sort()[0];
+  let escolhido: { data: string; valor: number } | null = null;
+  for (const achado of semAcentos(foraDaTabela.join('\n')).matchAll(SALDO_EM_DATA)) {
+    const data = `${achado[3]}-${achado[2]}-${achado[1]}`;
+    if (!primeiro || data >= primeiro) continue;
+    const valor = (achado[4] === '-' || achado[5] === '-' ? -1 : 1) * Math.abs(textoParaCentavos(achado[6]));
+    if (!escolhido || data > escolhido.data) escolhido = { data, valor };
+  }
+  return escolhido?.valor ?? null;
+}
+
+/** Extrato da poupança do BB: não traz o nome do banco, mas traz a variação 51 e o "saldo por data-base". */
+function pareceDoBB(texto: string): boolean {
+  return (
+    /EXTRATO DE POUPANCA/.test(texto) &&
+    (/SALDOS POR DATA-BASE|DATAS BASE DISPONIVEIS/.test(texto) || /\bCONTA\s+51\d{6,}-[\dX]\b/.test(texto))
+  );
+}
+
 /** As linhas do PDF viram o extrato no formato do app (ou null se não há tabela de lançamentos). */
 export function lerExtratoDoPdf(paginas: LinhaDePdf[][], nomeArquivo: string): ExtratoLido | null {
   const todas = paginas.flat();
@@ -288,13 +353,27 @@ export function lerExtratoDoPdf(paginas: LinhaDePdf[][], nomeArquivo: string): E
   let ignoradas = 0;
   let numeroDaLinha = 0;
 
-  for (const linhasDaPagina of paginas) {
+  // duas tabelas lado a lado na mesma página (PicPay): cada coluna é lida como uma página à parte
+  const paginasDaTabela = paginas.flatMap(separarColunas);
+
+  // convenção do documento: se só a saída traz sinal ("-R$"), o valor sem sinal é entrada
+  let negativosExplicitos = 0;
+  let positivosExplicitos = 0;
+  for (const linha of paginasDaTabela.flat()) {
+    const data = lerDataDoComeco(linha.texto);
+    const valor = data ? lerValorDoFim(data.resto) : null;
+    if (valor?.explicito === -1) negativosExplicitos++;
+    if (valor?.explicito === 1) positivosExplicitos++;
+  }
+  const semSinal: -1 | 1 = origem === 'conta' && negativosExplicitos > 0 && positivosExplicitos === 0 ? 1 : -1;
+
+  for (const linhasDaPagina of paginasDaTabela) {
     // 1. linhas com data no começo e valor no fim são os lançamentos
     const ancoras: Ancora[] = [];
     const soltas: LinhaDePdf[] = [];
     for (const linha of linhasDaPagina) {
       const data = lerDataDoComeco(linha.texto);
-      const valor = data ? lerValorDoFim(data.resto, origem) : null;
+      const valor = data ? lerValorDoFim(data.resto) : null;
       if (!data || !valor || CABECALHO.test(semAcentos(linha.texto))) {
         soltas.push(linha);
         continue;
@@ -303,7 +382,7 @@ export function lerExtratoDoPdf(paginas: LinhaDePdf[][], nomeArquivo: string): E
       const meio = linha.pedacos.slice(1, -1);
       const xDescricao = meio.find((p) => !/^\d{4,}$/.test(p.texto))?.x ?? linha.pedacos[1]?.x ?? 0;
       const textoDoMeio = linha.pedacos.length >= 3 ? limparMeio(meio) : valor.resto;
-      ancoras.push({ y: linha.y, data: data.data, meio: textoDoMeio, valor: valor.valor, xDescricao, acima: [], abaixo: [] });
+      ancoras.push({ y: linha.y, data: data.data, meio: textoDoMeio, valor: comSinal(valor, origem, semSinal), xDescricao, acima: [], abaixo: [] });
     }
     if (ancoras.length === 0) {
       foraDaTabela.push(...linhasDaPagina.map((l) => l.texto));
@@ -315,7 +394,14 @@ export function lerExtratoDoPdf(paginas: LinhaDePdf[][], nomeArquivo: string): E
     const espacoTipico = espacos.length > 0 ? espacos[Math.floor(espacos.length / 2)] : 24;
     const alcance = Math.max(8, espacoTipico * 0.75);
     const xColunaDescricao = layoutBB ? Math.min(...ancoras.map((a) => a.xDescricao).filter((x) => x > 0)) : null;
+    // fatura em que cada compra já traz a descrição na própria linha (PicPay): as linhas soltas
+    // são cabeçalhos ("Transações Nacionais", "Picpay Card final 6033", o nome no cartão)
+    const descricaoNaPropriaLinha = origem === 'cartao' && ancoras.filter((a) => a.meio !== '').length >= ancoras.length * 0.8;
     for (const linha of soltas) {
+      if (descricaoNaPropriaLinha) {
+        foraDaTabela.push(linha.texto);
+        continue;
+      }
       const semAcentoDaLinha = semAcentos(linha.texto);
       const primeiroX = linha.pedacos[0]?.x ?? 0;
       const naColuna = xColunaDescricao === null || primeiroX >= xColunaDescricao - 6;
@@ -324,7 +410,12 @@ export function lerExtratoDoPdf(paginas: LinhaDePdf[][], nomeArquivo: string): E
         null
       );
       const pareceDescricao =
-        naColuna && !CABECALHO.test(semAcentoDaLinha) && !VALOR_NO_FIM.test(linha.texto.trim()) && proxima !== null && Math.abs(proxima.y - linha.y) <= alcance;
+        naColuna &&
+        !CABECALHO.test(semAcentoDaLinha) &&
+        !TITULO_DA_SECAO.test(semAcentoDaLinha.trim()) &&
+        !VALOR_NO_FIM.test(linha.texto.trim()) &&
+        proxima !== null &&
+        Math.abs(proxima.y - linha.y) <= alcance;
       if (!pareceDescricao || !proxima) {
         foraDaTabela.push(linha.texto);
         continue;
@@ -370,7 +461,9 @@ export function lerExtratoDoPdf(paginas: LinhaDePdf[][], nomeArquivo: string): E
     foraDaTabela.splice(0, foraDaTabela.length, ...porColunas.foraDaTabela);
   }
   if (lidas.length === 0) return null;
-  const banco: BancoId | null = layoutBB ? 'bb' : bancoPorTexto(foraDaTabela.join(' ')) ?? bancoPorTexto(nomeArquivo);
+  if (saldoAnterior === null && origem === 'conta') saldoAnterior = saldoAntesDoPrimeiro(foraDaTabela, lidas);
+  const banco: BancoId | null =
+    layoutBB || pareceDoBB(semAcento) ? 'bb' : bancoPorTexto(foraDaTabela.join(' ')) ?? bancoPorTexto(nomeArquivo);
   const porHash = idExternoDeLinhas(lidas, `h:${banco ?? 'outro'}`);
   const transacoes = lidas.map((t, i) => ({ ...t, idExterno: porHash[i] }));
   const datas = transacoes.map((t) => t.data).sort();
