@@ -90,6 +90,7 @@ export default function DashboardScreen() {
 
   const [membroSelecionadoId, setMembroSelecionadoId] = useState<number | null>(null);
   const [verConta, setVerConta] = useState(false);
+  const [verFixos, setVerFixos] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -687,25 +688,72 @@ export default function DashboardScreen() {
         <View style={{ height: 12 }} />
 
         <TourTarget id="gastos-fixos">
-          <Pressable onPress={() => router.push('/conta-fixa')} style={{ marginHorizontal: 20 }}>
+          <Pressable
+            onPress={() => (gastosFixos.itens.length > 0 ? setVerFixos((v) => !v) : router.push('/conta-fixa'))}
+            style={{ marginHorizontal: 20 }}
+            accessibilityRole="button"
+            accessibilityLabel={`Compromissos do mês: ${formatarMoeda(gastosFixos.total)}`}
+          >
             <Card>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text className="font-body-medium" style={{ color: colors.textMuted, fontSize: 13 }}>
-                  Gastos fixos do mês (inclui cartão)
+                  Compromissos do mês
                 </Text>
-                <Feather name="chevron-right" size={16} color={colors.textMuted} />
+                <Feather name={verFixos ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
               </View>
               <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 20, marginTop: 4 }}>
                 {formatarMoeda(gastosFixos.total)}
               </Text>
               {gastosFixos.total > 0 ? (
-                <Text className="font-body" style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
-                  {formatarMoeda(gastosFixos.totalPago)} pago · {formatarMoeda(gastosFixos.totalPendente)} pendente
-                </Text>
+                <>
+                  <Text className="font-body" style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                    {[
+                      gastosFixos.porTipo.conta_fixa > 0 ? `Contas fixas ${formatarMoeda(gastosFixos.porTipo.conta_fixa)}` : null,
+                      gastosFixos.porTipo.parcela > 0 ? `Parcelas ${formatarMoeda(gastosFixos.porTipo.parcela)}` : null,
+                      gastosFixos.porTipo.cartao > 0 ? `Compras no cartão ${formatarMoeda(gastosFixos.porTipo.cartao)}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </Text>
+                  <Text className="font-body" style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                    {formatarMoeda(gastosFixos.totalPago)} pago · {formatarMoeda(gastosFixos.totalPendente)} pendente
+                  </Text>
+                </>
               ) : (
                 <Text className="font-body" style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
                   Nenhuma conta fixa, parcela ou compra no cartão neste mês.
                 </Text>
+              )}
+              {verFixos && (
+                <View style={{ marginTop: 10, paddingTop: 6, borderTopWidth: 1, borderTopColor: colors.border }}>
+                  {gastosFixos.itens.map((item) => (
+                    <Pressable
+                      key={item.chave}
+                      onPress={() => router.push(item.link as Href)}
+                      style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 8 }}
+                      accessibilityRole="link"
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text className="font-body" style={{ color: colors.text, fontSize: 13 }} numberOfLines={1}>
+                          {item.nome}
+                        </Text>
+                        <Text className="font-body" style={{ color: colors.textMuted, fontSize: 11 }}>
+                          {item.tipo === 'conta_fixa' ? 'Conta fixa' : item.tipo === 'parcela' ? 'Parcela' : 'Compras avulsas no cartão'}
+                          {item.paga ? ' · paga' : ''}
+                        </Text>
+                      </View>
+                      <Text className="font-body-medium" style={{ color: colors.text, fontSize: 13, fontVariant: ['tabular-nums'] }}>
+                        {formatarMoeda(item.valor)}
+                      </Text>
+                      <Feather name="chevron-right" size={14} color={colors.textMuted} />
+                    </Pressable>
+                  ))}
+                  <Pressable onPress={() => router.push('/conta-fixa')} style={{ minHeight: 44, justifyContent: 'center' }}>
+                    <Text className="font-body-medium" style={{ color: colors.brand, fontSize: 12 }}>
+                      Ver contas fixas
+                    </Text>
+                  </Pressable>
+                </View>
               )}
             </Card>
           </Pressable>

@@ -19,4 +19,14 @@ describe('calcularGastosFixosDoMes', () => {
     expect(resumo.totalPago).toBe(10000);
     expect(resumo.totalPendente).toBe(45000);
   });
+
+  it('diz quanto é conta fixa, parcela e compra no cartão, e onde abrir cada item', () => {
+    expect(resumo.porTipo).toEqual({ conta_fixa: 15000, parcela: 30000, cartao: 10000 });
+    expect(resumo.itens.map((i) => [i.tipo, i.link])).toEqual([
+      ['cartao', `/cartao/${nubank.id}`],
+      ['conta_fixa', `/conta-fixa/${luz.id}`],
+      ['conta_fixa', `/conta-fixa/${streaming.id}`],
+      ['parcela', `/compra-parcelada/${tv.id}`],
+    ]);
+  });
 });

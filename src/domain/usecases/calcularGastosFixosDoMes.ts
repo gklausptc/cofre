@@ -3,15 +3,21 @@ import type { Cartao, CompraParcelada, ContaFixa, GastoRapido, Parcela } from '@
 
 export type GastoFixoDoMes = {
   chave: string;
+  /** Conta fixa, parcela de compra ou o total das compras avulsas de um cartão. */
+  tipo: 'conta_fixa' | 'parcela' | 'cartao';
   nome: string;
   valor: number;
   paga: boolean;
+  /** Tela onde o item está (conta fixa, compra parcelada ou cartão). */
+  link: string;
 };
 
 export type ResumoGastosFixos = {
   total: number;
   totalPago: number;
   totalPendente: number;
+  /** Quanto do total é de cada tipo: o card mostra que não é tudo conta fixa. */
+  porTipo: Record<GastoFixoDoMes['tipo'], number>;
   itens: GastoFixoDoMes[];
 };
 
@@ -41,13 +47,13 @@ export function calcularGastosFixosDoMes(
     if (p.contaFixaId !== null) {
       const conta = contasPorId.get(p.contaFixaId);
       if (!conta) continue;
-      itens.push({ chave: `parcela-${p.id}`, nome: conta.nome, valor: p.valor, paga: p.status === 'paga' });
+      itens.push({ chave: `parcela-${p.id}`, tipo: 'conta_fixa', nome: conta.nome, valor: p.valor, paga: p.status === 'paga', link: `/conta-fixa/${conta.id}` });
     } else if (p.compraParceladaId !== null) {
       const compra = comprasPorId.get(p.compraParceladaId);
       if (!compra) continue;
       const cartao = cartoesPorId.get(compra.cartaoId);
       const nome = `${compra.descricao} (${p.numero}/${compra.numParcelas})${cartao ? ` · ${cartao.nome}` : ''}`;
-      itens.push({ chave: `parcela-${p.id}`, nome, valor: p.valor, paga: p.status === 'paga' });
+      itens.push({ chave: `parcela-${p.id}`, tipo: 'parcela', nome, valor: p.valor, paga: p.status === 'paga', link: `/compra-parcelada/${compra.id}` });
     }
   }
 
@@ -61,9 +67,11 @@ export function calcularGastosFixosDoMes(
     const cartao = cartoesPorId.get(cartaoId);
     itens.push({
       chave: `gastos-cartao-${cartaoId}`,
+      tipo: 'cartao',
       nome: `Compras no ${cartao?.nome ?? 'cartão'}`,
       valor,
       paga: false,
+      link: `/cartao/${cartaoId}`,
     });
   }
 
@@ -72,5 +80,8 @@ export function calcularGastosFixosDoMes(
   const totalPago = itens.filter((i) => i.paga).reduce((soma, i) => soma + i.valor, 0);
   const totalPendente = itens.filter((i) => !i.paga).reduce((soma, i) => soma + i.valor, 0);
 
-  return { total: totalPago + totalPendente, totalPago, totalPendente, itens };
+  const porTipo: ResumoGastosFixos['porTipo'] = { conta_fixa: 0, parcela: 0, cartao: 0 };
+  for (const item of itens) porTipo[item.tipo] += item.valor;
+
+  return { total: totalPago + totalPendente, totalPago, totalPendente, porTipo, itens };
 }
