@@ -1,5 +1,5 @@
 import { mesAnterior } from '@/core/utils/date';
-import { ehDespesa } from '@/domain/usecases/naturezaMovimentacao';
+import { ehDespesa, ehReceita } from '@/domain/usecases/naturezaMovimentacao';
 import type { GastoRapido, Movimentacao, Parcela } from '@/domain/types/entities';
 
 export type ResumoMensal = {
@@ -32,11 +32,11 @@ export function calcularResumoMensal(
   const mesAnteriorRef = mesAnterior(mesReferencia);
 
   const receitasDoMes = movimentacoes
-    .filter((m) => m.tipo === 'entrada' && m.data.startsWith(mesReferencia) && !m.reservarProximoMes)
+    .filter((m) => ehReceita(m) && m.data.startsWith(mesReferencia) && !m.reservarProximoMes)
     .reduce((soma, m) => soma + m.valor, 0);
 
   const reservadoParaEsteMes = movimentacoes
-    .filter((m) => m.tipo === 'entrada' && m.reservarProximoMes && m.data.startsWith(mesAnteriorRef))
+    .filter((m) => ehReceita(m) && m.reservarProximoMes && m.data.startsWith(mesAnteriorRef))
     .reduce((soma, m) => soma + m.valor, 0);
 
   const receitas = receitasDoMes + reservadoParaEsteMes;

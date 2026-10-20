@@ -198,7 +198,7 @@ describe('transferência entre contas suas', () => {
     );
     expect(r[0]).toMatchObject({ tipo: 'transferencia_propria', outraContaId: 2, contraparteId: null });
     expect(r[1]).toMatchObject({ tipo: 'transferencia_propria', contraparteId: null });
-    expect(r[2]).toMatchObject({ tipo: 'transferencia_propria', outraContaId: null, motivo: 'Aplicação no próprio banco' });
+    expect(r[2]).toMatchObject({ tipo: 'transferencia_propria', outraContaId: null, motivo: 'Aplicação (dinheiro guardado)' });
   });
 });
 
@@ -296,5 +296,63 @@ describe('casos da revisão', () => {
       dados({ movimentacoes: [entradaNoC6] })
     );
     expect(r).toBeNull();
+  });
+});
+
+describe('movimentações internas (seu nome, poupança, caixinha)', () => {
+  const meus = ['GREGORY K SILVA PEREIRA'];
+
+  it('PIX para o seu nome, cortado de outro jeito, é entre contas suas', () => {
+    const r = conciliarExtrato(
+      [
+        linha({ valor: -107943, descricao: 'Pix - Enviado 01/10 07:37 GREGORY KLAUS DA SILVA PE' }),
+        linha({ valor: 8000, descricao: 'Transferido da poupança 09/10 16:49 GREGORY K SILVA PEREIRA', data: '2026-10-09' }),
+        linha({ valor: -2000, descricao: 'Pix - Enviado 02/10 07:02 MARIA APARECIDA SOUZA', data: '2026-10-02' }),
+      ],
+      semCategoria(3),
+      naContaBB,
+      dados({ nomesProprios: meus })
+    );
+    expect(r[0]).toMatchObject({ tipo: 'transferencia_propria', contraparteId: null });
+    expect(r[1]).toMatchObject({ tipo: 'transferencia_propria', contraparteId: null });
+    expect(r[2]).toBeNull();
+  });
+
+  it('poupança e caixinha, nos dois sentidos, mas rendimento continua receita', () => {
+    const poupanca = umaConta({ id: 3, banco: 'Banco do Brasil', nomeConta: 'BB Poupança' });
+    const r = conciliarExtrato(
+      [
+        linha({ valor: -5000, descricao: 'TRANSFERIDO PARA POUPANCA' }),
+        linha({ valor: 3000, descricao: 'RESGATE CAIXINHA', data: '2026-10-11' }),
+        linha({ valor: 120, descricao: 'REND POUPANCA', data: '2026-10-12' }),
+        linha({ valor: 4000, descricao: 'DINHEIRO RESGATADO', data: '2026-10-13' }),
+      ],
+      semCategoria(4),
+      naContaBB,
+      dados({ contas: [bb, c6, poupanca] })
+    );
+    expect(r[0]).toMatchObject({ tipo: 'transferencia_propria', outraContaId: 3, motivo: 'Guardado na poupança para BB Poupança' });
+    expect(r[1]).toMatchObject({ tipo: 'transferencia_propria', outraContaId: null, motivo: 'Resgate de aplicação' });
+    expect(r[2]).toBeNull();
+    expect(r[3]).toMatchObject({ tipo: 'transferencia_propria' });
+  });
+
+  it('os dois lados com o seu nome abreviado de jeitos diferentes viram uma transferência só', () => {
+    const entradaNoC6 = umaMovimentacao({
+      id: 702,
+      contaBancariaId: 2,
+      tipo: 'entrada',
+      origem: 'interna',
+      valor: 107943,
+      data: '2026-10-01',
+      descricao: 'Pix recebido de GREGORY KLAUS DA SILVA PEREIRA',
+    });
+    const [r] = conciliarExtrato(
+      [linha({ data: '2026-10-01', valor: -107943, descricao: 'Pix - Enviado 01/10 07:37 GREGORY K SILVA PEREIRA' })],
+      semCategoria(1),
+      naContaBB,
+      dados({ movimentacoes: [entradaNoC6], nomesProprios: meus })
+    );
+    expect(r).toMatchObject({ tipo: 'transferencia_propria', outraContaId: 2, contraparteId: 702 });
   });
 });

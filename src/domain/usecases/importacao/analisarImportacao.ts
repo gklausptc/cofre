@@ -53,6 +53,7 @@ export function existentesDoDestino(
       valor: m.tipo === 'entrada' || (m.tipo === 'transferencia' && m.contaDestinoId === contaId) ? m.valor : -m.valor,
       descricao: m.descricao ?? '',
       idExterno: m.idExterno,
+      transferencia: m.tipo === 'transferencia' || m.origem === 'interna',
     }));
   const debitosDaConta = gastos
     .filter((g) => g.contaBancariaId === contaId && (g.formaPagamento === 'debito' || g.formaPagamento === 'pix'))
@@ -458,8 +459,8 @@ export function montarRegistroDeImportacao(params: {
         linha: { idExterno: t.idExterno, data: t.data, valor: t.valor, descricao: t.descricao },
         mudancas:
           t.valor < 0
-            ? { tipo: 'transferencia', contaBancariaId: contaId, contaDestinoId: c.outraContaId, categoriaId: null }
-            : { tipo: 'transferencia', contaBancariaId: c.outraContaId, contaDestinoId: contaId, categoriaId: null },
+            ? { tipo: 'transferencia', contaBancariaId: contaId, contaDestinoId: c.outraContaId, categoriaId: null, origem: 'manual' }
+            : { tipo: 'transferencia', contaBancariaId: c.outraContaId, contaDestinoId: contaId, categoriaId: null, origem: 'manual' },
       });
     } else if (
       t.valor < 0 &&
@@ -472,6 +473,15 @@ export function montarRegistroDeImportacao(params: {
           membroId: linha.membroId ?? null,
           descricao: linha.acao === 'emprestimo' ? `Empréstimo: ${t.descricao}` : t.descricao,
         })
+      );
+    } else if (t.valor > 0 && (c?.tipo === 'transferencia_propria' || linha.acao === 'transferencia_propria')) {
+      // dinheiro que veio de outra conta sua: transferência quando a conta está no app; senão
+      // entrada 'interna' (soma no saldo, mas não é receita)
+      const outraContaId = c?.tipo === 'transferencia_propria' ? c.outraContaId : null;
+      registro.movimentacoes.push(
+        outraContaId !== null
+          ? movimentacaoDaLinha(outraContaId, t, { tipo: 'transferencia', contaDestinoId: contaId, membroId: linha.membroId ?? null })
+          : movimentacaoDaLinha(contaId, t, { origem: 'interna', membroId: linha.membroId ?? null })
       );
     } else if (c?.tipo === 'receita_prevista' && t.valor > 0) {
       registro.alteracoes.push({

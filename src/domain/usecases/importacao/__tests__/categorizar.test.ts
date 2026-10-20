@@ -220,3 +220,18 @@ describe('desempenho', () => {
     expect(Date.now() - inicio).toBeLessThan(3000);
   });
 });
+
+describe('seu próprio nome', () => {
+  it('PIX para você mesmo é transferência e não vira "Quem é?"', () => {
+    const c = categorizar(
+      { descricao: 'Pix - Enviado 01/10 07:37 GREGORY KLAUS DA SILVA PE', natureza: 'despesa' },
+      { categorias: [], regras: [], contatos: [], historico: [], nomesProprios: ['GREGORY K SILVA PEREIRA'] }
+    );
+    expect(c).toMatchObject({ acao: 'transferencia_propria', pessoaPix: null, confianca: 1 });
+    const outra = categorizar(
+      { descricao: 'Pix - Enviado 02/10 07:02 MARIA APARECIDA SOUZA', natureza: 'despesa' },
+      { categorias: [], regras: [], contatos: [], historico: [], nomesProprios: ['GREGORY K SILVA PEREIRA'] }
+    );
+    expect(outra.acao).toBeNull();
+  });
+});

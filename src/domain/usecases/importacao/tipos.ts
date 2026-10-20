@@ -27,9 +27,15 @@ export type TransacaoLida = {
   categoriaDoBanco?: string;
 };
 
+/** Agência, número e tipo da conta, quando o extrato diz. */
+export type DadosDaConta = { agencia: string | null; numero: string | null; tipo: 'corrente' | 'poupanca' | null };
+
+/** O que a fatura diz do cartão (para criar o cartão na importação em lote). */
+export type DadosDoCartao = { nome: string | null; limite: number | null; diaFechamento: number | null; diaVencimento: number | null };
+
 export type ExtratoLido = {
   /** 'txt' é a fatura Ourocard do BB, em largura fixa. */
-  formato: 'ofx' | 'csv' | 'txt';
+  formato: 'ofx' | 'csv' | 'txt' | 'pdf';
   banco: BancoId | null;
   /** Detectada pelo arquivo; null quando não dá para saber (o usuário escolhe). */
   origem: OrigemExtrato | null;
@@ -39,4 +45,12 @@ export type ExtratoLido = {
   periodo: { inicio: string; fim: string } | null;
   /** Vencimento da fatura, quando o arquivo informa (só em faturas de cartão). */
   vencimentoFatura: string | null;
+  /** Nome do titular ("Cliente: FULANO"), para reconhecer PIX para si mesmo. */
+  titular?: string | null;
+  /** Qual conta é: liga os próximos arquivos à mesma conta do app. */
+  conta?: DadosDaConta | null;
+  /** Saldo antes do primeiro lançamento ("Saldo Anterior"): conta criada na importação já nasce certa. */
+  saldoAnterior?: number | null;
+  /** Fatura: nome, limite e dias do cartão, quando o arquivo diz. */
+  cartao?: DadosDoCartao | null;
 };

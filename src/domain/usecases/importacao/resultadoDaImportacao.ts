@@ -147,10 +147,11 @@ export function resumirImportacao(params: {
 
   return {
     mes,
-    entradas: movsDaImportacao.filter((m) => m.tipo === 'entrada').reduce((s, m) => s + m.valor, 0),
+    entradas: movsDaImportacao.filter((m) => m.tipo === 'entrada' && m.origem !== 'interna').reduce((s, m) => s + m.valor, 0),
     saidas: importadas.reduce((s, d) => s + d.valor, 0),
     pagamentos: movsDaImportacao.filter((m) => m.tipo === 'saida' && ehPagamentoDeCompromisso(m)).reduce((s, m) => s + m.valor, 0),
-    transferencias: movsDaImportacao.filter((m) => m.tipo === 'transferencia').length + (efeitos?.movimentacoes.length ?? 0),
+    transferencias:
+      movsDaImportacao.filter((m) => m.tipo === 'transferencia' || m.origem === 'interna').length + (efeitos?.movimentacoes.length ?? 0),
     porCategoria,
     comparacao: mes ? { mes, total: totalDoMes(mes), anterior: totalDoMes(mesAnterior(mes)) } : null,
     foraDoPadrao: detectarForaDoPadrao(importadas, todasDespesas, nomeDaCategoria),

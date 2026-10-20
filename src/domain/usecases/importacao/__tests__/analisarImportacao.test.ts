@@ -269,7 +269,7 @@ describe('análise completa (categorização + conciliação) e o que gravar', (
         movimentacaoId: 700,
         motivo: 'transferencia',
         linha: { idExterno: 'transf', data: '2026-10-15', valor: -20000, descricao: 'PIX ENVIADO GREGORY KLAUS' },
-        mudancas: { tipo: 'transferencia', contaBancariaId: 1, contaDestinoId: 2, categoriaId: null },
+        mudancas: { tipo: 'transferencia', contaBancariaId: 1, contaDestinoId: 2, categoriaId: null, origem: 'manual' },
       },
     ]);
     expect(registro.movimentacoes.map((m) => [m.idExterno, m.tipo, m.origem, m.categoriaId, m.parcelaId])).toEqual([
@@ -328,5 +328,41 @@ describe('análise completa (categorização + conciliação) e o que gravar', (
       agora: new Date(),
     });
     expect(registro.regrasUsadas).toEqual([62]);
+  });
+});
+
+describe('entrada vinda de outra conta sua', () => {
+  const contas = [umaConta({ id: 1, banco: 'Banco do Brasil', nomeConta: 'BB corrente' }), umaConta({ id: 3, banco: 'Banco do Brasil', nomeConta: 'BB Poupança' })];
+  const dadosVazios = { contas, cartoes: [], contasFixas: [], parcelas: [], compras: [], gastos: [], faturas: [], movimentacoes: [] };
+  const destino = { tipo: 'conta' as const, contaBancariaId: 1 };
+
+  it('com a conta no app vira transferência; sem ela, entrada interna (não é receita)', () => {
+    const extrato = extratoCom(
+      [
+        transacao({ idExterno: 'poup', data: '2026-10-09', valor: 8000, descricao: 'Transferido da poupança' }),
+        transacao({ idExterno: 'eu', data: '2026-10-10', valor: 5000, descricao: 'PIX RECEBIDO GREGORY K SILVA PEREIRA' }),
+      ],
+      { banco: 'bb', origem: 'conta' }
+    );
+    const inteligencia = {
+      categorizar: prepararCategorizador({ categorias: [], regras: [], contatos: [], historico: [], nomesProprios: ['GREGORY KLAUS DA SILVA PEREIRA'] }),
+      dados: { ...dadosVazios, nomesProprios: ['GREGORY KLAUS DA SILVA PEREIRA'] },
+      categorias: [],
+    };
+    const { itens, resumo } = analisarImportacao(extrato, destino, [], inteligencia);
+    expect(itens.map((i) => i.precisaDeVoce)).toEqual([false, false]);
+    expect(resumo.transferencias).toBe(2);
+    const registro = montarRegistroDeImportacao({
+      arquivo: 'extrato.csv',
+      extrato,
+      destino,
+      linhas: itens.map((i) => linhaDoItem(i)),
+      agora: new Date(Date.UTC(2026, 9, 20)),
+    });
+    expect(registro.movimentacoes.map((m) => [m.idExterno, m.tipo, m.origem, m.contaBancariaId, m.contaDestinoId, m.categoriaId])).toEqual([
+      ['poup', 'transferencia', 'manual', 3, 1, null],
+      ['eu', 'entrada', 'interna', 1, null, null],
+    ]);
+    expect(registro.importacao.pendentes).toBe(0);
   });
 });

@@ -8,7 +8,7 @@ type ContasBancariasState = {
   contas: ContaBancaria[];
   carregando: boolean;
   carregar: () => Promise<void>;
-  criar: (dados: Omit<NovaContaBancaria, 'id' | 'ativo'>) => Promise<void>;
+  criar: (dados: Omit<NovaContaBancaria, 'id' | 'ativo'>) => Promise<ContaBancaria>;
   atualizar: (id: number, dados: Partial<NovaContaBancaria>) => Promise<void>;
   remover: (id: number) => Promise<void>;
 };
@@ -24,8 +24,9 @@ export const useContasBancariasStore = create<ContasBancariasState>((set, get) =
   },
 
   criar: async (dados) => {
-    await repo().criarContaBancaria(dados);
+    const criado = await repo().criarContaBancaria(dados);
     await get().carregar();
+    return criado;
   },
 
   atualizar: async (id, dados) => {

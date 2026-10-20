@@ -89,6 +89,8 @@ export type LancamentoExistente = {
   valor: number;
   descricao: string;
   idExterno: string | null;
+  /** Transferência entre contas suas (ou entrada/saída interna): o outro lado já está no app. */
+  transferencia?: boolean;
 };
 
 export type SituacaoDuplicidade =
@@ -135,7 +137,9 @@ export function deduplicar(transacoes: TransacaoLida[], existentes: LancamentoEx
       if (marca && marcaExistente && (marca.numero !== marcaExistente.numero || marca.total !== marcaExistente.total)) continue;
       const dias = Math.abs(differenceInCalendarDays(parseISO(existente.data), parseISO(t.data)));
       if (dias > DIAS_DE_TOLERANCIA) continue;
-      const nota = semelhanca(existente.descricao, t.descricao);
+      // o outro lado de uma transferência entre contas suas tem outro texto em cada banco
+      // ("Transferido da poupança" × "Transferência para conta corrente"): valor e data bastam
+      const nota = existente.transferencia && dias <= 1 ? 1 : semelhanca(existente.descricao, t.descricao);
       if (!melhor || nota > melhor.nota) melhor = { existente, nota, mesmoDia: dias === 0 };
     }
 

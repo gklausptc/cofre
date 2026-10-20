@@ -3,6 +3,7 @@ import { CATEGORIAS_DOS_BANCOS, PALAVRAS_CHAVE_DESPESA, PALAVRAS_CHAVE_RECEITA }
 import { ehPagamentoDeCompromisso } from '@/domain/usecases/naturezaMovimentacao';
 import { normalizarDescricao, semAcentos } from './normalizarDescricao';
 import { semelhanca } from './deduplicar';
+import { contemNomeProprio } from './nomesProprios';
 import type { Categoria, ContatoPix, GastoRapido, Movimentacao, RegraCategorizacao } from '@/domain/types/entities';
 
 /** Saída de dinheiro (compra, pagamento) ou entrada (salário, PIX recebido). */
@@ -54,6 +55,8 @@ export type ContextoCategorizacao = {
   regras: RegraCategorizacao[];
   contatos: ContatoPix[];
   historico: LancamentoCategorizado[];
+  /** Nomes do titular como os bancos escrevem (PIX para si mesmo é transferência). */
+  nomesProprios?: string[];
 };
 
 export type LinhaParaCategorizar = {
@@ -69,7 +72,7 @@ export function historicoDeCategorias(
 ): LancamentoCategorizado[] {
   const historico: LancamentoCategorizado[] = [];
   for (const m of movimentacoes) {
-    if (m.categoriaId === null || !m.descricao || m.tipo === 'transferencia' || ehPagamentoDeCompromisso(m)) continue;
+    if (m.categoriaId === null || !m.descricao || m.tipo === 'transferencia' || m.origem === 'interna' || ehPagamentoDeCompromisso(m)) continue;
     historico.push({ descricao: m.descricao, categoriaId: m.categoriaId, natureza: m.tipo === 'entrada' ? 'receita' : 'despesa' });
   }
   for (const g of gastos) {
@@ -248,7 +251,18 @@ export function prepararCategorizador(contexto: ContextoCategorizacao): (linha: 
       });
     }
 
-    // 1b. contatos PIX
+    // 1b. PIX ou transferência para você mesmo (outra conta sua, poupança)
+    if (contemNomeProprio(linha.descricao, contexto.nomesProprios ?? [])) {
+      return resultado({
+        pessoaPix: null,
+        confianca: CONFIANCA.contato,
+        camada: 'contato',
+        motivo: 'Para você mesmo (outra conta sua)',
+        acao: 'transferencia_propria',
+      });
+    }
+
+    // 1c. contatos PIX
     if (pix) {
       const contato = contexto.contatos.find((c) => mesmoContato(pix.nome, c.nomeNormalizado));
       if (contato) {

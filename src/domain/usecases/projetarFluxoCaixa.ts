@@ -1,5 +1,6 @@
 import { addMonths, format, parseISO } from 'date-fns';
 import { mesDeCobrancaDaParcela, mesDeCobrancaDoGasto } from '@/domain/usecases/mesDaFatura';
+import { ehReceita } from '@/domain/usecases/naturezaMovimentacao';
 import type { Cartao, CompraParcelada, ContaFixa, GastoRapido, Movimentacao, Parcela } from '@/domain/types/entities';
 
 export type ProjecaoMes = {
@@ -27,7 +28,7 @@ function mesEfetivoDaEntrada(mov: Movimentacao): string {
  */
 function calcularReceitaDoMes(movimentacoes: Movimentacao[], mes: string): number {
   return movimentacoes
-    .filter((m) => m.tipo === 'entrada' && m.recorrenteOrigemId === null)
+    .filter((m) => ehReceita(m) && m.recorrenteOrigemId === null)
     .filter((m) => {
       const mesEfetivo = mesEfetivoDaEntrada(m);
       return m.recorrente ? mesEfetivo <= mes : mesEfetivo === mes;

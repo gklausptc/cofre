@@ -27,6 +27,7 @@ export function umaConta(dados: Partial<ContaBancaria> = {}): ContaBancaria {
     banco: 'Banco',
     nomeConta: 'Conta corrente',
     saldoInicial: 0,
+    identificadorExtrato: null,
     cor: '#2A5CE0',
     icone: 'credit-card',
     ativo: true,

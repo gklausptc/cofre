@@ -11,5 +11,19 @@ export function ehPagamentoDeCompromisso(mov: Pick<Movimentacao, 'origem' | 'fat
 
 /** Saída que é consumo de verdade (entra em "quanto gastei" e nos gastos por categoria). */
 export function ehDespesa(mov: Pick<Movimentacao, 'tipo' | 'origem' | 'faturaId' | 'parcelaId'>): boolean {
-  return mov.tipo === 'saida' && !ehPagamentoDeCompromisso(mov);
+  return mov.tipo === 'saida' && !ehPagamentoDeCompromisso(mov) && mov.origem !== 'interna';
+}
+
+/**
+ * Dinheiro que só mudou de lugar entre contas suas: transferência, ou entrada/saída marcada
+ * 'interna' (o outro lado é uma conta fora do app, como a poupança ou um PIX para o próprio
+ * nome). Conta no saldo, mas não é receita nem despesa.
+ */
+export function ehMovimentoInterno(mov: Pick<Movimentacao, 'tipo' | 'origem'>): boolean {
+  return mov.tipo === 'transferencia' || mov.origem === 'interna';
+}
+
+/** Entrada que é receita de verdade (salário, venda, reembolso…). */
+export function ehReceita(mov: Pick<Movimentacao, 'tipo' | 'origem'>): boolean {
+  return mov.tipo === 'entrada' && mov.origem !== 'interna';
 }

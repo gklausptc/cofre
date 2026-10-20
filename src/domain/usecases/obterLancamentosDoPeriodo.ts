@@ -97,7 +97,8 @@ export function obterLancamentosDoPeriodo(
       origem: mov.origem ?? 'manual',
       link: `/movimentacao/${mov.id}`,
     };
-    if (mov.tipo === 'transferencia') {
+    if (mov.tipo === 'transferencia' || mov.origem === 'interna') {
+      // entrada/saída 'interna': o outro lado é uma conta sua fora do app (poupança, PIX para si)
       todos.push({ ...comum, natureza: 'transferencia', descricao: mov.descricao || 'Transferência' });
     } else if (mov.tipo === 'entrada') {
       todos.push({

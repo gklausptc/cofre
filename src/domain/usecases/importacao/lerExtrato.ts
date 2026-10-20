@@ -4,6 +4,7 @@ import { bancoPorCodigo, bancoPorTexto, origemPorNomeDoArquivo } from './bancos'
 import { idExternoDeLinhas } from './deduplicar';
 import { semAcentos } from './normalizarDescricao';
 import { reconhecerLayout } from './layouts';
+import { contaDoTexto, titularDoTexto } from './dadosDoArquivo';
 import type { BancoId, ExtratoLido, MarcaParcela, OrigemExtrato, TransacaoLida } from './tipos';
 
 /**
@@ -270,6 +271,8 @@ export type OpcoesLeituraCsv = {
   blocoRepetido?: boolean;
   /** Vencimento da fatura, quando o arquivo diz (nome do arquivo, cabeçalho). */
   vencimentoFatura?: string | null;
+  /** Nome do arquivo (diz às vezes se é poupança). */
+  nomeArquivo?: string;
 };
 
 /**
@@ -290,6 +293,7 @@ export function lerCsvComMapeamento(
   const jaVistas = new Set<string>();
   let depoisDeRepeticao = false;
   let ignoradas = 0;
+  let saldoAnterior: number | null = null;
 
   tabela.linhas.forEach((campos, i) => {
     const pegar = (indice: number | undefined) => (indice === undefined ? '' : (campos[indice] ?? '').trim());
@@ -326,6 +330,9 @@ export function lerCsvComMapeamento(
     }
     if (opcoes.inverterSinal && Number.isFinite(valor)) valor = -valor;
 
+    if (saldoAnterior === null && lidas.length === 0 && /^SALDO ANTERIOR\b/.test(semAcentos(descricao)) && Number.isFinite(valor)) {
+      saldoAnterior = opcoes.inverterSinal ? -valor : valor;
+    }
     if (!data || !Number.isFinite(valor) || valor === 0 || LINHA_DE_SALDO.test(semAcentos(descricao))) {
       ignoradas++;
       return;
@@ -350,7 +357,12 @@ export function lerCsvComMapeamento(
     ...t,
     idExterno: identificadores[i] ? `id:${banco ?? 'outro'}:${identificadores[i]}` : porHash[i],
   }));
-  return montarExtrato('csv', banco, origem, transacoes, ignoradas, opcoes.vencimentoFatura ?? null);
+  return {
+    ...montarExtrato('csv', banco, origem, transacoes, ignoradas, opcoes.vencimentoFatura ?? null),
+    titular: titularDoTexto(tabela.preambulo),
+    conta: origem === 'cartao' ? null : contaDoTexto(tabela.preambulo, opcoes.nomeArquivo ?? ''),
+    saldoAnterior: origem === 'cartao' ? null : saldoAnterior,
+  };
 }
 
 // ---------------------------------------------------------------- OFX
@@ -414,7 +426,26 @@ function lerOfx(texto: string, nomeArquivo: string): ExtratoLido {
     const usaFitid = !ehCartao && fitid !== null && UUID.test(fitid);
     return { ...t, idExterno: usaFitid ? `id:${banco ?? 'outro'}:${fitid}` : porHash[i] };
   });
-  return montarExtrato('ofx', banco, ehCartao ? 'cartao' : 'conta', transacoes, ignoradas, null);
+  const extrato = montarExtrato('ofx', banco, ehCartao ? 'cartao' : 'conta', transacoes, ignoradas, null);
+  if (ehCartao) return extrato;
+  const numero = campoOfx(texto, 'ACCTID');
+  const tipoOfx = (campoOfx(texto, 'ACCTTYPE') ?? '').toUpperCase();
+  // LEDGERBAL é o saldo no fim do período: o de antes é ele menos o que entrou e saiu
+  const saldoFinal = campoOfx(texto.match(/<LEDGERBAL>[\s\S]*?(<\/LEDGERBAL>|$)/i)?.[0] ?? '', 'BALAMT');
+  const saldoFinalCentavos = saldoFinal ? textoParaCentavos(saldoFinal) : Number.NaN;
+  return {
+    ...extrato,
+    conta: numero
+      ? {
+          agencia: campoOfx(texto, 'BRANCHID'),
+          numero,
+          tipo: tipoOfx === 'SAVINGS' ? 'poupanca' : tipoOfx === 'CHECKING' ? 'corrente' : null,
+        }
+      : contaDoTexto([], nomeArquivo),
+    saldoAnterior: Number.isFinite(saldoFinalCentavos)
+      ? saldoFinalCentavos - transacoes.reduce((soma, t) => soma + t.valor, 0)
+      : null,
+  };
 }
 
 // ---------------------------------------------------------------- TXT da fatura Ourocard (BB)
@@ -479,10 +510,12 @@ function montarExtrato(
   };
 }
 
-/** "Fatura_2026-11-10.csv" (C6), "Nubank_2026-11-05.csv": a data do nome é o vencimento. */
+/** "Fatura_2026-11-10.csv" (C6), "Nubank_2026-11-05.csv", "Fatura_01-10-2026.pdf": a data do nome é o vencimento. */
 function vencimentoPeloNomeDoArquivo(nome: string): string | null {
   const achado = nome.match(/(\d{4})-(\d{2})-(\d{2})/);
-  return achado ? parseDataExtrato(achado[0]) : null;
+  if (achado) return parseDataExtrato(achado[0]);
+  const invertido = nome.match(/(\d{2})-(\d{2})-(\d{4})/);
+  return invertido ? parseDataExtrato(`${invertido[3]}-${invertido[2]}-${invertido[1]}`) : null;
 }
 
 export type ResultadoLeitura =
@@ -492,7 +525,7 @@ export type ResultadoLeitura =
   | { ok: false; motivo: 'nao_suportado' | 'sem_transacoes'; mensagem: string };
 
 const MENSAGEM_NAO_SUPORTADO =
-  'Esse arquivo não é CSV, OFX nem TXT de extrato. PDF e Excel não são suportados: exporte em CSV ou OFX no app do banco.';
+  'Esse arquivo não é CSV, OFX, TXT nem PDF de extrato. Excel não é suportado: exporte em CSV, OFX ou PDF no app do banco.';
 
 /**
  * Primeira etapa da importação: lê um extrato de conta ou fatura de cartão (OFX, CSV ou o TXT
@@ -536,6 +569,7 @@ export function lerExtrato(conteudo: string, nomeArquivo: string): ResultadoLeit
     inverterSinal: layout?.inverterSinal,
     blocoRepetido: layout?.blocoRepetido,
     vencimentoFatura: vencimentoPeloNomeDoArquivo(nomeArquivo),
+    nomeArquivo,
   });
   return extrato.transacoes.length > 0
     ? { ok: true, extrato }

@@ -7,6 +7,7 @@ import { bancoPorTexto } from './bancos';
 import { semelhanca } from './deduplicar';
 import { normalizarDescricao, semAcentos } from './normalizarDescricao';
 import { pareceNomeDePessoa, textoParaRegra, type Categorizacao } from './categorizar';
+import { contemNomeProprio } from './nomesProprios';
 import type { DestinoImportacao } from '@/domain/usecases/prepararImportacaoExtrato';
 import type {
   Cartao,
@@ -30,6 +31,8 @@ export type DadosParaConciliar = {
   gastos: GastoRapido[];
   faturas: Fatura[];
   movimentacoes: Movimentacao[];
+  /** Nomes do titular (PIX para o próprio nome é transferência entre contas suas). */
+  nomesProprios?: string[];
 };
 
 /**
@@ -39,7 +42,8 @@ export type DadosParaConciliar = {
  *   o texto diz que é pagamento de fatura, mas o cartão não está no app;
  * - ja_paga: o app já tem esse pagamento (você marcou a conta ou a fatura como paga);
  * - ja_na_fatura: na fatura do cartão, a compra já está no app como parcela ou conta fixa;
- * - transferencia_propria: dinheiro entre contas suas (não é despesa nem receita);
+ * - transferencia_propria: dinheiro entre contas suas, poupança ou aplicação (não é despesa nem
+ *   receita);
  * - receita_prevista: confirma a entrada recorrente (salário) que o app já tinha lançado;
  * - salario: entrada que é salário (pelo texto ou porque se repete todo mês).
  */
@@ -188,9 +192,13 @@ const PAGAMENTO_DE_FATURA =
 const MESMA_TITULARIDADE = /MESMA TITULARIDADE|MESMO TITULAR|ENTRE CONTAS|CONTA PROPRIA|CONTAS PROPRIAS/;
 /** Dinheiro que vai para (ou volta de) aplicação no próprio banco. */
 const APLICACAO =
-  /\b(APLICACAO|APLIC|RESGATE|RESG|CDB|RDB|LCI|LCA|CAIXINHA|CAIXINHAS|COFRINHO|COFRINHOS|PORQUINHO|INVESTIMENTO|TESOURO DIRETO)\b/;
+  /\b(APLICACAO|APLIC|RESGATE|RESG|CDB|RDB|LCI|LCA|CAIXINHA|CAIXINHAS|COFRINHO|COFRINHOS|PORQUINHO|INVESTIMENTO|TESOURO DIRETO|POUPANCA|POUP|RENDE FACIL|DINHEIRO GUARDADO|DINHEIRO RESGATADO|GUARDADO NO|RESGATADO DO)\b/;
+/** Rendimento da aplicação é receita, não dinheiro voltando ("REND APLIC", "JUROS POUPANCA"). */
+const RENDIMENTO = /\b(REND|RENDIMENTO|RENDIMENTOS|JUROS|REMUNERACAO|DIVIDENDOS?|PROVENTO)\b/;
+/** Poupança: casa com a conta poupança do app, quando houver só uma. */
+const POUPANCA = /\bPOUP(ANCA)?\b/;
 /** Linha com cara de transferência (para aceitar o outro lado como contraparte). */
-const PARECE_TRANSFERENCIA = /\b(PIX|TRANSF|TRANSFERENCIA|TED|DOC|TEV)\b/;
+const PARECE_TRANSFERENCIA = /\b(PIX|TRANSF|TRANSFERENCIA|TRANSFERIDO|TRANSFERIDA|TED|DOC|TEV)\b/;
 /** Entrada de salário pelo texto. */
 const SALARIO = /\b(SALARIO|SALARIOS|FOLHA|PROVENTOS|VENCIMENTOS|PAGTO SALARIO|CRED SALARIO|HOLERITE)\b/;
 
@@ -264,9 +272,16 @@ export function conciliarExtrato(
       !m.idExterno &&
       m.importacaoId === null
   );
-  const entradasDaConta = dados.movimentacoes.filter((m) => m.contaBancariaId === contaId && m.tipo === 'entrada');
+  const entradasDaConta = dados.movimentacoes.filter((m) => m.contaBancariaId === contaId && m.tipo === 'entrada' && m.origem !== 'interna');
+
+  const nomesProprios = dados.nomesProprios ?? [];
+  const ehProprio = (texto: string) => contemNomeProprio(texto, nomesProprios);
 
   const outraContaPeloTexto = (texto: string): number | null => {
+    if (POUPANCA.test(texto)) {
+      const poupancas = outrasContas.filter((c) => POUPANCA.test(semAcentos(`${c.nomeConta} ${c.banco}`)));
+      if (poupancas.length === 1) return poupancas[0].id;
+    }
     const banco = bancoPorTexto(texto);
     if (!banco) return null;
     const doBanco = outrasContas.filter((c) => bancoPorTexto(`${c.banco} ${c.nomeConta}`) === banco);
@@ -276,9 +291,30 @@ export function conciliarExtrato(
   return transacoes.map((t, indice): Conciliacao | null => {
     const categorizacao = categorizacoes[indice] ?? null;
     const original = semAcentos(t.descricao);
+    /** Entre contas suas sem o outro lado no app: regra/contato, seu nome, mesma titularidade, poupança. */
+    const transferenciaSemContraparte = (sentido: 'para' | 'de'): Conciliacao | null => {
+      const outraContaId = outraContaPeloTexto(original);
+      const outraConta = outraContaId !== null ? dados.contas.find((c) => c.id === outraContaId) : undefined;
+      const onde = outraConta ? ` ${sentido} ${outraConta.nomeConta}` : '';
+      if (categorizacao?.acao === 'transferencia_propria') {
+        return { tipo: 'transferencia_propria', outraContaId, contraparteId: null, motivo: `${categorizacao.motivo}${onde}` };
+      }
+      if (ehProprio(original) || MESMA_TITULARIDADE.test(original)) {
+        return { tipo: 'transferencia_propria', outraContaId, contraparteId: null, motivo: `Entre contas suas${onde}` };
+      }
+      if (APLICACAO.test(original) && !RENDIMENTO.test(original)) {
+        const motivo = POUPANCA.test(original)
+          ? sentido === 'para' ? 'Guardado na poupança' : 'Resgatado da poupança'
+          : sentido === 'para' ? 'Aplicação (dinheiro guardado)' : 'Resgate de aplicação';
+        return { tipo: 'transferencia_propria', outraContaId, contraparteId: null, motivo: outraConta ? `${motivo}${onde}` : motivo };
+      }
+      return null;
+    };
     const valor = Math.abs(t.valor);
     const pareceTransferencia = PARECE_TRANSFERENCIA.test(original);
     const nomeNoPix = normalizarDescricao(t.descricao).pix?.nome ?? null;
+    const proprioAqui = ehProprio(original);
+    const propriaPelaCategoria = categorizacao?.acao === 'transferencia_propria' || proprioAqui;
 
     // --- transferência própria com o outro lado já no app
     const contraparte = dados.movimentacoes.find((m) => {
@@ -286,15 +322,21 @@ export function conciliarExtrato(
       if (m.faturaId !== null || m.parcelaId !== null) return false;
       // os dois lados com cara de transferência (ou uma regra dizendo que é), e, se os dois
       // trazem nome de pessoa, o mesmo nome (o seu) — senão é coincidência de valor
-      const outroLadoPareceTransferencia = PARECE_TRANSFERENCIA.test(semAcentos(m.descricao ?? ''));
-      if (!outroLadoPareceTransferencia || (!pareceTransferencia && categorizacao?.acao !== 'transferencia_propria')) return false;
-      const nomeDoOutroLado = normalizarDescricao(m.descricao ?? '').pix?.nome ?? null;
-      const pessoaAqui = nomeNoPix !== null && pareceNomeDePessoa(nomeNoPix);
-      const pessoaLa = nomeDoOutroLado !== null && pareceNomeDePessoa(nomeDoOutroLado);
-      if (pessoaAqui && pessoaLa && semelhanca(nomeNoPix ?? '', nomeDoOutroLado ?? '') < 0.8) return false;
-      // só um dos lados nomeia uma pessoa (PIX para um amigo × TED genérica): coincidência de
-      // valor, a não ser que uma regra ou contato diga que é conta sua
-      if (pessoaAqui !== pessoaLa && categorizacao?.acao !== 'transferencia_propria') return false;
+      const textoDoOutroLado = semAcentos(m.descricao ?? '');
+      const proprioLa = ehProprio(textoDoOutroLado);
+      const outroLadoPareceTransferencia =
+        PARECE_TRANSFERENCIA.test(textoDoOutroLado) || m.origem === 'interna' || m.tipo === 'transferencia' || proprioLa;
+      if (!outroLadoPareceTransferencia || (!pareceTransferencia && !propriaPelaCategoria)) return false;
+      // os dois lados com o seu nome (cada banco abrevia de um jeito): é você mesmo
+      if (!(proprioAqui && proprioLa)) {
+        const nomeDoOutroLado = normalizarDescricao(m.descricao ?? '').pix?.nome ?? null;
+        const pessoaAqui = nomeNoPix !== null && pareceNomeDePessoa(nomeNoPix) && !proprioAqui;
+        const pessoaLa = nomeDoOutroLado !== null && pareceNomeDePessoa(nomeDoOutroLado) && !proprioLa;
+        if (pessoaAqui && pessoaLa && semelhanca(nomeNoPix ?? '', nomeDoOutroLado ?? '') < 0.8) return false;
+        // só um dos lados nomeia uma pessoa (PIX para um amigo × TED genérica): coincidência de
+        // valor, a não ser que uma regra, um contato ou o seu nome diga que é conta sua
+        if (pessoaAqui !== pessoaLa && !propriaPelaCategoria && !proprioLa) return false;
+      }
       if (t.valor < 0) return m.tipo === 'entrada';
       return m.tipo === 'saida' || (m.tipo === 'transferencia' && m.contaDestinoId === null);
     });
@@ -394,17 +436,8 @@ export function conciliarExtrato(
       }
 
       // --- transferência própria sem o outro lado no app
-      if (categorizacao?.acao === 'transferencia_propria' || MESMA_TITULARIDADE.test(original)) {
-        return {
-          tipo: 'transferencia_propria',
-          outraContaId: outraContaPeloTexto(original),
-          contraparteId: null,
-          motivo: categorizacao?.acao === 'transferencia_propria' ? categorizacao.motivo : 'Transferência entre contas suas',
-        };
-      }
-      if (APLICACAO.test(original)) {
-        return { tipo: 'transferencia_propria', outraContaId: null, contraparteId: null, motivo: 'Aplicação no próprio banco' };
-      }
+      const propria = transferenciaSemContraparte('para');
+      if (propria) return propria;
       return null;
     }
 
@@ -425,10 +458,9 @@ export function conciliarExtrato(
       return { tipo: 'receita_prevista', movimentacaoId: prevista.id, motivo: `Confirma a entrada prevista: ${prevista.descricao ?? 'receita'}` };
     }
 
-    if (categorizacao?.acao === 'transferencia_propria') {
-      // sem o outro lado no app, a entrada continua entrada (o app não sabe de onde veio)
-      return null;
-    }
+    // dinheiro que volta da poupança, da caixinha ou de outra conta sua: não é receita
+    const propria = transferenciaSemContraparte('de');
+    if (propria) return propria;
 
     if (valor >= VALOR_MINIMO_SALARIO && !categorizacao?.pessoaPix) {
       if (SALARIO.test(original)) return { tipo: 'salario', motivo: 'Salário' };

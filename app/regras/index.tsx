@@ -13,6 +13,9 @@ import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { useRegrasStore } from '@/store/regrasStore';
 import { useAvisoStore } from '@/store/avisoStore';
 import { useCategoriasStore } from '@/store/categoriasStore';
+import { usePreferenciasStore } from '@/store/preferenciasStore';
+import { TextField } from '@/components/TextField';
+import { juntarNomeProprio, lerNomesProprios } from '@/domain/usecases/importacao/nomesProprios';
 import type { Categoria, ContatoPix, RegraCategorizacao } from '@/domain/types/entities';
 
 const CORRESPONDENCIAS: { valor: RegraCategorizacao['tipoCorrespondencia']; rotulo: string }[] = [
@@ -145,6 +148,61 @@ function CartaoDoContato({ contato, categorias }: { contato: ContatoPix; categor
   );
 }
 
+/** O seu nome como os bancos escrevem: PIX e transferência para ele são entre contas suas. */
+function SeusNomes() {
+  const { colors } = useAppTheme();
+  const { preferencias, carregar, atualizar } = usePreferenciasStore();
+  const [novo, setNovo] = useState('');
+  const nomes = lerNomesProprios(preferencias?.nomesProprios ?? null);
+
+  useFocusEffect(
+    useCallback(() => {
+      carregar();
+    }, [carregar])
+  );
+
+  const salvar = (lista: string[]) => atualizar({ nomesProprios: JSON.stringify(lista) });
+
+  return (
+    <Card>
+      <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15 }}>
+        Seu nome nos bancos
+      </Text>
+      <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginTop: 4, marginBottom: 8 }}>
+        PIX, TED ou transferência para estes nomes conta como movimentação entre contas suas (nem gasto nem receita).
+        O app aprende sozinho com o nome do titular dos extratos; cada banco abrevia de um jeito.
+      </Text>
+      {nomes.map((nome) => (
+        <View key={nome} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 40 }}>
+          <Feather name="user" size={15} color={colors.brand} style={{ marginRight: 8 }} />
+          <Text className="font-body-medium" style={{ color: colors.text, fontSize: 13, flex: 1 }}>
+            {nome}
+          </Text>
+          <Pressable
+            onPress={() => salvar(nomes.filter((n) => n !== nome))}
+            accessibilityRole="button"
+            accessibilityLabel={`Tirar ${nome}`}
+            hitSlop={10}
+            style={{ minWidth: 44, minHeight: 44, alignItems: 'flex-end', justifyContent: 'center' }}
+          >
+            <Feather name="x" size={18} color={colors.textMuted} />
+          </Pressable>
+        </View>
+      ))}
+      <TextField label="Adicionar nome" value={novo} onChangeText={setNovo} autoCapitalize="characters" placeholder="Como aparece no extrato" />
+      <Button
+        titulo="Adicionar"
+        variante="secundaria"
+        disabled={novo.trim().split(/\s+/).length < 2}
+        onPress={async () => {
+          await salvar(juntarNomeProprio(nomes, novo));
+          setNovo('');
+        }}
+      />
+    </Card>
+  );
+}
+
 export default function RegrasAprendidasScreen() {
   const { colors } = useAppTheme();
   const router = useRouter();
@@ -164,6 +222,7 @@ export default function RegrasAprendidasScreen() {
         <ScreenHeader title="Regras aprendidas" subtitle="O que o Cofre faz sozinho ao importar extratos" />
 
         <View style={{ paddingHorizontal: 20, gap: 10 }}>
+          <SeusNomes />
           {regras.length === 0 && contatos.length === 0 ? (
             <>
               <EmptyState

@@ -3,7 +3,6 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
-import { File } from 'expo-file-system';
 import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card } from '@/components/Card';
@@ -22,13 +21,13 @@ import { useParcelasStore } from '@/store/parcelasStore';
 import { useComprasParceladasStore } from '@/store/comprasParceladasStore';
 import { useFaturasStore } from '@/store/faturasStore';
 import { useRegrasStore } from '@/store/regrasStore';
-import { decodificarLatin1, removerBOM, temCaracteresInvalidos } from '@/core/utils/importParsers';
-import { lerCsvComMapeamento, lerExtrato, type TabelaCsv } from '@/domain/usecases/importacao/lerExtrato';
+import { usePreferenciasStore } from '@/store/preferenciasStore';
+import { TextField } from '@/components/TextField';
+import { lerArquivoDeExtrato, TIPOS_DE_ARQUIVO_DE_EXTRATO } from '@/core/importacao/lerArquivoDeExtrato';
+import { lerCsvComMapeamento, type TabelaCsv } from '@/domain/usecases/importacao/lerExtrato';
 import {
   analisarImportacao,
   dataNaFatura,
-  absorvidasDoDestino,
-  existentesDoDestino,
   linhaDoItem,
   montarRegistroDeImportacao,
   naturezaDaLinha,
@@ -36,7 +35,10 @@ import {
   sugerirMesDaFatura,
   type ItemDaAnalise,
 } from '@/domain/usecases/importacao/analisarImportacao';
-import { historicoDeCategorias, prepararCategorizador, textoParaRegra } from '@/domain/usecases/importacao/categorizar';
+import { textoParaRegra } from '@/domain/usecases/importacao/categorizar';
+import { existentesParaImportar, montarInteligencia, type BaseDaImportacao } from '@/domain/usecases/importacao/importacaoEmLote';
+import { juntarNomeProprio, lerNomesProprios } from '@/domain/usecases/importacao/nomesProprios';
+import { identificadorDoExtrato } from '@/domain/usecases/importacao/dadosDoArquivo';
 import { montarFilaDePerguntas } from '@/domain/usecases/importacao/montarFilaDePerguntas';
 import type { DadosRegraCategorizacao } from '@/domain/repositories/importacoesRepository';
 import { LinhaDaPrevia } from '@/components/importacao/LinhaDaPrevia';
@@ -46,36 +48,7 @@ import type { BancoId, ExtratoLido, OrigemExtrato } from '@/domain/usecases/impo
 import type { DestinoImportacao } from '@/domain/usecases/prepararImportacaoExtrato';
 import { formatarData, formatarMesReferencia, mesAnterior, mesSeguinte } from '@/core/utils/date';
 
-type Etapa = 'arquivo' | 'mapear' | 'destino' | 'preview';
-
-const TIPOS_ACEITOS = [
-  'text/csv',
-  'text/comma-separated-values',
-  'text/plain',
-  'application/x-ofx',
-  'application/vnd.ms-excel',
-  'application/octet-stream',
-];
-
-/**
- * Lê o arquivo como texto. Tenta UTF-8 primeiro; se falhar (erro nativo de codificação) ou vier
- * com caracteres de substituição, lê os bytes e decodifica como Latin-1, codificação comum
- * em extratos de bancos brasileiros.
- */
-async function lerArquivoComoTexto(uri: string): Promise<string> {
-  const arquivo = new File(uri);
-  let texto: string | null = null;
-  try {
-    texto = await arquivo.text();
-  } catch {
-    texto = null;
-  }
-  if (texto === null || temCaracteresInvalidos(texto)) {
-    const bytes = await arquivo.bytes();
-    texto = decodificarLatin1(bytes);
-  }
-  return removerBOM(texto);
-}
+type Etapa = 'arquivo' | 'senha' | 'mapear' | 'destino' | 'preview';
 
 function GuiaDosBancos() {
   const { colors } = useAppTheme();
@@ -121,7 +94,8 @@ function Voltar({ onPress }: { onPress: () => void }) {
 export default function ImportarExtratoScreen() {
   const { colors } = useAppTheme();
   const router = useRouter();
-  const { contas, carregar: carregarContas } = useContasBancariasStore();
+  const { contas, carregar: carregarContas, atualizar: atualizarConta } = useContasBancariasStore();
+  const { preferencias, carregar: carregarPreferencias, atualizar: atualizarPreferencias } = usePreferenciasStore();
   const { cartoes, carregar: carregarCartoes } = useCartoesStore();
   const { movimentacoes, carregar: carregarMovimentacoes } = useMovimentacoesStore();
   const { gastos, carregar: carregarGastos } = useGastosRapidosStore();
@@ -146,6 +120,7 @@ export default function ImportarExtratoScreen() {
       carregarFaturas();
       carregarRegras();
       carregarImportacoes();
+      carregarPreferencias();
     }, [
       carregarContas,
       carregarCartoes,
@@ -158,6 +133,7 @@ export default function ImportarExtratoScreen() {
       carregarFaturas,
       carregarRegras,
       carregarImportacoes,
+      carregarPreferencias,
     ])
   );
 
@@ -165,6 +141,10 @@ export default function ImportarExtratoScreen() {
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [nomeArquivo, setNomeArquivo] = useState('');
+  // PDF com senha: o arquivo espera a senha
+  const [pendente, setPendente] = useState<{ uri: string; nome: string } | null>(null);
+  const [senha, setSenha] = useState('');
+  const [abrindo, setAbrindo] = useState(false);
 
   // CSV que o app não reconheceu: o usuário diz qual coluna é qual
   const [tabela, setTabela] = useState<{ tabela: TabelaCsv; banco: BancoId | null; origem: OrigemExtrato | null } | null>(null);
@@ -203,26 +183,20 @@ export default function ImportarExtratoScreen() {
     setMesFatura(cartao && lido ? sugerirMesDaFatura(lido, cartao) : null);
   }
 
-  const categorizar = useMemo(
-    () =>
-      prepararCategorizador({
-        categorias,
-        regras,
-        contatos,
-        historico: historicoDeCategorias(movimentacoes, gastos),
-      }),
-    [categorias, regras, contatos, movimentacoes, gastos]
+  // o seu nome nos bancos (e o titular deste arquivo): PIX para você mesmo é transferência
+  const nomesSalvos = useMemo(() => lerNomesProprios(preferencias?.nomesProprios ?? null), [preferencias]);
+  const nomesProprios = useMemo(() => juntarNomeProprio(nomesSalvos, extrato?.titular ?? null), [nomesSalvos, extrato]);
+  const base = useMemo<BaseDaImportacao>(
+    () => ({ categorias, regras, contatos, contas, cartoes, contasFixas, parcelas, compras, gastos, faturas, movimentacoes, importacoes, nomesProprios }),
+    [categorias, regras, contatos, contas, cartoes, contasFixas, parcelas, compras, gastos, faturas, movimentacoes, importacoes, nomesProprios]
   );
+  const inteligencia = useMemo(() => montarInteligencia(base, mesFatura), [base, mesFatura]);
+  const categorizar = inteligencia.categorizar;
 
   const analise = useMemo(() => {
     if (!extrato || !destino) return null;
-    return analisarImportacao(extrato, destino, [...existentesDoDestino(destino, movimentacoes, gastos), ...absorvidasDoDestino(destino, importacoes)], {
-      categorizar,
-      categorias,
-      mesDaFatura: mesFatura,
-      dados: { contas, cartoes, contasFixas, parcelas, compras, gastos, faturas, movimentacoes },
-    });
-  }, [extrato, destino, movimentacoes, gastos, categorizar, categorias, mesFatura, contas, cartoes, contasFixas, parcelas, compras, faturas, importacoes]);
+    return analisarImportacao(extrato, destino, existentesParaImportar(destino, base), inteligencia);
+  }, [extrato, destino, base, inteligencia]);
 
   const chaveDaEscolha = useCallback(
     (item: ItemDaAnalise) => (destino ? `${naturezaDaLinha(item.transacao, destino)}|${textoParaRegra(item.transacao.descricao)}` : ''),
@@ -242,23 +216,26 @@ export default function ImportarExtratoScreen() {
     setEtapa('destino');
   }
 
-  async function handleEscolherArquivo() {
-    setErro(null);
-    let conteudo: string;
-    let nome = '';
+  async function lerArquivo(uri: string, nome: string, senhaDoPdf: string) {
+    setNomeArquivo(nome);
+    setAbrindo(true);
+    let leitura: Awaited<ReturnType<typeof lerArquivoDeExtrato>>;
     try {
-      const resultado = await DocumentPicker.getDocumentAsync({ type: TIPOS_ACEITOS, copyToCacheDirectory: true });
-      if (resultado.canceled || resultado.assets.length === 0) return;
-      const asset = resultado.assets[0];
-      nome = asset.name;
-      conteudo = await lerArquivoComoTexto(asset.uri);
+      leitura = await lerArquivoDeExtrato(uri, nome, senhaDoPdf);
     } catch {
       setErro('Não consegui abrir esse arquivo.');
       return;
+    } finally {
+      setAbrindo(false);
     }
-    setNomeArquivo(nome);
-
-    const leitura = lerExtrato(conteudo, nome);
+    if (!leitura.ok && (leitura.motivo === 'precisa_senha' || leitura.motivo === 'senha_errada')) {
+      setPendente({ uri, nome });
+      setErro(leitura.motivo === 'senha_errada' ? leitura.mensagem : null);
+      setEtapa('senha');
+      return;
+    }
+    setPendente(null);
+    setSenha('');
     if (leitura.ok) {
       irParaDestino(leitura.extrato);
       return;
@@ -272,6 +249,25 @@ export default function ImportarExtratoScreen() {
       return;
     }
     setErro(leitura.mensagem);
+  }
+
+  async function handleEscolherArquivo() {
+    setErro(null);
+    try {
+      const resultado = await DocumentPicker.getDocumentAsync({ type: TIPOS_DE_ARQUIVO_DE_EXTRATO, copyToCacheDirectory: true, multiple: true });
+      if (resultado.canceled || resultado.assets.length === 0) return;
+      if (resultado.assets.length > 1) {
+        // vários de uma vez: a importação em lote cria as contas e importa tudo na ordem
+        router.push({
+          pathname: '/importar-extrato/lote',
+          params: { arquivos: JSON.stringify(resultado.assets.map((a) => ({ uri: a.uri, nome: a.name }))) },
+        });
+        return;
+      }
+      await lerArquivo(resultado.assets[0].uri, resultado.assets[0].name, '');
+    } catch {
+      setErro('Não consegui abrir esse arquivo.');
+    }
   }
 
   function handleConfirmarMapeamento() {
@@ -365,7 +361,7 @@ export default function ImportarExtratoScreen() {
         fatura,
         regrasNovas,
       });
-      const existentes = [...existentesDoDestino(destino, movimentacoes, gastos), ...absorvidasDoDestino(destino, importacoes)];
+      const existentes = existentesParaImportar(destino, base);
       registro.perguntas = montarFilaDePerguntas({
         extrato,
         destino,
@@ -386,6 +382,10 @@ export default function ImportarExtratoScreen() {
         },
       });
       const importacaoId = await importar(registro);
+      if (nomesProprios.length !== nomesSalvos.length) await atualizarPreferencias({ nomesProprios: JSON.stringify(nomesProprios) });
+      const identificador = identificadorDoExtrato(extrato);
+      const conta = destino.tipo === 'conta' ? contas.find((c) => c.id === destino.contaBancariaId) : undefined;
+      if (identificador && conta && !conta.identificadorExtrato) await atualizarConta(conta.id, { identificadorExtrato: identificador });
       await Promise.all([
         carregarMovimentacoes(),
         carregarGastos(),
@@ -413,7 +413,7 @@ export default function ImportarExtratoScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
       <ScrollView contentContainerStyle={{ padding: 20 }}>
-        <ScreenHeader title="Importar extrato" subtitle="CSV ou OFX do seu banco ou cartão" />
+        <ScreenHeader title="Importar extrato" subtitle="CSV, OFX ou PDF do seu banco ou cartão" />
 
         {erro && (
           <Text className="font-body" style={{ color: colors.danger, fontSize: 13, marginBottom: 12 }}>
@@ -424,14 +424,46 @@ export default function ImportarExtratoScreen() {
         {etapa === 'arquivo' && (
           <>
             <Text className="font-body" style={{ color: colors.textMuted, fontSize: 13, marginBottom: 16 }}>
-              Selecione o arquivo .csv ou .ofx exportado do app ou internet banking (extrato da conta ou fatura do
-              cartão). O Cofre reconhece o banco e o tipo de arquivo sozinho. PDF não é suportado.
+              Selecione o arquivo .csv, .ofx ou .pdf exportado do app ou internet banking (extrato da conta ou fatura
+              do cartão). O Cofre reconhece o banco e o tipo de arquivo sozinho. Escolha vários de uma vez para
+              importar o ano todo: ele cria as contas e os cartões que faltam.
             </Text>
-            <Button titulo="Selecionar arquivo" onPress={handleEscolherArquivo} />
+            <Button titulo="Selecionar arquivos" onPress={handleEscolherArquivo} carregando={abrindo} />
             <GuiaDosBancos />
             <View style={{ marginTop: 12 }}>
               <Button titulo="Importações anteriores" variante="secundaria" onPress={() => router.push('/importar-extrato/historico')} />
             </View>
+          </>
+        )}
+
+        {etapa === 'senha' && pendente && (
+          <>
+            <Voltar onPress={() => setEtapa('arquivo')} />
+            <Card style={{ marginBottom: 12 }}>
+              <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 14 }} numberOfLines={1}>
+                {pendente.nome}
+              </Text>
+              <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>
+                Esse PDF tem senha. O banco costuma usar parte do seu CPF. A senha só é usada para abrir o arquivo aqui
+                no aparelho e não é guardada.
+              </Text>
+            </Card>
+            <TextField
+              label="Senha do PDF"
+              value={senha}
+              onChangeText={setSenha}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus
+              onSubmitEditing={() => senha !== '' && lerArquivo(pendente.uri, pendente.nome, senha)}
+            />
+            <Button
+              titulo="Abrir"
+              disabled={senha === ''}
+              carregando={abrindo}
+              onPress={() => lerArquivo(pendente.uri, pendente.nome, senha)}
+            />
           </>
         )}
 

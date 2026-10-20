@@ -106,6 +106,13 @@
       "when": 1792473022409,
       "tag": "0014_dusty_skreet",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1792514488882,
+      "tag": "0015_elite_gladiator",
+      "breakpoints": true
     }
   ]
 }

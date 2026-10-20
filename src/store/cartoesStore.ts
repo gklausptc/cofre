@@ -9,7 +9,7 @@ type CartoesState = {
   cartoes: Cartao[];
   carregando: boolean;
   carregar: () => Promise<void>;
-  criar: (dados: Omit<NovoCartao, 'id' | 'ativo'>) => Promise<void>;
+  criar: (dados: Omit<NovoCartao, 'id' | 'ativo'>) => Promise<Cartao>;
   atualizar: (id: number, dados: Partial<Omit<NovoCartao, 'id' | 'ativo'>>) => Promise<void>;
   remover: (id: number) => Promise<void>;
 };
@@ -25,9 +25,10 @@ export const useCartoesStore = create<CartoesState>((set, get) => ({
   },
 
   criar: async (dados) => {
-    await repo().criarCartao(dados);
+    const criado = await repo().criarCartao(dados);
     await get().carregar();
     pedirReagendamento();
+    return criado;
   },
 
   atualizar: async (id, dados) => {

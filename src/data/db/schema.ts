@@ -29,6 +29,8 @@ export const contasBancarias = sqliteTable('contas_bancarias', {
   cor: text('cor').notNull(),
   icone: text('icone').notNull(),
   ativo: integer('ativo', { mode: 'boolean' }).default(true),
+  // banco|agência|conta|tipo lido do extrato: liga os próximos arquivos a esta conta sozinho
+  identificadorExtrato: text('identificador_extrato'),
   // saldo_atual NÃO é coluna — é sempre calculado a partir de movimentacoes (ver usecases)
 });
 
@@ -41,7 +43,9 @@ export const movimentacoes = sqliteTable('movimentacoes', {
   descricao: text('descricao'),
   categoriaId: integer('categoria_id'),
   contaDestinoId: integer('conta_destino_id'), // só para transferencia
-  origem: text('origem', { enum: ['manual', 'conta_fixa', 'gasto', 'parcela', 'fatura'] }).default('manual'),
+  // 'interna': dinheiro que veio (ou foi) para uma conta sua fora do app — poupança, caixinha,
+  // PIX para o próprio nome. Mexe no saldo, mas não é receita nem despesa (ehMovimentoInterno).
+  origem: text('origem', { enum: ['manual', 'conta_fixa', 'gasto', 'parcela', 'fatura', 'interna'] }).default('manual'),
   membroId: integer('membro_id'),
   // só se aplica a entradas: exclui o valor do resumo do mês em que caiu e soma no mês seguinte
   reservarProximoMes: integer('reservar_proximo_mes', { mode: 'boolean' }).default(false),
@@ -231,6 +235,9 @@ export const preferencias = sqliteTable('preferencias', {
   insightsDispensados: text('insights_dispensados'),
   // avisos de orçamento já mandados (JSON de chaves "categoria-mês-80/100"), para avisar uma vez
   alertasEnviados: text('alertas_enviados'),
+  // nomes do titular como aparecem nos extratos (JSON), para reconhecer PIX e transferências
+  // entre contas suas; o app aprende pelo cabeçalho do extrato ("Cliente: ...")
+  nomesProprios: text('nomes_proprios'),
 });
 
 // Orçamento por categoria: limite mensal em centavos. Vale de `mes_inicio` em diante (o mais
@@ -247,7 +254,7 @@ export const orcamentos = sqliteTable('orcamentos', {
 export const importacoes = sqliteTable('importacoes', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   arquivo: text('arquivo').notNull(),
-  formato: text('formato', { enum: ['ofx', 'csv', 'txt'] }).notNull(),
+  formato: text('formato', { enum: ['ofx', 'csv', 'txt', 'pdf'] }).notNull(),
   banco: text('banco'),
   contaBancariaId: integer('conta_bancaria_id'),
   cartaoId: integer('cartao_id'),

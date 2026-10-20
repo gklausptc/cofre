@@ -9,13 +9,13 @@ reais, em `src/domain/usecases/importacao/__tests__/formatosDosBancos.test.ts`.
 
 | Banco | Conta | Cartão |
 |---|---|---|
-| Banco do Brasil | CSV, OFX, TXT (app e site) | TXT de largura fixa, OFX |
-| Santander | **Só PDF** desde 2026 | **Só PDF** |
+| Banco do Brasil | PDF, CSV, OFX, TXT (app e site) | TXT de largura fixa, OFX |
+| Santander | **Só PDF** desde 2026 (lido pelo leitor de PDF) | **Só PDF** |
 | Bradesco | CSV (`;`), OFX (site) | TXT/OFX no site; PDF no app |
 | Itaú | OFX, TXT (site) | CSV (desde set/2025); sem OFX |
 | Nubank | CSV, OFX (por e-mail) | CSV, OFX (fatura fechada) |
-| C6 Bank | CSV e OFX no Web Banking; app só PDF | CSV pelo app |
-| PicPay | CSV (por e-mail) | **Só PDF** |
+| C6 Bank | CSV e OFX no Web Banking; PDF no app | CSV e PDF (com senha) pelo app |
+| PicPay | CSV (por e-mail) | **Só PDF** (lido pelo leitor de PDF) |
 | InfinitePay | CSV, OFX (formato não confirmado) | não encontrado |
 
 ## Regras que valem para todos
@@ -26,6 +26,13 @@ reais, em `src/domain/usecases/importacao/__tests__/formatosDosBancos.test.ts`.
 - **O sinal muda de arquivo para arquivo.** No app, a conta tem saída negativa e o cartão tem compra positiva. Na fatura em OFX a compra vem negativa e é invertida na leitura.
 - **O FITID do OFX não é chave.** Repete no BB e nas parcelas do Nubank, e muda a cada download no Itaú, Bradesco e C6. O id de cada linha é data + valor + descrição normalizada + ordem entre linhas iguais. A exceção é o UUID da conta Nubank, o mesmo no CSV ("Identificador") e no OFX.
 - **Parcelas antigas vêm com a data da compra original** (C6, Itaú, Ourocard). Na importação de fatura, tudo entra na fatura escolhida, e as compras antigas ganham a data de fechamento dela, com "(compra em dd/mm/aaaa)" na descrição.
+
+## PDF
+
+- **Leitor em JS puro** (`src/core/utils/pdf/`, roda no Expo Go): acha os objetos varrendo o arquivo (não depende da tabela xref), lê fluxos de objetos (PDF 1.5+), descompacta FlateDecode (`fflate`), abre a proteção por senha do "Standard security handler" (RC4 de 40/128 bits e AES-128; AES-256 ainda não) com a senha do usuário ou do dono, e extrai o texto com a posição de cada pedaço (WinAnsi, MacRoman, Differences e ToUnicode).
+- **Do texto ao extrato** (`lerExtratoDoPdf`): cada linha que começa com data e termina com valor é um lançamento; o resto da descrição está nas linhas sem data mais próximas, na coluna da descrição (no BB ela fica centralizada na célula: uma linha acima e outra abaixo). Valor com `(+)`/`(-)`, `C`/`D` ou sinal; na fatura, compra é positiva e "Pagamento"/"Estorno" vira negativo. Saldo anterior, titular ("Cliente:"), agência/conta, corrente ou poupança, e, na fatura, vencimento (texto ou nome do arquivo `Fatura_01-10-2026.pdf`), fechamento, limite e nome do cartão.
+- **Conferido** com o extrato do BB em PDF (out/2026): 29 lançamentos, e saldo anterior + lançamentos = saldo final. A fatura do C6 em PDF (com senha) abre, mas a amostra estava zerada: o layout das compras da fatura em PDF ainda não foi conferido com um arquivo real.
+- PDF escaneado (foto) não tem texto: o app avisa.
 
 ## Particularidades
 

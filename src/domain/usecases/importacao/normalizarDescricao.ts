@@ -119,10 +119,12 @@ export function normalizarDescricao(original: string): DescricaoNormalizada {
     .replace(/\s+/g, ' ')
     .trim();
 
+  // "Pix - Enviado 01/10 FULANO" (BB) sobra como "PIX ENVIADO FULANO": o nome é só o FULANO
+  const nomeDoPix = texto.replace(/^PIX (AUTOMATICO )?(ENVIADO|RECEBIDO|ENVIO|EMITIDO|AGENDADO)( (PARA|DE))?\s*/, '').trim();
   return {
     normalizada: texto,
     intermediador,
-    pix: pixDetectado && texto !== '' ? { sentido, nome: texto } : null,
+    pix: pixDetectado && nomeDoPix !== '' ? { sentido, nome: nomeDoPix } : null,
     parcela: achadoParcela?.parcela ?? null,
   };
 }
