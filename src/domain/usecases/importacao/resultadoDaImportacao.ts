@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, parseISO } from 'date-fns';
+import { differenceInCalendarDays, format, parseISO, subDays } from 'date-fns';
 import { mesAnterior } from '@/core/utils/date';
 import { ehDespesa, ehPagamentoDeCompromisso } from '@/domain/usecases/naturezaMovimentacao';
 import { textoParaRegra } from './categorizar';
@@ -77,24 +77,40 @@ export function detectarForaDoPadrao(
   historico: Lancamento[],
   nomeDaCategoria: (id: number | null) => string
 ): GastoForaDoPadrao[] {
+  // índices montados uma vez: o texto de cada descrição e os lançamentos por texto e por categoria
+  const textos = new Map<string, string>();
+  const textoDe = (descricao: string) => {
+    let texto = textos.get(descricao);
+    if (texto === undefined) {
+      texto = textoParaRegra(descricao);
+      textos.set(descricao, texto);
+    }
+    return texto;
+  };
+  const porTexto = new Map<string, Lancamento[]>();
+  const porCategoria = new Map<number, Lancamento[]>();
+  for (const h of historico) {
+    const texto = textoDe(h.descricao);
+    if (texto !== '') porTexto.set(texto, [...(porTexto.get(texto) ?? []), h]);
+    if (h.categoriaId !== null) porCategoria.set(h.categoriaId, [...(porCategoria.get(h.categoriaId) ?? []), h]);
+  }
+
   const sinalizados: GastoForaDoPadrao[] = [];
   for (const l of importados) {
-    const antes = historico.filter((h) => {
-      if (h.importacaoId !== null && h.importacaoId === l.importacaoId) return false;
-      const dias = differenceInCalendarDays(parseISO(l.data), parseISO(h.data));
-      return dias > 0 && dias <= 90;
-    });
-    const texto = textoParaRegra(l.descricao);
-    const mesmoComerciante = texto === '' ? [] : antes.filter((h) => textoParaRegra(h.descricao) === texto);
+    const inicio = format(subDays(parseISO(l.data), 90), 'yyyy-MM-dd');
+    const naJanela = (h: Lancamento) =>
+      !(h.importacaoId !== null && h.importacaoId === l.importacaoId) && h.data >= inicio && h.data < l.data;
+    const texto = textoDe(l.descricao);
+    const mesmoComerciante = texto === '' ? [] : (porTexto.get(texto) ?? []).filter(naJanela);
     if (mesmoComerciante.length >= 2) {
       const m = media(mesmoComerciante.map((h) => h.valor));
       if (l.valor >= m * 1.5 && l.valor - m >= 5000) {
-        sinalizados.push({ id: l.id, descricao: l.descricao, valor: l.valor, media: Math.round(m), motivo: `${Math.round((l.valor / m - 1) * 100)}% acima do normal` });
+        sinalizados.push({ id: l.id, descricao: l.descricao, valor: l.valor, media: Math.round(m), motivo: comparadoAoNormal(l.valor, m, 'o normal', 'do normal') });
       }
       continue;
     }
     if (l.categoriaId === null) continue;
-    const mesmaCategoria = antes.filter((h) => h.categoriaId === l.categoriaId);
+    const mesmaCategoria = (porCategoria.get(l.categoriaId) ?? []).filter(naJanela);
     if (mesmaCategoria.length < 3) continue;
     const m = media(mesmaCategoria.map((h) => h.valor));
     if (l.valor >= m * 3 && l.valor - m >= 10000) {
@@ -103,11 +119,22 @@ export function detectarForaDoPadrao(
         descricao: l.descricao,
         valor: l.valor,
         media: Math.round(m),
-        motivo: `${Math.round(l.valor / m)}× o normal em ${nomeDaCategoria(l.categoriaId)}`,
+        motivo: `${comparadoAoNormal(l.valor, m, 'o normal', 'do normal')} em ${nomeDaCategoria(l.categoriaId)}`,
       });
     }
   }
   return sinalizados.sort((a, b) => b.valor - a.valor);
+}
+
+/**
+ * Quanto acima do normal, do jeito que se fala: "3,2× o normal" quando passa do dobro,
+ * "45% acima do normal" quando é menos (porcentagem gigante não diz nada).
+ */
+export function comparadoAoNormal(valor: number, media: number, comVezes: string, comPorcentagem: string): string {
+  if (media <= 0) return `muito acima ${comPorcentagem}`;
+  const razao = valor / media;
+  if (razao >= 2) return `${String(Math.round(razao * 10) / 10).replace('.', ',')}× ${comVezes}`;
+  return `${Math.round((razao - 1) * 100)}% acima ${comPorcentagem}`;
 }
 
 /** Números da tela de resultado de uma importação (o que entrou, por categoria, comparação, fora do padrão). */

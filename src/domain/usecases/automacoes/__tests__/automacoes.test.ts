@@ -281,7 +281,7 @@ describe('insights', () => {
     expect(r.map((i) => i.texto)).toEqual([
       `A conta C6 fica negativa dia 23/10: ${formatarMoeda(-21000)}.`,
       `Alimentação passou do orçamento: ${formatarMoeda(112000)} de ${formatarMoeda(90000)}.`,
-      `Luz veio ${formatarMoeda(31200)}, 60% acima da média.`,
+      `Luz: ${formatarMoeda(31200)}, 60% acima da média de ${formatarMoeda(19500)}. Toque para ver o lançamento.`,
       `Lazer já usou 85% do orçamento: ${formatarMoeda(8500)} de ${formatarMoeda(10000)}.`,
       'Melhor cartão hoje: C6, vence 12/12 (52 dias).',
     ]);

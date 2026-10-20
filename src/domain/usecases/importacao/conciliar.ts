@@ -91,7 +91,7 @@ type ContaFixaAberta = {
   vencimento: string;
 };
 
-type FaturaAberta = {
+export type FaturaAberta = {
   cartao: Cartao;
   mesReferencia: string;
   total: number;
@@ -117,7 +117,7 @@ const dentroDaTolerancia = (valor: number, esperado: number, tolerancia: number)
   Math.abs(valor - esperado) <= Math.max(1, Math.round(esperado * tolerancia));
 
 /** Meses ('YYYY-MM') de um mês antes do início a um depois do fim do extrato. */
-function mesesAoRedor(datas: string[]): string[] {
+export function mesesAoRedor(datas: string[]): string[] {
   if (datas.length === 0) return [];
   const ordenadas = [...datas].sort();
   const inicio = addMonths(parseISO(`${ordenadas[0].slice(0, 7)}-01`), -1);
@@ -128,7 +128,7 @@ function mesesAoRedor(datas: string[]): string[] {
 }
 
 /** Contas fixas, faturas e itens de fatura dos meses que o extrato cobre. */
-function compromissosDosMeses(dados: DadosParaConciliar, meses: string[]) {
+export function compromissosDosMeses(dados: DadosParaConciliar, meses: string[]) {
   const parcelasPorId = new Map(dados.parcelas.map((p) => [p.id, p]));
   const contasPorId = new Map(dados.contasFixas.map((c) => [c.id, c]));
   const comprasPorId = new Map(dados.compras.map((c) => [c.id, c]));
@@ -186,7 +186,7 @@ function compromissosDosMeses(dados: DadosParaConciliar, meses: string[]) {
 }
 
 /** Texto de pagamento de fatura de cartão no extrato da conta. */
-const PAGAMENTO_DE_FATURA =
+export const PAGAMENTO_DE_FATURA =
   /\bFATURA\b|\b(PAG(TO|AMENTO)?|PGTO)\.? (DE )?(FAT|CARTAO|CART CRED|CARTAO DE CREDITO|CARTAO CREDITO)\b|\bCARTAO DE CREDITO\b/;
 /** Transferência entre contas do mesmo titular. */
 const MESMA_TITULARIDADE = /MESMA TITULARIDADE|MESMO TITULAR|ENTRE CONTAS|CONTA PROPRIA|CONTAS PROPRIAS/;

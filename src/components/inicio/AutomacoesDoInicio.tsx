@@ -23,6 +23,7 @@ import { gerarInsights, MAXIMO_NO_INICIO, type Insight } from '@/domain/usecases
 import { lerDivisao, lerIds, salarioParaDividir, sugerirDivisao } from '@/domain/usecases/automacoes/divisaoSalario';
 import { detectarForaDoPadrao } from '@/domain/usecases/importacao/resultadoDaImportacao';
 import { calcularLimiteDisponivel } from '@/domain/usecases/calcularLimiteDisponivel';
+import { encontrarPagamentosSoltos, faturasAntigasEmAberto } from '@/domain/usecases/automacoes/faturasSoltas';
 
 function lerLista(json: string | null): string[] {
   if (!json) return [];
@@ -82,7 +83,21 @@ export function AutomacoesDoInicio({ onAvisar }: Props) {
         calcularLimiteDisponivel(c, dados.comprasParceladas ?? [], dados.parcelas ?? [], dados.gastos ?? [], dados.faturas ?? []),
       ])
     );
+    const paraConciliar = {
+      contas,
+      cartoes: dados.cartoes ?? [],
+      contasFixas: dados.contasFixas ?? [],
+      parcelas: dados.parcelas ?? [],
+      compras: dados.comprasParceladas ?? [],
+      gastos: dados.gastos ?? [],
+      faturas: dados.faturas ?? [],
+      movimentacoes: dados.movimentacoes ?? [],
+    };
+    const soltos = encontrarPagamentosSoltos(paraConciliar, hoje);
+    const antigas = faturasAntigasEmAberto(paraConciliar, hoje, soltos);
     return gerarInsights({
+      pagamentosSoltos: soltos.length,
+      faturasAntigas: antigas.length,
       negativos,
       orcamentos: orcamentosDoMes,
       mes,

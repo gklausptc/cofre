@@ -3,6 +3,7 @@ import { repositorios } from '@/domain/repositories';
 import { planejarPagamentoFatura, type PedidoPagamentoFatura } from '@/domain/usecases/pagarFatura';
 import { hojeIso } from '@/core/utils/date';
 import type { Fatura } from '@/domain/types/entities';
+import type { PagamentoFatura } from '@/domain/repositories/faturasRepository';
 import { pedirReagendamento } from '@/core/notifications/agendador';
 
 const repo = () => repositorios().faturas;
@@ -12,6 +13,8 @@ type FaturasState = {
   carregar: () => Promise<void>;
   /** Marca as parcelas da fatura como pagas e registra a fatura (e a conta de onde saiu o dinheiro). */
   pagarFatura: (pedido: PedidoPagamentoFatura) => Promise<void>;
+  /** Liga pagamentos que estavam como gasto às faturas (ou marca faturas antigas como pagas fora do app). */
+  ligarPagamentos: (itens: { pagamento: PagamentoFatura; parcelaIds: number[]; movimentacaoId: number | null }[]) => Promise<void>;
 };
 
 export const useFaturasStore = create<FaturasState>((set, get) => ({
@@ -30,6 +33,12 @@ export const useFaturasStore = create<FaturasState>((set, get) => ({
       const faturaId = await repo().registrarPagamentoFatura(plano.registro);
       await repos.movimentacoes.registrarPagamentoVinculado({ faturaId }, plano.saida);
     });
+    await get().carregar();
+    pedirReagendamento();
+  },
+
+  ligarPagamentos: async (itens) => {
+    for (const item of itens) await repo().ligarPagamento(item);
     await get().carregar();
     pedirReagendamento();
   },

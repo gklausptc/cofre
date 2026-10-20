@@ -7,6 +7,7 @@ import { MonthSelector } from '@/components/MonthSelector';
 import { Card } from '@/components/Card';
 import { Calendario, type MarcaDoDia } from '@/components/agenda/Calendario';
 import { PainelDePagamentos } from '@/components/agenda/PainelDePagamentos';
+import { FaturasParaArrumar } from '@/components/agenda/FaturasParaArrumar';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { formatarMoeda } from '@/core/utils/currency';
 import { formatarData, hojeIso, mesAnterior, mesAtualIso, mesSeguinte } from '@/core/utils/date';
@@ -100,6 +101,19 @@ export default function AgendaScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <ScreenHeader title="Agenda" subtitle="O que vence e o que já foi pago" />
+        <FaturasParaArrumar
+          dados={{
+            contas,
+            cartoes: dados.cartoes ?? [],
+            contasFixas: dados.contasFixas ?? [],
+            parcelas: dados.parcelas ?? [],
+            compras: dados.comprasParceladas ?? [],
+            gastos: dados.gastos ?? [],
+            faturas: dados.faturas ?? [],
+            movimentacoes: dados.movimentacoes ?? [],
+          }}
+          onMudou={carregarTudo}
+        />
         <MonthSelector
           mesReferencia={mes}
           onAnterior={() => {
