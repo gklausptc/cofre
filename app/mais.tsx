@@ -24,7 +24,7 @@ const ITENS: ItemMenu[] = [
   { icon: 'tag', titulo: 'Categorias', href: '/categorias' },
   { icon: 'zap', titulo: 'Regras aprendidas', href: '/regras' },
   { icon: 'help-circle', titulo: 'Revisão da importação', href: '/revisao' },
-  { icon: 'download', titulo: 'Exportar extrato', href: '/exportar-extrato' },
+  { icon: 'download', titulo: 'Exportar extrato e tudo para análise', href: '/exportar-extrato' },
   { icon: 'target', titulo: 'Metas financeiras', href: '/metas' },
   { icon: 'pie-chart', titulo: 'Orçamento do mês', href: '/orcamento' },
   { icon: 'repeat', titulo: 'Assinaturas', href: '/assinaturas' },

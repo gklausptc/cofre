@@ -16,7 +16,7 @@ const TIPOS_ACEITOS = ['application/json', 'text/json', 'text/plain', 'applicati
 
 export type BackupLido = { ok: true; backup: BackupCofre; resumo: ItemResumoBackup[] } | { ok: false; erro: string };
 
-async function gerarBackupAtual(agora: Date): Promise<BackupCofre> {
+export async function gerarBackupAtual(agora: Date): Promise<BackupCofre> {
   const repo = repositorios().backup;
   const [tabelas, versao] = await Promise.all([repo.exportarTabelas(), repo.versaoSchemaAtual()]);
   return montarBackup(tabelas, versao, agora);

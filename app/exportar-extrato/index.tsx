@@ -20,7 +20,11 @@ import { useComprasParceladasStore } from '@/store/comprasParceladasStore';
 import { useContasFixasStore } from '@/store/contasFixasStore';
 import { useFaturasStore } from '@/store/faturasStore';
 import { gerarExtratoCartaoCSV, gerarExtratoContaCSV } from '@/domain/usecases/gerarExtratoCSV';
-import { formatarMesReferencia, mesAnterior, mesAtualIso, mesSeguinte } from '@/core/utils/date';
+import { formatarMesReferencia, hojeIso, mesAnterior, mesAtualIso, mesSeguinte } from '@/core/utils/date';
+import { useDadosFinanceiros } from '@/store/useDadosFinanceiros';
+import { useMembrosFamiliaStore } from '@/store/membrosFamiliaStore';
+import { montarAnaliseCompleta } from '@/domain/usecases/analiseCompleta';
+import { compartilharAnaliseCompleta, compartilharPlanilhaDaAnalise } from '@/core/exportacao/exportarAnalise';
 
 type TipoOrigem = 'conta' | 'cartao';
 type Periodo = 'mes' | 'tudo';
@@ -45,6 +49,8 @@ export default function ExportarExtratoScreen() {
   const { compras, carregar: carregarCompras } = useComprasParceladasStore();
   const { contas: contasFixas, carregar: carregarContasFixas } = useContasFixasStore();
   const { faturas, carregar: carregarFaturas } = useFaturasStore();
+  const { dados, carregarTudo } = useDadosFinanceiros();
+  const { membros, carregar: carregarMembros } = useMembrosFamiliaStore();
 
   useFocusEffect(
     useCallback(() => {
@@ -57,7 +63,11 @@ export default function ExportarExtratoScreen() {
       carregarCompras();
       carregarContasFixas();
       carregarFaturas();
+      carregarTudo();
+      carregarMembros();
     }, [
+      carregarTudo,
+      carregarMembros,
       carregarContas,
       carregarCartoes,
       carregarCategorias,
@@ -77,6 +87,8 @@ export default function ExportarExtratoScreen() {
   const [mes, setMes] = useState(mesAtualIso());
   const [exportando, setExportando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [exportandoTudo, setExportandoTudo] = useState<'analise' | 'planilha' | null>(null);
+  const [erroTudo, setErroTudo] = useState<string | null>(null);
 
   const cartoesAtivos = useMemo(() => cartoes.filter((c) => c.ativo !== false), [cartoes]);
   const categoriasPorId = useMemo(() => new Map(categorias.map((c) => [c.id, c])), [categorias]);
@@ -135,6 +147,21 @@ export default function ExportarExtratoScreen() {
     }
   }
 
+  async function exportarTudo(como: 'analise' | 'planilha') {
+    setErroTudo(null);
+    setExportandoTudo(como);
+    try {
+      const agora = new Date();
+      const analise = montarAnaliseCompleta({ dados, contas, categorias, membros, hoje: hojeIso(), geradoEm: agora.toISOString() });
+      if (como === 'analise') await compartilharAnaliseCompleta(analise);
+      else await compartilharPlanilhaDaAnalise(analise);
+    } catch (falha) {
+      setErroTudo(falha instanceof Error && falha.message ? falha.message : 'Não consegui gerar o arquivo. Tente novamente.');
+    } finally {
+      setExportandoTudo(null);
+    }
+  }
+
   const descricaoPeriodo =
     tipoOrigem === 'conta'
       ? periodo === 'mes'
@@ -146,6 +173,40 @@ export default function ExportarExtratoScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
       <ScrollView contentContainerStyle={{ padding: 20 }}>
         <ScreenHeader title="Exportar extrato" subtitle="CSV para abrir no Excel ou enviar" />
+
+        <Card style={{ marginBottom: 20 }}>
+          <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 16 }}>
+            Tudo o que foi lançado
+          </Text>
+          <Text className="font-body" style={{ color: colors.textMuted, fontSize: 13, marginTop: 4, marginBottom: 12 }}>
+            Entradas, saídas, transferências, cartão, contas fixas e cofrinhos de todos os meses, com as contas que o app fez
+            em cada mês (Livre para gastar, compromissos, saldo das contas). Serve para mandar para conferência quando um
+            número parecer errado. O arquivo tem os seus dados financeiros: envie só para quem vai conferir.
+          </Text>
+          {erroTudo && (
+            <Text className="font-body" style={{ color: colors.danger, fontSize: 13, marginBottom: 12 }}>
+              {erroTudo}
+            </Text>
+          )}
+          <Button
+            titulo="Exportar tudo para análise"
+            onPress={() => void exportarTudo('analise')}
+            carregando={exportandoTudo === 'analise'}
+            disabled={exportandoTudo !== null}
+          />
+          <View style={{ height: 8 }} />
+          <Button
+            titulo="Planilha com todos os lançamentos"
+            variante="secundaria"
+            onPress={() => void exportarTudo('planilha')}
+            carregando={exportandoTudo === 'planilha'}
+            disabled={exportandoTudo !== null}
+          />
+        </Card>
+
+        <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 16, marginBottom: 12 }}>
+          Extrato de uma conta ou fatura
+        </Text>
 
         <ChipSelect<TipoOrigem>
           label="Exportar de"
