@@ -21,7 +21,7 @@ const GRADE: Acao[] = [
 ];
 
 /** Embaixo: trazer do banco. */
-const IMPORTAR: Acao = { icone: 'upload', titulo: 'Importar extratos', descricao: 'CSV, OFX ou PDF, um ou vários de uma vez', href: '/importar-extrato' };
+const IMPORTAR: Acao = { icone: 'upload', titulo: 'Importar extratos', descricao: 'CSV, OFX, PDF ou prints, um ou vários de uma vez', href: '/importar-extrato' };
 
 export const ACOES: Acao[] = [PRINCIPAL, ...GRADE, IMPORTAR];
 

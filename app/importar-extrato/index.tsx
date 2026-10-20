@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Clipboard from 'expo-clipboard';
 import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card } from '@/components/Card';
@@ -39,6 +40,7 @@ import { textoParaRegra } from '@/domain/usecases/importacao/categorizar';
 import { existentesParaImportar, montarInteligencia, type BaseDaImportacao } from '@/domain/usecases/importacao/importacaoEmLote';
 import { juntarNomeProprio, lerNomesProprios } from '@/domain/usecases/importacao/nomesProprios';
 import { identificadorDoExtrato } from '@/domain/usecases/importacao/dadosDoArquivo';
+import { lerTextoColado } from '@/domain/usecases/importacao/lerTextoColado';
 import { montarFilaDePerguntas } from '@/domain/usecases/importacao/montarFilaDePerguntas';
 import type { DadosRegraCategorizacao } from '@/domain/repositories/importacoesRepository';
 import { LinhaDaPrevia } from '@/components/importacao/LinhaDaPrevia';
@@ -46,9 +48,9 @@ import { COMO_EXPORTAR } from '@/domain/dados/comoExportar';
 import { NOMES_DOS_BANCOS } from '@/domain/usecases/importacao/bancos';
 import type { BancoId, ExtratoLido, OrigemExtrato } from '@/domain/usecases/importacao/tipos';
 import type { DestinoImportacao } from '@/domain/usecases/prepararImportacaoExtrato';
-import { formatarData, formatarMesReferencia, mesAnterior, mesSeguinte } from '@/core/utils/date';
+import { formatarData, formatarMesReferencia, hojeIso, mesAnterior, mesSeguinte } from '@/core/utils/date';
 
-type Etapa = 'arquivo' | 'senha' | 'mapear' | 'destino' | 'preview';
+type Etapa = 'arquivo' | 'colar' | 'senha' | 'mapear' | 'destino' | 'preview';
 
 function GuiaDosBancos() {
   const { colors } = useAppTheme();
@@ -145,6 +147,10 @@ export default function ImportarExtratoScreen() {
   const [pendente, setPendente] = useState<{ uri: string; nome: string } | null>(null);
   const [senha, setSenha] = useState('');
   const [abrindo, setAbrindo] = useState(false);
+  // prints colados (Texto ao Vivo do iPhone): um bloco por print
+  const [blocos, setBlocos] = useState<string[]>([]);
+  const [textoColado, setTextoColado] = useState('');
+  const [origemColada, setOrigemColada] = useState<OrigemExtrato>('cartao');
 
   // CSV que o app não reconheceu: o usuário diz qual coluna é qual
   const [tabela, setTabela] = useState<{ tabela: TabelaCsv; banco: BancoId | null; origem: OrigemExtrato | null } | null>(null);
@@ -268,6 +274,34 @@ export default function ImportarExtratoScreen() {
     } catch {
       setErro('Não consegui abrir esse arquivo.');
     }
+  }
+
+  async function colarDoPrint() {
+    setErro(null);
+    const copiado = (await Clipboard.getStringAsync()).trim();
+    if (copiado === '') {
+      setErro('Não há texto copiado. Na Fotos, abra o print, toque no ícone de texto e em "Copiar tudo".');
+      return;
+    }
+    setBlocos((atuais) => (atuais.includes(copiado) ? atuais : [...atuais, copiado]));
+  }
+
+  function adicionarTextoDigitado() {
+    const limpo = textoColado.trim();
+    if (limpo === '') return;
+    setBlocos((atuais) => [...atuais, limpo]);
+    setTextoColado('');
+  }
+
+  function lerPrints() {
+    const lido = lerTextoColado(blocos, origemColada, hojeIso());
+    if (!lido) {
+      setErro('Não encontrei compras com data e valor nesse texto. Confira se copiou o print inteiro.');
+      return;
+    }
+    setErro(null);
+    setNomeArquivo(blocos.length === 1 ? 'Texto de um print' : `Texto de ${blocos.length} prints`);
+    irParaDestino(lido);
   }
 
   function handleConfirmarMapeamento() {
@@ -413,7 +447,7 @@ export default function ImportarExtratoScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
       <ScrollView contentContainerStyle={{ padding: 20 }}>
-        <ScreenHeader title="Importar extrato" subtitle="CSV, OFX ou PDF do seu banco ou cartão" />
+        <ScreenHeader title="Importar extrato" subtitle="CSV, OFX, PDF ou prints do seu banco ou cartão" />
 
         {erro && (
           <Text className="font-body" style={{ color: colors.danger, fontSize: 13, marginBottom: 12 }}>
@@ -429,9 +463,69 @@ export default function ImportarExtratoScreen() {
               importar o ano todo: ele cria as contas e os cartões que faltam.
             </Text>
             <Button titulo="Selecionar arquivos" onPress={handleEscolherArquivo} carregando={abrindo} />
+            <View style={{ marginTop: 12 }}>
+              <Button titulo="Colar texto de prints (fatura em aberto)" variante="secundaria" onPress={() => setEtapa('colar')} />
+            </View>
             <GuiaDosBancos />
             <View style={{ marginTop: 12 }}>
               <Button titulo="Importações anteriores" variante="secundaria" onPress={() => router.push('/importar-extrato/historico')} />
+            </View>
+          </>
+        )}
+
+        {etapa === 'colar' && (
+          <>
+            <Voltar onPress={() => setEtapa('arquivo')} />
+            <Card style={{ marginBottom: 12 }}>
+              <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 14 }}>
+                Para a fatura que ainda não fechou
+              </Text>
+              <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>
+                1. Tire prints da fatura no app do banco.{'\n'}2. Na Fotos, abra o print, toque no ícone de texto (canto de
+                baixo) e em &quot;Copiar tudo&quot;.{'\n'}3. Volte aqui e toque em &quot;Colar do print&quot;. Repita para cada print: o
+                que se repetir entre eles entra uma vez só.
+              </Text>
+            </Card>
+            <ChipSelect<OrigemExtrato>
+              label="É de"
+              opcoes={[
+                { valor: 'cartao', rotulo: 'Cartão de crédito' },
+                { valor: 'conta', rotulo: 'Conta' },
+              ]}
+              valor={origemColada}
+              onSelecionar={setOrigemColada}
+            />
+            <Button titulo={blocos.length === 0 ? 'Colar do print' : 'Colar mais um print'} onPress={colarDoPrint} />
+            {blocos.map((bloco, i) => (
+              <View key={`${i}-${bloco.length}`} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                <Feather name="image" size={16} color={colors.brand} style={{ marginRight: 8 }} />
+                <Text className="font-body" style={{ color: colors.text, fontSize: 13, flex: 1 }} numberOfLines={1}>
+                  Print {i + 1}: {bloco.split('\n').filter((l) => l.trim() !== '').length} linhas
+                </Text>
+                <Pressable
+                  onPress={() => setBlocos((atuais) => atuais.filter((_, j) => j !== i))}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Tirar o print ${i + 1}`}
+                  hitSlop={10}
+                  style={{ minWidth: 44, minHeight: 44, alignItems: 'flex-end', justifyContent: 'center' }}
+                >
+                  <Feather name="x" size={18} color={colors.textMuted} />
+                </Pressable>
+              </View>
+            ))}
+            <View style={{ marginTop: 16 }}>
+              <TextField
+                label="Ou cole/digite aqui"
+                value={textoColado}
+                onChangeText={setTextoColado}
+                multiline
+                placeholder={'18 OUT\nUBER *TRIP 23,90'}
+                style={{ minHeight: 90, textAlignVertical: 'top' }}
+              />
+              {textoColado.trim() !== '' && <Button titulo="Adicionar este texto" variante="secundaria" onPress={adicionarTextoDigitado} />}
+            </View>
+            <View style={{ marginTop: 12 }}>
+              <Button titulo="Ler os prints" onPress={lerPrints} disabled={blocos.length === 0} />
             </View>
           </>
         )}
