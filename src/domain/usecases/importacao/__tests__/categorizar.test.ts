@@ -5,6 +5,7 @@ import {
   historicoDeCategorias,
   pareceNomeDePessoa,
   prepararCategorizador,
+  textoParaRegra,
   type ContextoCategorizacao,
 } from '@/domain/usecases/importacao/categorizar';
 import { COMERCIANTES } from '@/domain/dados/comerciantes';
@@ -174,8 +175,8 @@ describe('histórico', () => {
   });
 
   it('descrição parecida: sugere com 0,6 (vira pergunta)', () => {
-    const historico = [{ descricao: 'BAZAR DA ESQUINA LTDA', categoriaId: 7, natureza: 'despesa' as const }];
-    const r = categorizar(despesa('BAZAR DA ESQUINA FILIAL'), { ...vazio, historico });
+    const historico = [{ descricao: 'ARMAZEM DA ESQUINA LTDA', categoriaId: 7, natureza: 'despesa' as const }];
+    const r = categorizar(despesa('ARMAZEM DA ESQUINA FILIAL'), { ...vazio, historico });
     expect(r).toMatchObject({ categoriaId: 7, confianca: 0.6 });
     expect(r.confianca).toBeLessThan(CONFIANCA_MINIMA);
   });
@@ -202,8 +203,10 @@ describe('PIX para pessoa', () => {
   });
 
   it('PIX para pessoa desconhecida não é categorizado por palavra-chave', () => {
-    const r = categorizar(despesa('PIX ENVIADO - ANA CLUBE SOUZA'), vazio);
-    expect(r).toMatchObject({ categoriaId: null, pessoaPix: 'ANA CLUBE SOUZA', motivo: 'PIX para pessoa' });
+    const r = categorizar(despesa('PIX ENVIADO - ANA LIMA SOUZA'), vazio);
+    expect(r).toMatchObject({ categoriaId: null, pessoaPix: 'ANA LIMA SOUZA', motivo: 'PIX para pessoa' });
+    // nome com palavra de loja não é pessoa: "PASTEL DO GUI" é lanchonete
+    expect(categorizar(despesa('Pix - Enviado 03/10 PASTEL DO GUI'), vazio)).toMatchObject({ categoriaId: 1, pessoaPix: null });
   });
 });
 
@@ -233,5 +236,52 @@ describe('seu próprio nome', () => {
       { categorias: [], regras: [], contatos: [], historico: [], nomesProprios: ['GREGORY K SILVA PEREIRA'] }
     );
     expect(outra.acao).toBeNull();
+  });
+});
+
+describe('o que aparece nos extratos de verdade (out/2026)', () => {
+  const todas = CATEGORIAS_PADRAO.map((c, i) => umaCategoria({ id: 100 + i, nome: c.nome, tipo: c.tipo }));
+  const contexto: ContextoCategorizacao = { categorias: todas, regras: [], contatos: [], historico: [] };
+  const nomeDa = (descricao: string) => {
+    const c = categorizar(despesa(descricao), contexto);
+    return c.confianca >= CONFIANCA_MINIMA ? todas.find((t) => t.id === c.categoriaId)?.nome : null;
+  };
+
+  it('cada coisa na categoria detalhada', () => {
+    expect(nomeDa('Compra com Cartão 01/10 21:46 AUTOPOSTO IRMAOS')).toBe('Combustível');
+    expect(nomeDa('Compra com Cartão AUTO POSTO SAO JOSE')).toBe('Combustível');
+    expect(nomeDa('KEETA*0123 SAO PAULO')).toBe('Delivery');
+    expect(nomeDa('IFD*IFOOD.COM AGENCIA')).toBe('Delivery');
+    expect(nomeDa('EBN *TIKTOK SHOP')).toBe('Compras online');
+    expect(nomeDa('SSHP BRASIL INSTITUICAO')).toBe('Compras online');
+    expect(nomeDa('MERCADOLIVRE*VENDEDOR')).toBe('Compras online');
+    expect(nomeDa('SHEIN.COM')).toBe('Compras online');
+    expect(nomeDa('CRUNCHYROLL')).toBe('Assinaturas');
+    expect(nomeDa('Compra com Cartão 19/10 22:27 STONIC PARK ESTACION')).toBe('Estacionamento e pedágio');
+    expect(nomeDa('ESTACIONAMENTO SHOPPING IGUATEMI')).toBe('Estacionamento e pedágio');
+    expect(nomeDa('SUPER BOM PRECO')).toBe('Mercado');
+    expect(nomeDa('SONDA 123')).toBe('Mercado');
+    expect(nomeDa('MERCADO DE CARNES BENEDI')).toBe('Mercado');
+    expect(nomeDa('PADARIA E MERCEARIA SANTA LUZIA')).toBe('Mercado');
+    expect(nomeDa('Pix - Enviado 03/10 PASTEL DO GUI')).toBe('Alimentação');
+    expect(nomeDa('DOCES DA VOVO')).toBe('Alimentação');
+    expect(nomeDa('ADRIAN FOODS')).toBe('Alimentação');
+    expect(nomeDa('REFEICOES E PIZZA DO ZE')).toBe('Alimentação');
+    expect(nomeDa('GRAN COFFEE*VMT*GRAN')).toBe('Alimentação');
+    expect(nomeDa('SAQUE BANCO24HORAS')).toBe('Saque em dinheiro');
+    expect(nomeDa('DROGARIA SAO PAULO')).toBe('Farmácia');
+    // o intermediário não decide a categoria
+    expect(nomeDa('PIX ENVIADO MERCADO PAGO INSTITUICAO')).toBeNull();
+    // BARBEARIA não é bar
+    expect(nomeDa('BARBEARIA DO JOAO')).not.toBe('Alimentação');
+  });
+
+  it('a mesma loja com outro número ou CNPJ é a mesma pergunta e a mesma regra', () => {
+    expect(textoParaRegra('KEETA*0123 SAO PAULO')).toBe(textoParaRegra('KEETA*0457 SAO PAULO'));
+    expect(textoParaRegra('LOJA XPTO 12.345.678/0001-90')).toBe('LOJA XPTO');
+    expect(textoParaRegra('Pix - Enviado 03/10 PASTEL DO GUI LTDA')).toBe('PASTEL DO GUI');
+    // regra antiga, gravada com número, continua valendo
+    const regras = [umaRegra({ padrao: 'MISTERIO 4521', categoriaId: 105 })];
+    expect(categorizar(despesa('MISTERIO 9999'), { ...contexto, regras }).categoriaId).toBe(105);
   });
 });

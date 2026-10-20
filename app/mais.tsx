@@ -21,6 +21,7 @@ const ITENS: ItemMenu[] = [
   { icon: 'upload', titulo: 'Importar extrato', href: '/importar-extrato' },
   { icon: 'layers', titulo: 'Importar vários (o ano todo)', href: '/importar-extrato/lote' },
   { icon: 'clock', titulo: 'Importações anteriores', href: '/importar-extrato/historico' },
+  { icon: 'tag', titulo: 'Categorias', href: '/categorias' },
   { icon: 'zap', titulo: 'Regras aprendidas', href: '/regras' },
   { icon: 'help-circle', titulo: 'Revisão da importação', href: '/revisao' },
   { icon: 'download', titulo: 'Exportar extrato', href: '/exportar-extrato' },

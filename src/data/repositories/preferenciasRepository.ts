@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/data/db/client';
 import { preferencias } from '@/data/db/schema';
 import type { Preferencias, PreferenciasAtualizaveis } from '@/domain/types/entities';
+import { VERSAO_CATEGORIAS_PADRAO } from '@/domain/dados/categoriasPadrao';
 
 const PADRAO: Omit<Preferencias, 'id'> = {
   tema: 'sistema',
@@ -21,6 +22,8 @@ const PADRAO: Omit<Preferencias, 'id'> = {
   insightsDispensados: null,
   alertasEnviados: null,
   nomesProprios: null,
+  // banco novo: as categorias padrão já entram completas
+  categoriasPadraoVersao: VERSAO_CATEGORIAS_PADRAO,
 };
 
 export async function buscarPreferencias(): Promise<Preferencias> {

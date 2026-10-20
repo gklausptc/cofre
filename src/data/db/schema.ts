@@ -238,6 +238,9 @@ export const preferencias = sqliteTable('preferencias', {
   // nomes do titular como aparecem nos extratos (JSON), para reconhecer PIX e transferências
   // entre contas suas; o app aprende pelo cabeçalho do extrato ("Cliente: ...")
   nomesProprios: text('nomes_proprios'),
+  // leva de categorias padrão já aplicada (ver CATEGORIAS_PADRAO): quem já usava o app recebe
+  // só as novas, uma vez; null = banco de antes da leva 2
+  categoriasPadraoVersao: integer('categorias_padrao_versao'),
 });
 
 // Orçamento por categoria: limite mensal em centavos. Vale de `mes_inicio` em diante (o mais

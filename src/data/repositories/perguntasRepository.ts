@@ -1,6 +1,7 @@
 import type { PerguntasRepository } from '@/domain/repositories/perguntasRepository';
 import type { EfeitosDaImportacao } from '@/domain/repositories/importacoesRepository';
 import type { PlanoDeResposta } from '@/domain/usecases/importacao/responderPergunta';
+import type { JuncaoDePerguntas } from '@/domain/usecases/importacao/reavaliarPerguntas';
 import type { LinhaDaPergunta, PerguntaNova } from '@/domain/types/perguntas';
 import { and, desc, eq, inArray, ne, or, sql, type SQL } from 'drizzle-orm';
 import { db } from '@/data/db/client';
@@ -139,6 +140,12 @@ export async function responder(perguntaId: number, plano: PlanoDeResposta) {
             categoriaId: null,
           })
           .where(and(nasMovimentacoes, eq(movimentacoes.tipo, 'entrada'), ne(movimentacoes.contaBancariaId, origem)));
+      } else {
+        // veio de uma conta sua fora do app: continua entrada (soma no saldo), mas não é receita
+        await db
+          .update(movimentacoes)
+          .set({ origem: 'interna', categoriaId: null })
+          .where(and(nasMovimentacoes, eq(movimentacoes.tipo, 'entrada')));
       }
     }
 
@@ -201,7 +208,26 @@ export async function responder(perguntaId: number, plano: PlanoDeResposta) {
   });
 }
 
+export async function juntarPerguntas(juncao: JuncaoDePerguntas) {
+  await emTransacao(async () => {
+    await db
+      .update(perguntasPendentes)
+      .set({
+        chave: juncao.chave,
+        titulo: juncao.titulo,
+        valor: juncao.valor,
+        quantidade: juncao.quantidade,
+        dados: JSON.stringify(juncao.dados),
+      })
+      .where(and(eq(perguntasPendentes.id, juncao.manterId), eq(perguntasPendentes.status, 'pendente')));
+    if (juncao.juntarIds.length > 0) {
+      await db.delete(perguntasPendentes).where(and(inArray(perguntasPendentes.id, juncao.juntarIds), eq(perguntasPendentes.status, 'pendente')));
+    }
+  });
+}
+
 export const perguntasRepositorySqlite: PerguntasRepository = {
   listarPendentes,
   responder,
+  juntarPerguntas,
 };

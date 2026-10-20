@@ -1,0 +1,1 @@
+ALTER TABLE `preferencias` ADD `categorias_padrao_versao` integer;
