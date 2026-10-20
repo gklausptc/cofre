@@ -10,6 +10,9 @@ const PADRAO: Omit<Preferencias, 'id'> = {
   biometriaAtiva: false,
   tutorialConcluido: false,
   ultimoBackupEm: null,
+  taxaCdiAnual: null,
+  taxaSelicAnual: null,
+  taxasAtualizadasEm: null,
 };
 
 export async function buscarPreferencias(): Promise<Preferencias> {

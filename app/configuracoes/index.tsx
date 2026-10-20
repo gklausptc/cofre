@@ -238,6 +238,18 @@ export default function ConfiguracoesScreen() {
 
           <Card>
             <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15, marginBottom: 4 }}>
+              Rendimento das metas
+            </Text>
+            <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginBottom: 16 }}>
+              Taxas do CDI e da Selic usadas para estimar quanto rendem os cofrinhos e a reserva.
+            </Text>
+            <Button titulo="Taxas de referência" variante="secundaria" onPress={() => router.push('/configuracoes/taxas')} />
+          </Card>
+
+          <View style={{ height: 16 }} />
+
+          <Card>
+            <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15, marginBottom: 4 }}>
               Seus dados
             </Text>
             <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginBottom: 16 }}>

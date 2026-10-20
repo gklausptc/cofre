@@ -13,6 +13,16 @@ import { useReservaEmergenciaStore } from '@/store/reservaEmergenciaStore';
 import { useCofrinhosStore } from '@/store/cofrinhosStore';
 import { useAportesCofrinhoStore } from '@/store/aportesCofrinhoStore';
 import { legendaDoCofrinho, resumirMetasFinanceiras } from '@/domain/usecases/resumirMetasFinanceiras';
+import { descreverRendimento, type ConfigRendimento } from '@/domain/usecases/rendimento';
+
+/** "Previsão: 3 meses · rende 105% do CDI" */
+function juntarLegenda(...partes: (string | undefined)[]): string | undefined {
+  const texto = partes.filter((p): p is string => Boolean(p)).join(' · ');
+  return texto || undefined;
+}
+
+const rendeEm = (config: ConfigRendimento) =>
+  config.indexador === 'nenhum' ? undefined : `rende ${descreverRendimento(config)}`;
 
 function TituloSecao({ children }: { children: string }) {
   const { colors } = useAppTheme();
@@ -67,11 +77,10 @@ export default function MetasFinanceirasScreen() {
                 valorAtual={resumo.reserva.valorAtual}
                 valorMeta={resumo.reserva.valorMeta}
                 percentual={resumo.reserva.percentual}
-                legenda={
-                  resumo.reserva.mesesCobertura
-                    ? `Meta para ${resumo.reserva.mesesCobertura} meses de cobertura`
-                    : undefined
-                }
+                legenda={juntarLegenda(
+                  resumo.reserva.mesesCobertura ? `Meta para ${resumo.reserva.mesesCobertura} meses de cobertura` : undefined,
+                  reserva ? rendeEm(reserva) : undefined
+                )}
               />
             </Pressable>
           ) : (
@@ -101,7 +110,7 @@ export default function MetasFinanceirasScreen() {
                   valorAtual={progresso.valorAtual}
                   valorMeta={cofrinho.valorMeta}
                   percentual={progresso.percentual}
-                  legenda={legendaDoCofrinho(cofrinho, progresso)}
+                  legenda={juntarLegenda(legendaDoCofrinho(cofrinho, progresso), rendeEm(cofrinho))}
                 />
               </Pressable>
             ))

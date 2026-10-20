@@ -8,6 +8,11 @@ import { ColorPicker } from '@/components/ColorPicker';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { ProgressCard } from '@/components/ProgressCard';
+import { DateField } from '@/components/DateField';
+import { ConfigRendimentoForm } from '@/components/ConfigRendimentoForm';
+import { PainelRendimento } from '@/components/PainelRendimento';
+import { usePreferenciasStore } from '@/store/preferenciasStore';
+import type { ConfigRendimento } from '@/domain/usecases/rendimento';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { useCofrinhosStore } from '@/store/cofrinhosStore';
 import { useAportesCofrinhoStore } from '@/store/aportesCofrinhoStore';
@@ -23,6 +28,7 @@ export default function DetalheCofrinhoScreen() {
 
   const { cofrinhos, carregar: carregarCofrinhos, atualizar, remover } = useCofrinhosStore();
   const { aportes, carregar: carregarAportes, criar: criarAporte } = useAportesCofrinhoStore();
+  const { preferencias, carregar: carregarPreferencias } = usePreferenciasStore();
 
   const [novoAporte, setNovoAporte] = useState(0);
   const [salvando, setSalvando] = useState(false);
@@ -30,6 +36,12 @@ export default function DetalheCofrinhoScreen() {
   const [nome, setNome] = useState('');
   const [valorMeta, setValorMeta] = useState(0);
   const [cor, setCor] = useState('#2A5CE0');
+  const [dataMeta, setDataMeta] = useState<string | null>(null);
+  const [rendimento, setRendimento] = useState<ConfigRendimento>({
+    indexador: 'nenhum',
+    percentualIndexador: 10000,
+    cobraIr: false,
+  });
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
   const [carregadoParaId, setCarregadoParaId] = useState<number | null>(null);
 
@@ -37,7 +49,8 @@ export default function DetalheCofrinhoScreen() {
     useCallback(() => {
       carregarCofrinhos();
       carregarAportes();
-    }, [carregarCofrinhos, carregarAportes])
+      carregarPreferencias();
+    }, [carregarCofrinhos, carregarAportes, carregarPreferencias])
   );
 
   const cofrinho = cofrinhos.find((c) => c.id === cofrinhoId);
@@ -47,6 +60,12 @@ export default function DetalheCofrinhoScreen() {
     setNome(cofrinho.nome);
     setValorMeta(cofrinho.valorMeta);
     setCor(cofrinho.cor);
+    setDataMeta(cofrinho.dataMeta);
+    setRendimento({
+      indexador: cofrinho.indexador,
+      percentualIndexador: cofrinho.percentualIndexador,
+      cobraIr: cofrinho.cobraIr,
+    });
   }
 
   const aportesDoCofrinho = aportes
@@ -79,7 +98,7 @@ export default function DetalheCofrinhoScreen() {
     if (!validoEdicao) return;
     setSalvandoEdicao(true);
     try {
-      await atualizar(cofrinhoId, { nome: nome.trim(), valorMeta, cor });
+      await atualizar(cofrinhoId, { nome: nome.trim(), valorMeta, cor, dataMeta, ...rendimento });
     } finally {
       setSalvandoEdicao(false);
     }
@@ -113,6 +132,20 @@ export default function DetalheCofrinhoScreen() {
               ? `Previsão: ${progresso.previsaoMeses} ${progresso.previsaoMeses === 1 ? 'mês' : 'meses'} no ritmo atual`
               : undefined
           }
+        />
+
+        <View style={{ height: 12 }} />
+        <PainelRendimento
+          fluxos={aportesDoCofrinho.map((a) => ({ data: a.data, valor: a.valor }))}
+          config={{
+            indexador: cofrinho.indexador,
+            percentualIndexador: cofrinho.percentualIndexador,
+            cobraIr: cofrinho.cobraIr,
+          }}
+          taxas={{ cdiAnual: preferencias?.taxaCdiAnual ?? null, selicAnual: preferencias?.taxaSelicAnual ?? null }}
+          taxasAtualizadasEm={preferencias?.taxasAtualizadasEm ?? null}
+          valorMeta={cofrinho.valorMeta}
+          dataMeta={cofrinho.dataMeta}
         />
 
         <View style={{ height: 20 }} />
@@ -150,6 +183,8 @@ export default function DetalheCofrinhoScreen() {
         </Text>
         <TextField label="Nome" value={nome} onChangeText={setNome} />
         <CurrencyInput label="Meta" valor={valorMeta} onChangeValor={setValorMeta} />
+        <DateField label="Até quando (opcional)" valor={dataMeta} onChange={setDataMeta} />
+        <ConfigRendimentoForm key={carregadoParaId ?? 0} valor={rendimento} onAlterar={setRendimento} />
         <ColorPicker cor={cor} onSelecionar={setCor} />
 
         <View style={{ gap: 12 }}>

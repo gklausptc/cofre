@@ -169,6 +169,7 @@ function RootNavigator() {
         <Stack.Screen name="exportar-extrato/index" options={{ headerShown: true, title: 'Exportar extrato' }} />
         <Stack.Screen name="configuracoes/index" options={{ headerShown: true, title: 'Configurações' }} />
         <Stack.Screen name="backup/index" options={{ headerShown: true, title: 'Backup e restauração' }} />
+        <Stack.Screen name="configuracoes/taxas" options={{ headerShown: true, title: 'Taxas de referência' }} />
       </Stack>
     </>
   );

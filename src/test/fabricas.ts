@@ -180,6 +180,9 @@ export function umCofrinho(dados: Partial<Cofrinho> = {}): Cofrinho {
     cor: '#06B6D4',
     icone: 'gift',
     status: 'ativo',
+    indexador: 'nenhum',
+    percentualIndexador: 10000,
+    cobraIr: false,
     ...dados,
   };
 }

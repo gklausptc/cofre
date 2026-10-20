@@ -147,6 +147,11 @@ export const cofrinhos = sqliteTable('cofrinhos', {
   cor: text('cor').notNull(),
   icone: text('icone').notNull(),
   status: text('status', { enum: ['ativo', 'concluido'] }).default('ativo'),
+  // Rendimento (estimado): onde o dinheiro está aplicado. percentual_indexador em centésimos
+  // (10500 = 105% do CDI); cobra_ir = tabela regressiva do IR (CDB/Tesouro; LCI/LCA não cobram).
+  indexador: text('indexador', { enum: ['nenhum', 'cdi', 'selic', 'poupanca'] }).notNull().default('nenhum'),
+  percentualIndexador: integer('percentual_indexador').notNull().default(10000),
+  cobraIr: integer('cobra_ir', { mode: 'boolean' }).notNull().default(false),
   // valor_atual NÃO é coluna — calculado pela soma de aportes_cofrinho
 });
 
@@ -162,6 +167,11 @@ export const reservaEmergencia = sqliteTable('reserva_emergencia', {
   valorMeta: integer('valor_meta').notNull(),
   // valor_atual NÃO é coluna — calculado pelo histórico de movimentacoes_reserva (saldoReserva.ts)
   mesesCoberturaDesejados: integer('meses_cobertura_desejados'),
+  // Rendimento (estimado): onde o dinheiro está aplicado. percentual_indexador em centésimos
+  // (10500 = 105% do CDI); cobra_ir = tabela regressiva do IR (CDB/Tesouro; LCI/LCA não cobram).
+  indexador: text('indexador', { enum: ['nenhum', 'cdi', 'selic', 'poupanca'] }).notNull().default('nenhum'),
+  percentualIndexador: integer('percentual_indexador').notNull().default(10000),
+  cobraIr: integer('cobra_ir', { mode: 'boolean' }).notNull().default(false),
 });
 
 export const movimentacoesReserva = sqliteTable('movimentacoes_reserva', {
@@ -190,4 +200,9 @@ export const preferencias = sqliteTable('preferencias', {
   tutorialConcluido: integer('tutorial_concluido', { mode: 'boolean' }).notNull().default(false),
   // quando o último backup foi compartilhado para fora do app (ISO com hora); null = nunca
   ultimoBackupEm: text('ultimo_backup_em'),
+  // Taxas de referência para o rendimento estimado, digitadas pelo usuário (o app não tem
+  // internet). Centésimos de % ao ano: 1490 = 14,90% a.a. null = ainda não informada.
+  taxaCdiAnual: integer('taxa_cdi_anual'),
+  taxaSelicAnual: integer('taxa_selic_anual'),
+  taxasAtualizadasEm: text('taxas_atualizadas_em'),
 });

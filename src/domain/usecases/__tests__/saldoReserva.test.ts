@@ -15,7 +15,14 @@ describe('valor da reserva calculado pelo histórico', () => {
   });
 
   it('a reserva vem com o valor guardado calculado', () => {
-    const reserva = { id: 1, valorMeta: 1200000, mesesCoberturaDesejados: 6 };
+    const reserva = {
+      id: 1,
+      valorMeta: 1200000,
+      mesesCoberturaDesejados: 6,
+      indexador: 'cdi' as const,
+      percentualIndexador: 10000,
+      cobraIr: false,
+    };
     expect(comSaldo(reserva, historico)).toEqual({ ...reserva, valorAtual: 60000 });
     expect(comSaldo(null, historico)).toBeNull();
   });

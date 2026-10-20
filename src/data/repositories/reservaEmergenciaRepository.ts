@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/data/db/client';
 import { movimentacoesReserva, reservaEmergencia } from '@/data/db/schema';
 import { calcularValorReserva } from '@/domain/usecases/saldoReserva';
+import type { ConfigRendimento } from '@/domain/usecases/rendimento';
 import { formatarMoeda } from '@/core/utils/currency';
 import { listarMovimentacoesReserva, registrarMovimentacaoReserva } from './movimentacoesReservaRepository';
 
@@ -23,6 +24,11 @@ export async function definirMetaReserva(valorMeta: number, mesesCoberturaDeseja
   }
   const [reserva] = await db.insert(reservaEmergencia).values({ id: 1, valorMeta, mesesCoberturaDesejados }).returning();
   return reserva;
+}
+
+export async function definirRendimentoReserva(config: ConfigRendimento) {
+  const { indexador, percentualIndexador, cobraIr } = config;
+  await db.update(reservaEmergencia).set({ indexador, percentualIndexador, cobraIr }).where(eq(reservaEmergencia.id, 1));
 }
 
 export async function aportarReserva(valor: number) {
@@ -52,6 +58,7 @@ export async function removerReservaEmergencia() {
 export const reservaEmergenciaRepositorySqlite: ReservaEmergenciaRepository = {
   buscarReservaEmergencia,
   definirMetaReserva,
+  definirRendimentoReserva,
   aportarReserva,
   retirarReserva,
   removerReservaEmergencia,

@@ -64,6 +64,13 @@
       "when": 1792463658152,
       "tag": "0008_smiling_mojo",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1792465233587,
+      "tag": "0009_military_stature",
+      "breakpoints": true
     }
   ]
 }

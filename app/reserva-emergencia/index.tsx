@@ -12,13 +12,19 @@ import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { useReservaEmergenciaStore } from '@/store/reservaEmergenciaStore';
 import { formatarMoeda } from '@/core/utils/currency';
 import { formatarData } from '@/core/utils/date';
+import { ConfigRendimentoForm } from '@/components/ConfigRendimentoForm';
+import { PainelRendimento } from '@/components/PainelRendimento';
+import { usePreferenciasStore } from '@/store/preferenciasStore';
+import { descreverRendimento, type ConfigRendimento } from '@/domain/usecases/rendimento';
 
-type Modo = 'nenhum' | 'aportar' | 'retirar' | 'editar-meta';
+type Modo = 'nenhum' | 'aportar' | 'retirar' | 'editar-meta' | 'editar-rendimento';
 
 export default function ReservaEmergenciaScreen() {
   const { colors } = useAppTheme();
-  const { reserva, historico, carregar, definirMeta, aportar, retirar, removerReserva } =
+  const { reserva, historico, carregar, definirMeta, definirRendimento, aportar, retirar, removerReserva } =
     useReservaEmergenciaStore();
+  const { preferencias, carregar: carregarPreferencias } = usePreferenciasStore();
+  const [rendimento, setRendimento] = useState<ConfigRendimento | null>(null);
 
   const [valorMeta, setValorMeta] = useState(0);
   const [meses, setMeses] = useState('6');
@@ -30,13 +36,35 @@ export default function ReservaEmergenciaScreen() {
   useFocusEffect(
     useCallback(() => {
       carregar();
-    }, [carregar])
+      carregarPreferencias();
+    }, [carregar, carregarPreferencias])
   );
 
   function iniciarEdicaoMeta() {
     setValorMeta(reserva?.valorMeta ?? 0);
     setMeses(reserva?.mesesCoberturaDesejados ? String(reserva.mesesCoberturaDesejados) : '6');
     setModo('editar-meta');
+  }
+
+  function iniciarEdicaoRendimento() {
+    if (!reserva) return;
+    setRendimento({
+      indexador: reserva.indexador,
+      percentualIndexador: reserva.percentualIndexador,
+      cobraIr: reserva.cobraIr,
+    });
+    setModo('editar-rendimento');
+  }
+
+  async function handleSalvarRendimento() {
+    if (!rendimento) return;
+    setSalvando(true);
+    try {
+      await definirRendimento(rendimento);
+      cancelarModo();
+    } finally {
+      setSalvando(false);
+    }
   }
 
   function cancelarModo() {
@@ -120,11 +148,41 @@ export default function ReservaEmergenciaScreen() {
                     : undefined
                 }
               />
-              <Pressable onPress={iniciarEdicaoMeta} style={{ alignSelf: 'flex-start', marginTop: 10 }}>
-                <Text className="font-body-medium" style={{ color: colors.brand, fontSize: 12 }}>
-                  Editar meta
-                </Text>
-              </Pressable>
+              <View style={{ flexDirection: 'row', gap: 24, marginTop: 4 }}>
+                <Pressable onPress={iniciarEdicaoMeta} style={{ minHeight: 44, justifyContent: 'center' }}>
+                  <Text className="font-body-medium" style={{ color: colors.brand, fontSize: 12 }}>
+                    Editar meta
+                  </Text>
+                </Pressable>
+                <Pressable onPress={iniciarEdicaoRendimento} style={{ minHeight: 44, justifyContent: 'center' }}>
+                  <Text className="font-body-medium" style={{ color: colors.brand, fontSize: 12 }}>
+                    Onde está aplicada: {descreverRendimento(reserva)}
+                  </Text>
+                </Pressable>
+              </View>
+
+              {modo === 'editar-rendimento' && rendimento && (
+                <Card style={{ marginTop: 8 }}>
+                  <ConfigRendimentoForm valor={rendimento} onAlterar={setRendimento} />
+                  <View style={{ gap: 12 }}>
+                    <Button titulo="Salvar" onPress={handleSalvarRendimento} carregando={salvando} />
+                    <Button titulo="Cancelar" variante="secundaria" onPress={cancelarModo} />
+                  </View>
+                </Card>
+              )}
+
+              <View style={{ height: 12 }} />
+              <PainelRendimento
+                fluxos={historico.map((h) => ({ data: h.data, valor: h.tipo === 'aporte' ? h.valor : -h.valor }))}
+                config={{
+                  indexador: reserva.indexador,
+                  percentualIndexador: reserva.percentualIndexador,
+                  cobraIr: reserva.cobraIr,
+                }}
+                taxas={{ cdiAnual: preferencias?.taxaCdiAnual ?? null, selicAnual: preferencias?.taxaSelicAnual ?? null }}
+                taxasAtualizadasEm={preferencias?.taxasAtualizadasEm ?? null}
+                valorMeta={reserva.valorMeta}
+              />
 
               <View style={{ height: 20 }} />
 
