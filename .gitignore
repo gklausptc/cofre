@@ -40,3 +40,6 @@ yarn-error.*
 /ios
 /android
 _ngrok_tmp.js
+
+# extratos e comprovantes do usuário (dados pessoais): nunca versionar
+extrato/
