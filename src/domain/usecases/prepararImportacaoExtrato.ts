@@ -6,6 +6,8 @@ export type TransacaoExtrato = {
   descricao: string;
   /** Em centavos, com sinal: em conta, negativo = saída; em fatura de cartão, negativo = pagamento/estorno. */
   valor: number;
+  /** Id da linha no banco (FITID ou hash), para não importar duas vezes. */
+  idExterno?: string | null;
 };
 
 export type DestinoImportacao =
@@ -48,6 +50,7 @@ export function prepararImportacaoExtrato(
         contaDestinoId: null,
         origem: 'manual',
         membroId: null,
+        idExterno: t.idExterno ?? null,
       })),
       gastos: [],
       ignoradas: 0,
@@ -66,6 +69,7 @@ export function prepararImportacaoExtrato(
       contaBancariaId: null,
       cartaoId: destino.cartaoId,
       membroId: null,
+      idExterno: t.idExterno ?? null,
     })),
     ignoradas: transacoes.length - validas.length,
   };

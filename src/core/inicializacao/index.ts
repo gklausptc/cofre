@@ -13,6 +13,7 @@ import { contasBancariasRepositorySqlite } from '@/data/repositories/contasBanca
 import { contasFixasRepositorySqlite } from '@/data/repositories/contasFixasRepository';
 import { faturasRepositorySqlite } from '@/data/repositories/faturasRepository';
 import { gastosRapidosRepositorySqlite } from '@/data/repositories/gastosRapidosRepository';
+import { importacoesRepositorySqlite } from '@/data/repositories/importacoesRepository';
 import { manutencaoRepositorySqlite } from '@/data/repositories/manutencaoRepository';
 import { membrosFamiliaRepositorySqlite } from '@/data/repositories/membrosFamiliaRepository';
 import { movimentacoesRepositorySqlite } from '@/data/repositories/movimentacoesRepository';
@@ -37,6 +38,7 @@ export function inicializarRepositorios(): void {
     contasFixas: contasFixasRepositorySqlite,
     faturas: faturasRepositorySqlite,
     gastosRapidos: gastosRapidosRepositorySqlite,
+    importacoes: importacoesRepositorySqlite,
     manutencao: manutencaoRepositorySqlite,
     membrosFamilia: membrosFamiliaRepositorySqlite,
     movimentacoes: movimentacoesRepositorySqlite,

@@ -46,17 +46,29 @@ export function parseValorEmCentavos(valor: string): number {
   return textoParaCentavos(valor);
 }
 
-/** Converte datas comuns em extratos (DD/MM/AAAA, AAAA-MM-DD) para ISO 'YYYY-MM-DD'. */
+function dataValida(ano: number, mes: number, dia: number): boolean {
+  if (mes < 1 || mes > 12 || dia < 1) return false;
+  return dia <= new Date(ano, mes, 0).getDate();
+}
+
+/**
+ * Converte datas comuns em extratos para ISO 'YYYY-MM-DD': DD/MM/AAAA, DD/MM/AA, DD-MM-AAAA,
+ * DD.MM.AAAA e AAAA-MM-DD (com ou sem hora depois). null se não for uma data que existe.
+ */
 export function parseDataExtrato(valor: string): string | null {
-  const texto = valor.trim();
+  const texto = valor.trim().replace(/^"|"$/g, '');
 
   const isoMatch = texto.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  if (isoMatch) {
+    const [, ano, mes, dia] = isoMatch;
+    return dataValida(Number(ano), Number(mes), Number(dia)) ? `${ano}-${mes}-${dia}` : null;
+  }
 
-  const brMatch = texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  const brMatch = texto.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})\b/);
   if (brMatch) {
     const [, dia, mes, anoBruto] = brMatch;
     const ano = anoBruto.length === 2 ? `20${anoBruto}` : anoBruto;
+    if (ano.length !== 4 || !dataValida(Number(ano), Number(mes), Number(dia))) return null;
     return `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
   }
 

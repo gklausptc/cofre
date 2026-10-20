@@ -8,6 +8,7 @@ import type { ContasBancariasRepository } from './contasBancariasRepository';
 import type { ContasFixasRepository } from './contasFixasRepository';
 import type { FaturasRepository } from './faturasRepository';
 import type { GastosRapidosRepository } from './gastosRapidosRepository';
+import type { ImportacoesRepository } from './importacoesRepository';
 import type { ManutencaoRepository } from './manutencaoRepository';
 import type { MembrosFamiliaRepository } from './membrosFamiliaRepository';
 import type { MovimentacoesRepository } from './movimentacoesRepository';
@@ -33,6 +34,7 @@ export type Repositorios = {
   contasFixas: ContasFixasRepository;
   faturas: FaturasRepository;
   gastosRapidos: GastosRapidosRepository;
+  importacoes: ImportacoesRepository;
   manutencao: ManutencaoRepository;
   membrosFamilia: MembrosFamiliaRepository;
   movimentacoes: MovimentacoesRepository;

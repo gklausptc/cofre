@@ -54,6 +54,10 @@ export const movimentacoes = sqliteTable('movimentacoes', {
   // entra como despesa nos relatórios: a despesa já é contada pela fatura/conta fixa.
   faturaId: integer('fatura_id'),
   parcelaId: integer('parcela_id'),
+  // Veio de um extrato importado: qual importação (para desfazer) e o id da linha no banco
+  // (FITID do OFX ou hash da linha do CSV), para nunca importar a mesma linha duas vezes.
+  importacaoId: integer('importacao_id'),
+  idExterno: text('id_externo'),
 });
 
 export const cartoes = sqliteTable('cartoes', {
@@ -137,6 +141,10 @@ export const gastosRapidos = sqliteTable('gastos_rapidos', {
   membroId: integer('membro_id'),
   valorOriginal: integer('valor_original'),
   justificativaAlteracao: text('justificativa_alteracao'),
+  // Veio de um extrato importado: qual importação (para desfazer) e o id da linha no banco
+  // (FITID do OFX ou hash da linha do CSV), para nunca importar a mesma linha duas vezes.
+  importacaoId: integer('importacao_id'),
+  idExterno: text('id_externo'),
 });
 
 export const cofrinhos = sqliteTable('cofrinhos', {
@@ -205,4 +213,20 @@ export const preferencias = sqliteTable('preferencias', {
   taxaCdiAnual: integer('taxa_cdi_anual'),
   taxaSelicAnual: integer('taxa_selic_anual'),
   taxasAtualizadasEm: text('taxas_atualizadas_em'),
+});
+
+export const importacoes = sqliteTable('importacoes', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  arquivo: text('arquivo').notNull(),
+  formato: text('formato', { enum: ['ofx', 'csv'] }).notNull(),
+  banco: text('banco'),
+  contaBancariaId: integer('conta_bancaria_id'),
+  cartaoId: integer('cartao_id'),
+  periodoInicio: text('periodo_inicio'),
+  periodoFim: text('periodo_fim'),
+  totalLinhas: integer('total_linhas').notNull(),
+  importadas: integer('importadas').notNull(),
+  ignoradas: integer('ignoradas').notNull(),
+  pendentes: integer('pendentes').notNull().default(0),
+  criadaEm: text('criada_em').notNull(),
 });

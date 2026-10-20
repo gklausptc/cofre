@@ -24,6 +24,7 @@ export async function limparTodosOsDados() {
     schema.reservaEmergencia,
     schema.metasFinanceiras,
     schema.membrosFamilia,
+    schema.importacoes,
     schema.categorias,
     schema.preferencias,
   ];

@@ -49,6 +49,8 @@ export function umaMovimentacao(dados: Partial<Movimentacao> = {}): Movimentacao
     recorrenteOrigemId: null,
     faturaId: null,
     parcelaId: null,
+    importacaoId: null,
+    idExterno: null,
     ...dados,
   };
 }
@@ -66,6 +68,8 @@ export function umGasto(dados: Partial<GastoRapido> = {}): GastoRapido {
     membroId: null,
     valorOriginal: null,
     justificativaAlteracao: null,
+    importacaoId: null,
+    idExterno: null,
     ...dados,
   };
 }

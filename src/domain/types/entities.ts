@@ -41,5 +41,8 @@ export type MetaFinanceira = InferSelectModel<typeof schema.metasFinanceiras>;
 
 export type MembroFamilia = InferSelectModel<typeof schema.membrosFamilia>;
 
+export type Importacao = InferSelectModel<typeof schema.importacoes>;
+export type NovaImportacao = InferInsertModel<typeof schema.importacoes>;
+
 export type Preferencias = InferSelectModel<typeof schema.preferencias>;
 export type PreferenciasAtualizaveis = Partial<Omit<InferInsertModel<typeof schema.preferencias>, 'id'>>;

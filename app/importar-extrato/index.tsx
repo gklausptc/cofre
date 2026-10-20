@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
@@ -14,36 +14,30 @@ import { useContasBancariasStore } from '@/store/contasBancariasStore';
 import { useCartoesStore } from '@/store/cartoesStore';
 import { useMovimentacoesStore } from '@/store/movimentacoesStore';
 import { useGastosRapidosStore } from '@/store/gastosRapidosStore';
+import { useImportacoesStore } from '@/store/importacoesStore';
+import { decodificarLatin1, removerBOM, temCaracteresInvalidos } from '@/core/utils/importParsers';
+import { lerCsvComMapeamento, lerExtrato, type TabelaCsv } from '@/domain/usecases/importacao/lerExtrato';
 import {
-  decodificarLatin1,
-  pareceArquivoBinario,
-  parseCSV,
-  parseDataExtrato,
-  parseOFX,
-  parseValorEmCentavos,
-  removerBOM,
-  temCaracteresInvalidos,
-} from '@/core/utils/importParsers';
-import {
-  ehPagamentoOuEstorno,
-  prepararImportacaoExtrato,
-  type DestinoImportacao,
-} from '@/domain/usecases/prepararImportacaoExtrato';
+  analisarImportacao,
+  existentesDoDestino,
+  montarRegistroDeImportacao,
+  sugerirDestino,
+} from '@/domain/usecases/importacao/analisarImportacao';
+import { normalizarDescricao } from '@/domain/usecases/importacao/normalizarDescricao';
+import { NOMES_DOS_BANCOS } from '@/domain/usecases/importacao/bancos';
+import type { BancoId, ExtratoLido, OrigemExtrato } from '@/domain/usecases/importacao/tipos';
+import type { DestinoImportacao } from '@/domain/usecases/prepararImportacaoExtrato';
 import { formatarMoeda } from '@/core/utils/currency';
 import { formatarData } from '@/core/utils/date';
 
-type Transacao = { id: string; data: string; descricao: string; valor: number; incluir: boolean };
-type Etapa = 'destino' | 'arquivo' | 'mapear' | 'preview';
-type TipoDestino = DestinoImportacao['tipo'];
-
-const ERRO_ARQUIVO_NAO_SUPORTADO =
-  'Esse arquivo não é CSV nem OFX. PDF não é suportado: exporte o extrato em CSV ou OFX no app do banco.';
+type Etapa = 'arquivo' | 'mapear' | 'destino' | 'preview';
 
 const TIPOS_ACEITOS = [
   'text/csv',
   'text/comma-separated-values',
   'text/plain',
   'application/x-ofx',
+  'application/vnd.ms-excel',
   'application/octet-stream',
 ];
 
@@ -67,34 +61,51 @@ async function lerArquivoComoTexto(uri: string): Promise<string> {
   return removerBOM(texto);
 }
 
+function Voltar({ onPress }: { onPress: () => void }) {
+  const { colors } = useAppTheme();
+  return (
+    <Pressable onPress={onPress} style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }}>
+      <Text className="font-body-medium" style={{ color: colors.brand, fontSize: 13 }}>
+        ‹ Voltar
+      </Text>
+    </Pressable>
+  );
+}
+
 export default function ImportarExtratoScreen() {
   const { colors } = useAppTheme();
   const router = useRouter();
   const { contas, carregar: carregarContas } = useContasBancariasStore();
   const { cartoes, carregar: carregarCartoes } = useCartoesStore();
-  const { criar: criarMovimentacao } = useMovimentacoesStore();
-  const { criar: criarGasto } = useGastosRapidosStore();
+  const { movimentacoes, carregar: carregarMovimentacoes } = useMovimentacoesStore();
+  const { gastos, carregar: carregarGastos } = useGastosRapidosStore();
+  const importar = useImportacoesStore((s) => s.importar);
 
   useFocusEffect(
     useCallback(() => {
       carregarContas();
       carregarCartoes();
-    }, [carregarContas, carregarCartoes])
+      carregarMovimentacoes();
+      carregarGastos();
+    }, [carregarContas, carregarCartoes, carregarMovimentacoes, carregarGastos])
   );
 
-  const [etapa, setEtapa] = useState<Etapa>('destino');
-  const [tipoDestino, setTipoDestino] = useState<TipoDestino>('conta');
-  const [contaId, setContaId] = useState<number | null>(null);
-  const [cartaoId, setCartaoId] = useState<number | null>(null);
+  const [etapa, setEtapa] = useState<Etapa>('arquivo');
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [nomeArquivo, setNomeArquivo] = useState('');
 
-  const [csv, setCsv] = useState<{ headers: string[]; linhas: string[][] } | null>(null);
+  // CSV que o app não reconheceu: o usuário diz qual coluna é qual
+  const [tabela, setTabela] = useState<{ tabela: TabelaCsv; banco: BancoId | null; origem: OrigemExtrato | null } | null>(null);
   const [colData, setColData] = useState<string | null>(null);
   const [colDescricao, setColDescricao] = useState<string | null>(null);
   const [colValor, setColValor] = useState<string | null>(null);
 
-  const [transacoes, setTransacoes] = useState<Transacao[]>([]);
+  const [extrato, setExtrato] = useState<ExtratoLido | null>(null);
+  const [tipoDestino, setTipoDestino] = useState<OrigemExtrato>('conta');
+  const [contaId, setContaId] = useState<number | null>(null);
+  const [cartaoId, setCartaoId] = useState<number | null>(null);
+  const [marcadas, setMarcadas] = useState<Set<string>>(new Set());
 
   const cartoesAtivos = useMemo(() => cartoes.filter((c) => c.ativo !== false), [cartoes]);
 
@@ -103,114 +114,101 @@ export default function ImportarExtratoScreen() {
     return cartaoId !== null ? { tipo: 'cartao', cartaoId } : null;
   }, [tipoDestino, contaId, cartaoId]);
 
-  const bloqueada = useCallback(
-    (t: Pick<Transacao, 'valor'>) => (destino ? ehPagamentoOuEstorno(t, destino) : false),
-    [destino]
+  const analise = useMemo(
+    () => (extrato && destino ? analisarImportacao(extrato, destino, existentesDoDestino(destino, movimentacoes, gastos)) : null),
+    [extrato, destino, movimentacoes, gastos]
   );
 
-  function definirTransacoes(lista: Omit<Transacao, 'incluir'>[]) {
-    setTransacoes(lista.map((t) => ({ ...t, incluir: !bloqueada(t) })));
+  function irParaDestino(lido: ExtratoLido) {
+    const sugestao = sugerirDestino(lido, contas, cartoesAtivos);
+    setExtrato(lido);
+    setTipoDestino(sugestao.tipo);
+    setContaId(sugestao.tipo === 'conta' ? sugestao.id : null);
+    setCartaoId(sugestao.tipo === 'cartao' ? sugestao.id : null);
+    setEtapa('destino');
   }
 
   async function handleEscolherArquivo() {
     setErro(null);
     let conteudo: string;
-    let nomeArquivo = '';
+    let nome = '';
     try {
       const resultado = await DocumentPicker.getDocumentAsync({ type: TIPOS_ACEITOS, copyToCacheDirectory: true });
       if (resultado.canceled || resultado.assets.length === 0) return;
       const asset = resultado.assets[0];
-      nomeArquivo = asset.name;
+      nome = asset.name;
       conteudo = await lerArquivoComoTexto(asset.uri);
     } catch {
-      setErro(ERRO_ARQUIVO_NAO_SUPORTADO);
+      setErro('Não consegui abrir esse arquivo.');
       return;
     }
+    setNomeArquivo(nome);
 
-    if (/\.pdf$/i.test(nomeArquivo) || pareceArquivoBinario(conteudo)) {
-      setErro(ERRO_ARQUIVO_NAO_SUPORTADO);
+    const leitura = lerExtrato(conteudo, nome);
+    if (leitura.ok) {
+      irParaDestino(leitura.extrato);
       return;
     }
-
-    const ehOFX = /\.ofx$/i.test(nomeArquivo) || /<OFX>/i.test(conteudo);
-
-    if (ehOFX) {
-      const importadas = parseOFX(conteudo);
-      if (importadas.length === 0) {
-        setErro('Não encontrei transações nesse arquivo OFX.');
-        return;
-      }
-      definirTransacoes(
-        importadas.map((t, i) => ({ id: `ofx-${i}`, data: t.data, descricao: t.descricao, valor: t.valor }))
-      );
-      setEtapa('preview');
+    if (leitura.motivo === 'precisa_mapear') {
+      setTabela({ tabela: leitura.tabela, banco: leitura.banco, origem: leitura.origem });
+      setColData(null);
+      setColDescricao(null);
+      setColValor(null);
+      setEtapa('mapear');
       return;
     }
-
-    const resultadoCSV = parseCSV(conteudo);
-    if (resultadoCSV.headers.length === 0 || resultadoCSV.linhas.length === 0) {
-      setErro(ERRO_ARQUIVO_NAO_SUPORTADO);
-      return;
-    }
-    setCsv(resultadoCSV);
-    setColData(null);
-    setColDescricao(null);
-    setColValor(null);
-    setEtapa('mapear');
+    setErro(leitura.mensagem);
   }
 
   function handleConfirmarMapeamento() {
-    if (!csv || !colData || !colDescricao || !colValor) return;
-    const idxData = csv.headers.indexOf(colData);
-    const idxDescricao = csv.headers.indexOf(colDescricao);
-    const idxValor = csv.headers.indexOf(colValor);
-
-    const importadas = csv.linhas
-      .map((linha, i) => {
-        const dataIso = parseDataExtrato(linha[idxData] ?? '');
-        const valor = parseValorEmCentavos(linha[idxValor] ?? '');
-        if (!dataIso || Number.isNaN(valor)) return null;
-        return {
-          id: `csv-${i}`,
-          data: dataIso,
-          descricao: linha[idxDescricao] || 'Importado do extrato',
-          valor,
-        };
-      })
-      .filter((t): t is Omit<Transacao, 'incluir'> => t !== null);
-
-    if (importadas.length === 0) {
+    if (!tabela || colData === null || colDescricao === null || colValor === null) return;
+    const lido = lerCsvComMapeamento(
+      tabela.tabela,
+      { data: Number(colData), descricao: [Number(colDescricao)], valor: Number(colValor) },
+      tabela.banco,
+      tabela.origem
+    );
+    if (lido.transacoes.length === 0) {
       setErro('Nenhuma linha válida encontrada com essas colunas. Confira o mapeamento.');
       return;
     }
     setErro(null);
-    definirTransacoes(importadas);
+    irParaDestino(lido);
+  }
+
+  function handleVerPrevia() {
+    if (!analise) return;
+    setMarcadas(new Set(analise.itens.filter((i) => i.incluirPorPadrao).map((i) => i.transacao.idExterno)));
     setEtapa('preview');
   }
 
-  function alternarInclusao(id: string) {
-    setTransacoes((atual) =>
-      atual.map((t) => (t.id === id && !bloqueada(t) ? { ...t, incluir: !t.incluir } : t))
-    );
+  function alternar(idExterno: string) {
+    setMarcadas((atual) => {
+      const nova = new Set(atual);
+      if (nova.has(idExterno)) nova.delete(idExterno);
+      else nova.add(idExterno);
+      return nova;
+    });
   }
 
   const selecionadas = useMemo(
-    () => transacoes.filter((t) => t.incluir && !bloqueada(t)),
-    [transacoes, bloqueada]
+    () => (analise ? analise.itens.filter((i) => i.podeIncluir && marcadas.has(i.transacao.idExterno)).map((i) => i.transacao) : []),
+    [analise, marcadas]
   );
 
   async function handleImportar() {
-    if (!destino || selecionadas.length === 0) return;
+    if (!extrato || !destino || selecionadas.length === 0) return;
     setSalvando(true);
     try {
-      const preparada = prepararImportacaoExtrato(selecionadas, destino);
-      for (const mov of preparada.movimentacoes) {
-        await criarMovimentacao(mov);
-      }
-      for (const gasto of preparada.gastos) {
-        await criarGasto(gasto);
-      }
-      router.back();
+      await importar(montarRegistroDeImportacao({ arquivo: nomeArquivo, extrato, destino, selecionadas, agora: new Date() }));
+      await Promise.all([carregarMovimentacoes(), carregarGastos()]);
+      Alert.alert(
+        'Extrato importado',
+        `${selecionadas.length} ${selecionadas.length === 1 ? 'lançamento importado' : 'lançamentos importados'}.`,
+        [{ text: 'OK', onPress: () => router.back() }]
+      );
+    } catch {
+      setErro('Não consegui importar. Nada foi gravado; tente de novo.');
     } finally {
       setSalvando(false);
     }
@@ -223,26 +221,76 @@ export default function ImportarExtratoScreen() {
         : cartoesAtivos.map((c) => ({ valor: String(c.id), rotulo: c.nome })),
     [tipoDestino, contas, cartoesAtivos]
   );
-
-  const semOpcoesDeDestino = opcoesDestino.length === 0;
+  const opcoesColunas = tabela?.tabela.cabecalho.map((h, i) => ({ valor: String(i), rotulo: h || `Coluna ${i + 1}` })) ?? [];
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
       <ScrollView contentContainerStyle={{ padding: 20 }}>
         <ScreenHeader title="Importar extrato" subtitle="CSV ou OFX do seu banco ou cartão" />
 
-        {etapa === 'destino' && (
+        {erro && (
+          <Text className="font-body" style={{ color: colors.danger, fontSize: 13, marginBottom: 12 }}>
+            {erro}
+          </Text>
+        )}
+
+        {etapa === 'arquivo' && (
           <>
-            <ChipSelect<TipoDestino>
+            <Text className="font-body" style={{ color: colors.textMuted, fontSize: 13, marginBottom: 16 }}>
+              Selecione o arquivo .csv ou .ofx exportado do app ou internet banking (extrato da conta ou fatura do
+              cartão). O Cofre reconhece o banco e o tipo de arquivo sozinho. PDF não é suportado.
+            </Text>
+            <Button titulo="Selecionar arquivo" onPress={handleEscolherArquivo} />
+          </>
+        )}
+
+        {etapa === 'mapear' && tabela && (
+          <>
+            <Voltar onPress={() => setEtapa('arquivo')} />
+            <Text className="font-body" style={{ color: colors.textMuted, fontSize: 13, marginBottom: 12 }}>
+              Não reconheci o formato deste arquivo. Diga qual coluna corresponde a cada campo.
+            </Text>
+            <ChipSelect label="Coluna da data" opcoes={opcoesColunas} valor={colData ?? ''} onSelecionar={setColData} />
+            <ChipSelect label="Coluna da descrição" opcoes={opcoesColunas} valor={colDescricao ?? ''} onSelecionar={setColDescricao} />
+            <ChipSelect label="Coluna do valor" opcoes={opcoesColunas} valor={colValor ?? ''} onSelecionar={setColValor} />
+            <Button
+              titulo="Continuar"
+              onPress={handleConfirmarMapeamento}
+              disabled={colData === null || colDescricao === null || colValor === null}
+            />
+          </>
+        )}
+
+        {etapa === 'destino' && extrato && (
+          <>
+            <Voltar onPress={() => setEtapa('arquivo')} />
+            <Card style={{ marginBottom: 16 }}>
+              <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 14 }} numberOfLines={1}>
+                {nomeArquivo}
+              </Text>
+              <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>
+                {extrato.banco ? NOMES_DOS_BANCOS[extrato.banco] : 'Banco não identificado'} ·{' '}
+                {extrato.origem === 'cartao' ? 'fatura de cartão' : extrato.origem === 'conta' ? 'extrato de conta' : 'tipo não identificado'}{' '}
+                · {extrato.transacoes.length} {extrato.transacoes.length === 1 ? 'lançamento' : 'lançamentos'}
+                {extrato.periodo ? ` de ${formatarData(extrato.periodo.inicio)} a ${formatarData(extrato.periodo.fim)}` : ''}
+              </Text>
+            </Card>
+
+            <ChipSelect<OrigemExtrato>
               label="Importar para"
               opcoes={[
                 { valor: 'conta', rotulo: 'Conta bancária' },
                 { valor: 'cartao', rotulo: 'Cartão de crédito' },
               ]}
               valor={tipoDestino}
-              onSelecionar={setTipoDestino}
+              onSelecionar={(tipo) => {
+                setTipoDestino(tipo);
+                const sugestao = sugerirDestino({ banco: extrato.banco, origem: tipo }, contas, cartoesAtivos);
+                if (tipo === 'conta') setContaId(sugestao.id);
+                else setCartaoId(sugestao.id);
+              }}
             />
-            {semOpcoesDeDestino ? (
+            {opcoesDestino.length === 0 ? (
               <Text className="font-body" style={{ color: colors.textMuted, fontSize: 13 }}>
                 {tipoDestino === 'conta'
                   ? 'Cadastre uma conta bancária antes de importar um extrato.'
@@ -253,128 +301,82 @@ export default function ImportarExtratoScreen() {
                 <ChipSelect
                   label={tipoDestino === 'conta' ? 'Qual conta?' : 'Qual cartão?'}
                   opcoes={opcoesDestino}
-                  valor={
-                    tipoDestino === 'conta'
-                      ? contaId !== null
-                        ? String(contaId)
-                        : ''
-                      : cartaoId !== null
-                        ? String(cartaoId)
-                        : ''
-                  }
+                  valor={tipoDestino === 'conta' ? (contaId !== null ? String(contaId) : '') : cartaoId !== null ? String(cartaoId) : ''}
                   onSelecionar={(v) => (tipoDestino === 'conta' ? setContaId(Number(v)) : setCartaoId(Number(v)))}
                 />
                 {tipoDestino === 'cartao' && (
                   <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginBottom: 16 }}>
-                    Cada linha da fatura vira um gasto no cartão. Pagamentos e estornos (valores negativos) são
-                    ignorados.
+                    Cada compra da fatura vira um gasto no cartão. Pagamentos e estornos (valores negativos) não são
+                    importados.
                   </Text>
                 )}
-                <Button titulo="Continuar" onPress={() => setEtapa('arquivo')} disabled={!destino} />
+                <Button titulo="Ver o que vai entrar" onPress={handleVerPrevia} disabled={!destino} />
               </>
             )}
           </>
         )}
 
-        {etapa === 'arquivo' && (
+        {etapa === 'preview' && analise && (
           <>
-            <Text className="font-body" style={{ color: colors.textMuted, fontSize: 13, marginBottom: 16 }}>
-              Selecione o arquivo .csv ou .ofx exportado do internet banking ou do app do cartão. PDF não é
-              suportado.
-            </Text>
-            {erro && (
-              <Text className="font-body" style={{ color: colors.danger, fontSize: 13, marginBottom: 12 }}>
-                {erro}
+            <Voltar onPress={() => setEtapa('destino')} />
+            <Card style={{ marginBottom: 16 }}>
+              <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15 }}>
+                {selecionadas.length} de {analise.resumo.total} serão importados
               </Text>
-            )}
-            <Button titulo="Selecionar arquivo" onPress={handleEscolherArquivo} />
-          </>
-        )}
-
-        {etapa === 'mapear' && csv && (
-          <>
-            <Text className="font-body" style={{ color: colors.textMuted, fontSize: 13, marginBottom: 12 }}>
-              Diga qual coluna do arquivo corresponde a cada campo.
-            </Text>
-            <ChipSelect
-              label="Coluna da data"
-              opcoes={csv.headers.map((h) => ({ valor: h, rotulo: h }))}
-              valor={colData ?? ''}
-              onSelecionar={setColData}
-            />
-            <ChipSelect
-              label="Coluna da descrição"
-              opcoes={csv.headers.map((h) => ({ valor: h, rotulo: h }))}
-              valor={colDescricao ?? ''}
-              onSelecionar={setColDescricao}
-            />
-            <ChipSelect
-              label="Coluna do valor"
-              opcoes={csv.headers.map((h) => ({ valor: h, rotulo: h }))}
-              valor={colValor ?? ''}
-              onSelecionar={setColValor}
-            />
-            {erro && (
-              <Text className="font-body" style={{ color: colors.danger, fontSize: 13, marginBottom: 12 }}>
-                {erro}
+              <Text className="font-body" style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>
+                {[
+                  `${analise.resumo.novas} ${analise.resumo.novas === 1 ? 'novo' : 'novos'}`,
+                  analise.resumo.jaImportadas > 0 ? `${analise.resumo.jaImportadas} já importados antes` : null,
+                  analise.resumo.duplicatas + analise.resumo.duvidas > 0
+                    ? `${analise.resumo.duplicatas + analise.resumo.duvidas} parecem já lançados à mão`
+                    : null,
+                  analise.resumo.pagamentosOuEstornos > 0
+                    ? `${analise.resumo.pagamentosOuEstornos} ${analise.resumo.pagamentosOuEstornos === 1 ? 'pagamento ou estorno' : 'pagamentos ou estornos'}`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </Text>
-            )}
-            <Button
-              titulo="Ver prévia"
-              onPress={handleConfirmarMapeamento}
-              disabled={!colData || !colDescricao || !colValor}
-            />
-          </>
-        )}
+            </Card>
 
-        {etapa === 'preview' && (
-          <>
-            <Text className="font-body-medium" style={{ color: colors.text, fontSize: 14, marginBottom: 12 }}>
-              {selecionadas.length} de {transacoes.length} transações serão importadas
-            </Text>
             <View style={{ gap: 8, marginBottom: 20 }}>
-              {transacoes.map((t) => {
-                const desabilitada = bloqueada(t);
-                const marcada = t.incluir && !desabilitada;
+              {analise.itens.map((item) => {
+                const t = item.transacao;
+                const marcada = item.podeIncluir && marcadas.has(t.idExterno);
+                const parcela = t.parcela ?? normalizarDescricao(t.descricao).parcela;
+                const aviso =
+                  item.situacao.tipo === 'ja_importada'
+                    ? 'já importado antes'
+                    : item.pagamentoOuEstorno
+                      ? 'pagamento ou estorno'
+                      : item.situacao.tipo === 'duplicata'
+                        ? 'igual a um lançamento que você já fez'
+                        : item.situacao.tipo === 'duvida'
+                          ? 'pode ser um lançamento que você já fez'
+                          : null;
                 return (
-                  <Pressable key={t.id} onPress={() => alternarInclusao(t.id)} disabled={desabilitada}>
-                    <Card
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        opacity: marcada ? 1 : 0.4,
-                      }}
-                    >
+                  <Pressable key={t.idExterno} onPress={() => alternar(t.idExterno)} disabled={!item.podeIncluir}>
+                    <Card style={{ flexDirection: 'row', alignItems: 'center', opacity: marcada ? 1 : 0.5 }}>
                       <Feather
                         name={marcada ? 'check-square' : 'square'}
                         size={18}
-                        color={desabilitada ? colors.textMuted : colors.brand}
+                        color={item.podeIncluir ? colors.brand : colors.textMuted}
                         style={{ marginRight: 10 }}
                       />
                       <View style={{ flex: 1 }}>
-                        <Text
-                          className="font-body-medium"
-                          style={{ color: colors.text, fontSize: 13 }}
-                          numberOfLines={1}
-                        >
+                        <Text className="font-body-medium" style={{ color: colors.text, fontSize: 13 }} numberOfLines={1}>
                           {t.descricao}
                         </Text>
-                        <Text className="font-body" style={{ color: colors.textMuted, fontSize: 11 }}>
+                        <Text className="font-body" style={{ color: aviso && item.podeIncluir ? colors.warning : colors.textMuted, fontSize: 11 }}>
                           {formatarData(t.data)}
-                          {desabilitada ? ' · pagamento/estorno' : ''}
+                          {parcela ? ` · parcela ${parcela.numero}/${parcela.total}` : ''}
+                          {aviso ? ` · ${aviso}` : ''}
                         </Text>
                       </View>
                       <Text
                         className="font-heading-medium"
                         style={{
-                          color:
-                            tipoDestino === 'cartao'
-                              ? t.valor < 0
-                                ? colors.textMuted
-                                : colors.text
-                              : t.valor < 0
-                                ? colors.danger
-                                : colors.success,
+                          color: tipoDestino === 'cartao' ? (t.valor < 0 ? colors.textMuted : colors.text) : t.valor < 0 ? colors.danger : colors.success,
                           fontSize: 13,
                         }}
                       >
@@ -386,7 +388,7 @@ export default function ImportarExtratoScreen() {
               })}
             </View>
             <Button
-              titulo={`Importar ${selecionadas.length} transaç${selecionadas.length === 1 ? 'ão' : 'ões'}`}
+              titulo={`Importar ${selecionadas.length} ${selecionadas.length === 1 ? 'lançamento' : 'lançamentos'}`}
               onPress={handleImportar}
               disabled={selecionadas.length === 0}
               carregando={salvando}
