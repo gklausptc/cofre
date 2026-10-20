@@ -8,6 +8,7 @@ import { Card } from '@/components/Card';
 import { AvisoPendencias } from '@/components/AvisoPendencias';
 import { AutomacoesDoInicio } from '@/components/inicio/AutomacoesDoInicio';
 import { Snackbar } from '@/components/Snackbar';
+import { NOME_DO_APP } from '@/core/marca';
 import { useOrcamentosStore } from '@/store/orcamentosStore';
 import { usePerguntasStore } from '@/store/perguntasStore';
 import { EmptyState } from '@/components/EmptyState';
@@ -239,7 +240,7 @@ export default function DashboardScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
       <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 20 }}>
-          <ScreenHeader title="Cofre" subtitle="Seu dinheiro, sob controle" />
+          <ScreenHeader title={NOME_DO_APP} subtitle="Seu dinheiro, sob controle" />
           <TourTarget id="tema">
             <Pressable
               onPress={handleAlternarTema}

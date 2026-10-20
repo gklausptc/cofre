@@ -241,9 +241,11 @@ npm test                                                    # testes (Jest + jes
 
 Testes ficam em `__tests__/` ao lado do código (ex.: `src/domain/usecases/__tests__/`), importam `describe/it/expect` de `@jest/globals` (o TypeScript 6 não carrega tipos globais por padrão) e usam as fábricas e cenários de `src/test/`.
 
-## 13. Identidade visual — Cofre
+## 13. Identidade visual — Cofre Klaus
 
-Marca definida para o app: **Cofre**.
+Marca do app: **Cofre Klaus** (nome escolhido em out/2026, ver `docs/pesquisa-concorrentes.md`). Só o nome **exibido** mudou (`app.json` → `name`, `src/core/marca.ts` → `NOME_DO_APP`); `slug`, `scheme`, o banco `cofre.db` e as chaves do SecureStore continuam "cofre" — mudar qualquer um deles troca a identidade no Expo Go e o app abre vazio (§14).
+
+- **Logo**: quadrado arredondado azul `#2A5CE0` com um "K" claro desenhado como porta de cofre (a haste é a dobradiça, com duas presilhas) e um ponto ciano no lugar do segredo. Geometria única em `scripts/marca-klaus.js` (ícones, splash e favicon via `node scripts/generate-brand-assets.js`) e espelhada em `src/components/Logo.tsx`. No Expo Go o ícone do app não muda na tela do iPhone (só num build próprio).
 
 - **Paleta** (fonte da verdade: `src/core/theme/colors.ts`, espelhada à mão em `tailwind.config.js`): azul elétrico + ciano, alto contraste.
   - Marca: brand `#2A5CE0` (no escuro `#5B8CFF`), brandDark `#1A3FA8`; acento ciano `#06B6D4` (no escuro `#22D3EE`), também usado como "sucesso"; perigo/despesa `#D32F2F`.

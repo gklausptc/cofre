@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Cofre",
+    "name": "Cofre Klaus",
     "slug": "cofre",
     "scheme": "cofre",
     "version": "1.0.0",
@@ -17,7 +17,7 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
         "monochromeImage": "./assets/android-icon-monochrome.png",
-        "backgroundColor": "#0A0D14"
+        "backgroundColor": "#2A5CE0"
       },
       "predictiveBackGestureEnabled": false
     },

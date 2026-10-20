@@ -9,6 +9,7 @@ import { esperaAtualDoPin, tentarPin, zerarTentativasPin } from '@/core/auth/app
 import { autenticarComBiometria, biometriaDisponivel } from '@/core/auth/biometria';
 import { descreverEspera } from '@/domain/usecases/bloqueioPin';
 import { LogoMark } from '@/components/Logo';
+import { NOME_DO_APP } from '@/core/marca';
 import { PinPad } from '@/components/PinPad';
 
 export function AppLockScreen() {
@@ -100,7 +101,7 @@ export function AppLockScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
       <LogoMark size={56} />
       <Text className="font-heading" style={{ color: colors.text, fontSize: 20, marginTop: 16, marginBottom: 4 }}>
-        Cofre bloqueado
+        {NOME_DO_APP} bloqueado
       </Text>
       <Text
         className="font-body"
