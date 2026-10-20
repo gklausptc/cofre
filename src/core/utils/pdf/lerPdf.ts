@@ -768,12 +768,30 @@ export function montarLinhas(pedacos: Pedaco[]): LinhaDoPdf[] {
       texto += p.texto;
       fimAnterior = Math.max(p.xFim, fimAnterior ?? p.xFim);
     }
-    return {
-      y: linha[0].y,
-      texto: texto.replace(/\s+/g, ' ').trim(),
-      pedacos: linha.map((p) => ({ x: p.x, xFim: p.xFim, texto: p.texto.replace(/\s+/g, ' ').trim() })),
-    };
+    return { y: linha[0].y, texto: texto.replace(/\s+/g, ' ').trim(), pedacos: juntarVizinhos(linha) };
   });
+}
+
+/**
+ * Pedaços sem vão de coluna entre eles viram um só: alguns geradores (InfinitePay) desenham
+ * letra por letra, e as tabelas precisam da célula inteira ("Tipo de transação", "+20,00").
+ * Até 0,15 da fonte é a mesma palavra; até 0,6 é o espaço entre palavras; mais que isso é coluna.
+ */
+function juntarVizinhos(linha: Pedaco[]): PedacoDaLinha[] {
+  const juntos: PedacoDaLinha[] = [];
+  for (const p of linha) {
+    const texto = p.texto.replace(/\s+/g, ' ');
+    const ultimo = juntos[juntos.length - 1];
+    const distancia = ultimo ? p.x - ultimo.xFim : Infinity;
+    if (ultimo && distancia <= p.tamanho * 0.6 && distancia >= -p.tamanho * 0.5) {
+      const espaco = distancia > p.tamanho * 0.15 || ultimo.texto.endsWith(' ') || texto.startsWith(' ');
+      ultimo.texto = espaco ? `${ultimo.texto.trimEnd()} ${texto.trimStart()}` : ultimo.texto + texto;
+      ultimo.xFim = Math.max(ultimo.xFim, p.xFim);
+    } else {
+      juntos.push({ x: p.x, xFim: p.xFim, texto });
+    }
+  }
+  return juntos.map((p) => ({ ...p, texto: p.texto.trim() }));
 }
 
 export type ResultadoPdf =

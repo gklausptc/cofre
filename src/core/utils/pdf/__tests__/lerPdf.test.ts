@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 import { zlibSync } from 'fflate';
 import { md5, rc4 } from '@/core/utils/pdf/criptografia';
-import { ehPdf, lerTextoDoPdf } from '@/core/utils/pdf/lerPdf';
+import { ehPdf, lerTextoDoPdf, montarLinhas } from '@/core/utils/pdf/lerPdf';
 
 const bytesDe = (texto: string) => Uint8Array.from(texto, (c) => c.charCodeAt(0) & 0xff);
 const juntar = (...partes: Uint8Array[]) => {
@@ -127,5 +127,52 @@ describe('lerTextoDoPdf', () => {
 
   it('o que não é PDF', () => {
     expect(lerTextoDoPdf(bytesDe('Data;Valor\n01/10/2026;10,00'))).toEqual({ ok: false, motivo: 'invalido' });
+  });
+});
+
+describe('montarLinhas', () => {
+  /** Texto desenhado letra por letra (como a InfinitePay faz): 5 de largura, espaço de 2,5. */
+  function letraPorLetra(x: number, y: number, texto: string) {
+    const pedacos: { x: number; y: number; xFim: number; texto: string; tamanho: number }[] = [];
+    let pos = x;
+    for (const letra of texto) {
+      if (letra === ' ') {
+        pos += 2.5;
+        continue;
+      }
+      pedacos.push({ x: pos, y, xFim: pos + 5, texto: letra, tamanho: 10 });
+      pos += 5;
+    }
+    return pedacos;
+  }
+
+  it('junta letras e palavras da mesma célula, separa as colunas', () => {
+    const linhas = montarLinhas([
+      ...letraPorLetra(13, 400, '05 Mai, 2026'),
+      ...letraPorLetra(97, 400, '14:09'),
+      ...letraPorLetra(164, 400, 'Tipo de transação'),
+      ...letraPorLetra(299, 400, 'Pix FULANO DE TAL'),
+      ...letraPorLetra(800, 400, '+ 20,00'),
+    ]);
+    expect(linhas).toHaveLength(1);
+    expect(linhas[0].texto).toBe('05 Mai, 2026 14:09 Tipo de transação Pix FULANO DE TAL + 20,00');
+    expect(linhas[0].pedacos.map((p) => [p.x, p.texto])).toEqual([
+      [13, '05 Mai, 2026'],
+      [97, '14:09'],
+      [164, 'Tipo de transação'],
+      [299, 'Pix FULANO DE TAL'],
+      [800, '+ 20,00'],
+    ]);
+  });
+
+  it('pedaços que já vêm por célula continuam como estão', () => {
+    const linhas = montarLinhas([
+      { x: 30, y: 500, xFim: 80, texto: '01/10/2026', tamanho: 9 },
+      { x: 99, y: 500, xFim: 124, texto: '99008', tamanho: 9 },
+      { x: 265, y: 500, xFim: 360, texto: 'Compra com Cartão', tamanho: 9 },
+      { x: 532, y: 500, xFim: 560, texto: '100,00 ', tamanho: 9 },
+      { x: 562, y: 500, xFim: 574, texto: '(-)', tamanho: 9 },
+    ]);
+    expect(linhas[0].pedacos.map((p) => p.texto)).toEqual(['01/10/2026', '99008', 'Compra com Cartão', '100,00 (-)']);
   });
 });
