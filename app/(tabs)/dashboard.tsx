@@ -300,6 +300,14 @@ export default function DashboardScreen() {
           <ScreenHeader title={NOME_DO_APP} subtitle="Seu dinheiro, sob controle" />
           <View style={{ flexDirection: 'row', gap: 8 }}>
           <Pressable
+            onPress={() => router.push('/ajuda')}
+            accessibilityRole="button"
+            accessibilityLabel="Ajuda e assistente"
+            style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Feather name="help-circle" size={16} color={colors.brand} />
+          </Pressable>
+          <Pressable
             onPress={() => router.push('/busca')}
             accessibilityRole="button"
             accessibilityLabel="Buscar lançamentos"

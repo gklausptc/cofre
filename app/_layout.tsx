@@ -178,6 +178,7 @@ function RootNavigator() {
         <Stack.Screen name="importar-extrato/lote" options={{ headerShown: true, title: 'Importar vários' }} />
         <Stack.Screen name="regras/index" options={{ headerShown: true, title: 'Regras aprendidas' }} />
         <Stack.Screen name="categorias/index" options={{ headerShown: true, title: 'Categorias' }} />
+        <Stack.Screen name="ajuda/index" options={{ headerShown: true, title: 'Ajuda' }} />
         <Stack.Screen name="revisao/index" options={{ headerShown: true, title: 'Revisão' }} />
         <Stack.Screen name="exportar-extrato/index" options={{ headerShown: true, title: 'Exportar extrato' }} />
         <Stack.Screen name="configuracoes/index" options={{ headerShown: true, title: 'Configurações' }} />
