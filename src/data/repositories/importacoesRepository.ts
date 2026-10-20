@@ -22,6 +22,9 @@ import { emTransacao } from '@/data/db/transacao';
 import { registrarPagamentoFatura } from './faturasRepository';
 import { gravarPerguntasDaImportacao } from './perguntasRepository';
 
+/** Linhas por INSERT (o SQLite limita os parâmetros por comando). */
+const LOTE = 50;
+
 export async function listarImportacoes() {
   return db.select().from(importacoes).orderBy(desc(importacoes.criadaEm));
 }
@@ -54,12 +57,25 @@ export async function registrarImportacao(registro: RegistroDeImportacao): Promi
       }
     };
 
-    if (registro.movimentacoes.length > 0) {
-      await db.insert(movimentacoes).values(registro.movimentacoes.map((m) => ({ ...m, ...ligadas })));
-    }
-    if (registro.gastos.length > 0) {
-      await db.insert(gastosRapidos).values(registro.gastos.map((g) => ({ ...g, ...ligadas })));
-    }
+    // a ocorrência de conta fixa pode ter sido paga (ou apagada) entre a prévia e o gravar: aí a
+    // linha entra como saída comum, sem dar baixa de novo nem ficar ligada a algo que não existe
+    const idsDeContaFixa = registro.pagamentosDeContaFixa.map((p) => p.parcelaId);
+    const abertas = new Set(
+      idsDeContaFixa.length === 0
+        ? []
+        : (await db.select().from(parcelas).where(inArray(parcelas.id, idsDeContaFixa)))
+            .filter((p) => p.status !== 'paga')
+            .map((p) => p.id)
+    );
+    const linhas = registro.movimentacoes.map((m) =>
+      m.origem === 'conta_fixa' && m.parcelaId != null && !abertas.has(m.parcelaId)
+        ? { ...m, origem: 'manual' as const, parcelaId: null, ...ligadas }
+        : { ...m, ...ligadas }
+    );
+    // em lotes, para não passar do limite de parâmetros do SQLite num extrato grande
+    for (let i = 0; i < linhas.length; i += LOTE) await db.insert(movimentacoes).values(linhas.slice(i, i + LOTE));
+    const gastos = registro.gastos.map((g) => ({ ...g, ...ligadas }));
+    for (let i = 0; i < gastos.length; i += LOTE) await db.insert(gastosRapidos).values(gastos.slice(i, i + LOTE));
 
     // contas fixas pagas pelo extrato: o valor passa a ser o do banco (guardando o de antes)
     await guardarParcelas(registro.pagamentosDeContaFixa.map((p) => p.parcelaId));
@@ -119,6 +135,12 @@ export async function registrarImportacao(registro: RegistroDeImportacao): Promi
       if (!atual) continue;
       efeitos.movimentacoes.push({ id: atual.id, antes: camposAntes(atual, alteracao.mudancas) });
       await db.update(movimentacoes).set(alteracao.mudancas).where(eq(movimentacoes.id, atual.id));
+      if (alteracao.linha && registro.importacao.contaBancariaId != null) {
+        efeitos.linhasAbsorvidas = [
+          ...(efeitos.linhasAbsorvidas ?? []),
+          { contaBancariaId: registro.importacao.contaBancariaId, ...alteracao.linha },
+        ];
+      }
     }
 
     for (const regra of registro.regrasNovas) {
@@ -156,6 +178,10 @@ export async function desfazerImportacao(id: number): Promise<void> {
       await db.delete(parcelas).where(inArray(parcelas.compraParceladaId, compras));
       await db.delete(comprasParceladas).where(inArray(comprasParceladas.id, compras));
     }
+    // regras de conta fixa criadas junto com essas contas não podem apontar para conta apagada
+    if ((efeitos.contasFixasCriadas ?? []).length > 0) {
+      await db.delete(regrasCategorizacao).where(inArray(regrasCategorizacao.contaFixaId, efeitos.contasFixasCriadas ?? []));
+    }
     for (const contaFixaId of efeitos.contasFixasCriadas ?? []) {
       const ocorrencias = await db.select().from(parcelas).where(eq(parcelas.contaFixaId, contaFixaId));
       const pagas = ocorrencias.filter((p) => p.status === 'paga');
@@ -167,9 +193,13 @@ export async function desfazerImportacao(id: number): Promise<void> {
 
     await db.delete(movimentacoes).where(eq(movimentacoes.importacaoId, id));
     await db.delete(gastosRapidos).where(eq(gastosRapidos.importacaoId, id));
-    // gastos de importações antigas que tinham virado parcelas voltam como eram
-    const devolver = (efeitos.gastosApagados ?? []).filter((g) => g.importacaoId !== id);
-    if (devolver.length > 0) await db.insert(gastosRapidos).values(devolver);
+    // gastos de importações antigas que tinham virado parcelas voltam como eram (só os de
+    // importações que ainda existem, para continuarem podendo ser desfeitos)
+    const existentes = new Set((await db.select({ id: importacoes.id }).from(importacoes)).map((i) => i.id));
+    const devolver = (efeitos.gastosApagados ?? []).filter(
+      (g) => g.importacaoId !== id && (g.importacaoId === null || existentes.has(g.importacaoId))
+    );
+    for (let i = 0; i < devolver.length; i += LOTE) await db.insert(gastosRapidos).values(devolver.slice(i, i + LOTE));
 
     for (const antes of efeitos.parcelas) {
       const { id: parcelaId, ...campos } = antes;

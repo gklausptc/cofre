@@ -96,3 +96,17 @@ describe('importacoesQueDependem', () => {
     expect(importacoesQueDependem(1, [41], outras)).toEqual([]);
   });
 });
+
+describe('dependência por gastos absorvidos', () => {
+  it('importação que absorveu gastos desta como parcelas depende dela', () => {
+    const outras = [
+      {
+        id: 9,
+        arquivo: 'fatura-nov.csv',
+        efeitos: JSON.stringify({ parcelas: [], faturas: [], movimentacoes: [], regrasCriadas: [], gastosApagados: [{ id: 3, importacaoId: 1 }] }),
+      },
+    ];
+    expect(importacoesQueDependem(1, [], outras)).toEqual([outras[0]]);
+    expect(importacoesQueDependem(2, [], outras)).toEqual([]);
+  });
+});

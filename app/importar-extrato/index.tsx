@@ -27,6 +27,7 @@ import { lerCsvComMapeamento, lerExtrato, type TabelaCsv } from '@/domain/usecas
 import {
   analisarImportacao,
   dataNaFatura,
+  absorvidasDoDestino,
   existentesDoDestino,
   linhaDoItem,
   montarRegistroDeImportacao,
@@ -124,7 +125,7 @@ export default function ImportarExtratoScreen() {
   const { cartoes, carregar: carregarCartoes } = useCartoesStore();
   const { movimentacoes, carregar: carregarMovimentacoes } = useMovimentacoesStore();
   const { gastos, carregar: carregarGastos } = useGastosRapidosStore();
-  const importar = useImportacoesStore((s) => s.importar);
+  const { importar, importacoes, carregar: carregarImportacoes } = useImportacoesStore();
   const { categorias, carregar: carregarCategorias } = useCategoriasStore();
   const { contas: contasFixas, carregar: carregarContasFixas } = useContasFixasStore();
   const { parcelas, carregar: carregarParcelas } = useParcelasStore();
@@ -144,6 +145,7 @@ export default function ImportarExtratoScreen() {
       carregarCompras();
       carregarFaturas();
       carregarRegras();
+      carregarImportacoes();
     }, [
       carregarContas,
       carregarCartoes,
@@ -155,6 +157,7 @@ export default function ImportarExtratoScreen() {
       carregarCompras,
       carregarFaturas,
       carregarRegras,
+      carregarImportacoes,
     ])
   );
 
@@ -213,13 +216,13 @@ export default function ImportarExtratoScreen() {
 
   const analise = useMemo(() => {
     if (!extrato || !destino) return null;
-    return analisarImportacao(extrato, destino, existentesDoDestino(destino, movimentacoes, gastos), {
+    return analisarImportacao(extrato, destino, [...existentesDoDestino(destino, movimentacoes, gastos), ...absorvidasDoDestino(destino, importacoes)], {
       categorizar,
       categorias,
       mesDaFatura: mesFatura,
       dados: { contas, cartoes, contasFixas, parcelas, compras, gastos, faturas, movimentacoes },
     });
-  }, [extrato, destino, movimentacoes, gastos, categorizar, categorias, mesFatura, contas, cartoes, contasFixas, parcelas, compras, faturas]);
+  }, [extrato, destino, movimentacoes, gastos, categorizar, categorias, mesFatura, contas, cartoes, contasFixas, parcelas, compras, faturas, importacoes]);
 
   const chaveDaEscolha = useCallback(
     (item: ItemDaAnalise) => (destino ? `${naturezaDaLinha(item.transacao, destino)}|${textoParaRegra(item.transacao.descricao)}` : ''),
@@ -362,7 +365,7 @@ export default function ImportarExtratoScreen() {
         fatura,
         regrasNovas,
       });
-      const existentes = existentesDoDestino(destino, movimentacoes, gastos);
+      const existentes = [...existentesDoDestino(destino, movimentacoes, gastos), ...absorvidasDoDestino(destino, importacoes)];
       registro.perguntas = montarFilaDePerguntas({
         extrato,
         destino,

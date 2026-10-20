@@ -160,8 +160,9 @@ export function resumirImportacao(params: {
 }
 
 /**
- * Importações mais novas que mexeram em linhas desta (o outro lado de uma transferência):
- * desfazer esta antes delas deixaria a outra conta com saldo errado.
+ * Importações mais novas que mexeram em linhas desta (o outro lado de uma transferência, ou
+ * gastos desta que viraram parcelas de uma compra criada lá): desfazer esta antes delas
+ * deixaria saldos e faturas errados.
  */
 export function importacoesQueDependem(
   importacaoId: number,
@@ -172,6 +173,9 @@ export function importacoesQueDependem(
   return outras.filter((o) => {
     if (o.id === importacaoId || !o.efeitos) return false;
     const efeitos = JSON.parse(o.efeitos) as EfeitosDaImportacao;
-    return efeitos.movimentacoes.some((m) => ids.has(m.id));
+    return (
+      efeitos.movimentacoes.some((m) => ids.has(m.id)) ||
+      (efeitos.gastosApagados ?? []).some((g) => g.importacaoId === importacaoId)
+    );
   });
 }

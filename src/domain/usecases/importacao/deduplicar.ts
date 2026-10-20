@@ -54,18 +54,27 @@ export function semelhanca(a: string, b: string): number {
   return Math.max(levenshtein, jaccard, contida);
 }
 
+/** Marca de parcela da linha (coluna própria ou "3/10" no texto). */
+function marcaDaLinha(linha: { descricao: string; parcela?: TransacaoLida['parcela'] }): TransacaoLida['parcela'] {
+  return linha.parcela ?? normalizarDescricao(linha.descricao).parcela;
+}
+
 /**
  * Identificador de uma linha de CSV (que não tem FITID): banco, data, valor, descrição
- * normalizada e a ordem entre linhas idênticas no mesmo arquivo. Importar de novo o mesmo
- * extrato (ou um que se sobrepõe a ele) gera os mesmos ids.
+ * normalizada, a marca de parcela (C6 e Itaú mandam todas as parcelas com a data da compra
+ * original: sem a marca, a 4/10 teria o mesmo id da 3/10) e a ordem entre linhas idênticas no
+ * mesmo arquivo. Importar de novo o mesmo extrato (ou um que se sobrepõe a ele) gera os mesmos ids.
  */
 export function idExternoDeLinhas(
-  linhas: Pick<TransacaoLida, 'data' | 'valor' | 'descricao'>[],
+  linhas: (Pick<TransacaoLida, 'data' | 'valor' | 'descricao'> & { parcela?: TransacaoLida['parcela'] })[],
   prefixo: string
 ): string[] {
   const vistas = new Map<string, number>();
   return linhas.map((linha) => {
-    const chave = `${linha.data}|${linha.valor}|${normalizarDescricao(linha.descricao).normalizada}`;
+    const marca = marcaDaLinha(linha);
+    const chave =
+      `${linha.data}|${linha.valor}|${normalizarDescricao(linha.descricao).normalizada}` +
+      (marca ? `|p${marca.numero}/${marca.total}` : '');
     const ocorrencia = (vistas.get(chave) ?? 0) + 1;
     vistas.set(chave, ocorrencia);
     return `${prefixo}:${hashTexto(`${chave}|${ocorrencia}`)}`;
@@ -118,8 +127,12 @@ export function deduplicar(transacoes: TransacaoLida[], existentes: LancamentoEx
     if (mesmoId) return { tipo: 'ja_importada', existenteId: mesmoId.id };
 
     let melhor: { existente: LancamentoExistente; nota: number; mesmoDia: boolean } | null = null;
+    const marca = marcaDaLinha(t);
     for (const existente of existentes) {
       if (usados.has(existente.id) || existente.valor !== t.valor) continue;
+      // parcelas diferentes da mesma compra (3/10 e 4/10) nunca são a mesma linha
+      const marcaExistente = normalizarDescricao(existente.descricao).parcela;
+      if (marca && marcaExistente && (marca.numero !== marcaExistente.numero || marca.total !== marcaExistente.total)) continue;
       const dias = Math.abs(differenceInCalendarDays(parseISO(existente.data), parseISO(t.data)));
       if (dias > DIAS_DE_TOLERANCIA) continue;
       const nota = semelhanca(existente.descricao, t.descricao);

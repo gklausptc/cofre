@@ -289,15 +289,12 @@ export function conciliarExtrato(
       const outroLadoPareceTransferencia = PARECE_TRANSFERENCIA.test(semAcentos(m.descricao ?? ''));
       if (!outroLadoPareceTransferencia || (!pareceTransferencia && categorizacao?.acao !== 'transferencia_propria')) return false;
       const nomeDoOutroLado = normalizarDescricao(m.descricao ?? '').pix?.nome ?? null;
-      if (
-        nomeNoPix &&
-        nomeDoOutroLado &&
-        pareceNomeDePessoa(nomeNoPix) &&
-        pareceNomeDePessoa(nomeDoOutroLado) &&
-        semelhanca(nomeNoPix, nomeDoOutroLado) < 0.8
-      ) {
-        return false;
-      }
+      const pessoaAqui = nomeNoPix !== null && pareceNomeDePessoa(nomeNoPix);
+      const pessoaLa = nomeDoOutroLado !== null && pareceNomeDePessoa(nomeDoOutroLado);
+      if (pessoaAqui && pessoaLa && semelhanca(nomeNoPix ?? '', nomeDoOutroLado ?? '') < 0.8) return false;
+      // só um dos lados nomeia uma pessoa (PIX para um amigo × TED genérica): coincidência de
+      // valor, a não ser que uma regra ou contato diga que é conta sua
+      if (pessoaAqui !== pessoaLa && categorizacao?.acao !== 'transferencia_propria') return false;
       if (t.valor < 0) return m.tipo === 'entrada';
       return m.tipo === 'saida' || (m.tipo === 'transferencia' && m.contaDestinoId === null);
     });
@@ -412,8 +409,16 @@ export function conciliarExtrato(
     }
 
     // --- entradas
+    // só no mesmo mês: a cópia mensal do salário é identificada pelo mês da data, e movê-la
+    // para outro mês faria o app gerar outra cópia (salário em dobro)
     const prevista = receitasPrevistas
-      .filter((m) => !usados.has(`mov-${m.id}`) && dentroDaTolerancia(valor, m.valor, 0.1) && dias(m.data, t.data) <= 5)
+      .filter(
+        (m) =>
+          !usados.has(`mov-${m.id}`) &&
+          m.data.slice(0, 7) === t.data.slice(0, 7) &&
+          dentroDaTolerancia(valor, m.valor, 0.1) &&
+          dias(m.data, t.data) <= 5
+      )
       .sort((a, b) => dias(a.data, t.data) - dias(b.data, t.data))[0];
     if (prevista) {
       usados.add(`mov-${prevista.id}`);

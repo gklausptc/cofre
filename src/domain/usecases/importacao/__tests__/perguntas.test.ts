@@ -317,3 +317,26 @@ describe('planejarResposta', () => {
     expect(planejarResposta(dados, { tipo: 'duplicidade', mesmo: true }, contexto).inserir).toBeNull();
   });
 });
+
+describe('parcelamento absorve as outras parcelas já importadas', () => {
+  it('também a parcela mais nova de outra importação', () => {
+    const nova = umGasto({ id: 91, cartaoId: 10, formaPagamento: 'cartao', descricao: 'MAGAZINE LUIZA 04/10', valor: 19590 });
+    const antiga = umGasto({ id: 90, cartaoId: 10, formaPagamento: 'cartao', descricao: 'MAGAZINE LUIZA 02/10', valor: 19590 });
+    const outra = umGasto({ id: 92, cartaoId: 10, formaPagamento: 'cartao', descricao: 'OUTRA LOJA 04/10', valor: 19590 });
+    const dados: DadosDaPergunta = {
+      tipo: 'parcelamento',
+      descricao: 'MAGAZINE LUIZA',
+      valorParcela: 19590,
+      numero: 3,
+      total: 10,
+      cartaoId: 10,
+      mesDaFatura: '2026-11',
+      dataCompra: '2026-08-20',
+      categoriaId: 7,
+      membroId: null,
+      linhas: [{ importacaoId: 7, idExterno: 'a', onde: 'gasto' }],
+    };
+    const plano = planejarResposta(dados, { tipo: 'parcelamento', criar: true }, { agora: new Date(), cartoes: [cartao], gastos: [antiga, nova, outra] });
+    expect(plano.apagarGastos.sort()).toEqual([90, 91]);
+  });
+});

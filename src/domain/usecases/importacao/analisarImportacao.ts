@@ -12,6 +12,27 @@ import type { DadosGastoRapido } from '@/domain/repositories/gastosRapidosReposi
 import type { Cartao, Categoria, ContaBancaria, GastoRapido, Movimentacao } from '@/domain/types/entities';
 import type { ExtratoLido, OrigemExtrato, TransacaoLida } from './tipos';
 
+/**
+ * Linhas de extratos anteriores desta conta que não viraram lançamento próprio (o outro lado
+ * de uma transferência já estava no app), para a reimportação reconhecê-las pelo id.
+ */
+export function absorvidasDoDestino(
+  destino: DestinoImportacao,
+  importacoes: { efeitos: string | null }[]
+): LancamentoExistente[] {
+  if (destino.tipo !== 'conta') return [];
+  const lista: LancamentoExistente[] = [];
+  for (const imp of importacoes) {
+    if (!imp.efeitos) continue;
+    const efeitos = JSON.parse(imp.efeitos) as { linhasAbsorvidas?: { contaBancariaId: number; idExterno: string; data: string; valor: number; descricao: string }[] };
+    for (const l of efeitos.linhasAbsorvidas ?? []) {
+      if (l.contaBancariaId !== destino.contaBancariaId) continue;
+      lista.push({ id: `absorvida-${l.idExterno}`, data: l.data, valor: l.valor, descricao: l.descricao, idExterno: l.idExterno });
+    }
+  }
+  return lista;
+}
+
 /** O que já está no app naquela conta ou cartão, na convenção de sinal do extrato. */
 export function existentesDoDestino(
   destino: DestinoImportacao,
@@ -434,6 +455,7 @@ export function montarRegistroDeImportacao(params: {
       registro.alteracoes.push({
         movimentacaoId: c.contraparteId,
         motivo: 'transferencia',
+        linha: { idExterno: t.idExterno, data: t.data, valor: t.valor, descricao: t.descricao },
         mudancas:
           t.valor < 0
             ? { tipo: 'transferencia', contaBancariaId: contaId, contaDestinoId: c.outraContaId, categoriaId: null }

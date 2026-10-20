@@ -274,3 +274,27 @@ describe('fatura do cartão', () => {
     expect(r?.tipo).toBe('ja_na_fatura');
   });
 });
+
+describe('casos da revisão', () => {
+  it('receita prevista de outro mês não é confirmada (evita salário em dobro)', () => {
+    const prevista = umaMovimentacao({ id: 801, contaBancariaId: 1, tipo: 'entrada', valor: 500000, data: '2026-11-01', recorrenteOrigemId: 1 });
+    const [r] = conciliarExtrato(
+      [linha({ data: '2026-10-31', valor: 500000, descricao: 'TED RECEBIDA ACME' })],
+      semCategoria(1),
+      naContaBB,
+      dados({ movimentacoes: [prevista] })
+    );
+    expect(r?.tipo).not.toBe('receita_prevista');
+  });
+
+  it('PIX para uma pessoa e TED genérica de mesmo valor não viram transferência', () => {
+    const entradaNoC6 = umaMovimentacao({ contaBancariaId: 2, tipo: 'entrada', valor: 20000, data: '2026-10-10', descricao: 'TED RECEBIDA' });
+    const [r] = conciliarExtrato(
+      [linha({ valor: -20000, descricao: 'PIX ENVIADO - JOAO PEREIRA' })],
+      semCategoria(1),
+      naContaBB,
+      dados({ movimentacoes: [entradaNoC6] })
+    );
+    expect(r).toBeNull();
+  });
+});

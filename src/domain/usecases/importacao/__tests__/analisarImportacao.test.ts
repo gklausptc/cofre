@@ -268,6 +268,7 @@ describe('análise completa (categorização + conciliação) e o que gravar', (
       {
         movimentacaoId: 700,
         motivo: 'transferencia',
+        linha: { idExterno: 'transf', data: '2026-10-15', valor: -20000, descricao: 'PIX ENVIADO GREGORY KLAUS' },
         mudancas: { tipo: 'transferencia', contaBancariaId: 1, contaDestinoId: 2, categoriaId: null },
       },
     ]);

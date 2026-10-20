@@ -127,7 +127,8 @@ export function planejarResposta(
       const fechamento = format(addMonths(parseISO(`${mesPrimeiraParcela}-01`), i), 'yyyy-MM');
       return { numero, dataPagamento: dataNoMes(mesVencimentoDaFatura(fechamento, cartao), cartao.diaVencimento) };
     });
-    // parcelas antigas já importadas como gasto ("LOJA 02/10" na fatura passada) viram parcelas pagas
+    // as outras parcelas da mesma compra já importadas como gasto ("LOJA 02/10" na fatura passada,
+    // ou a 04/10 de uma importação mais nova) viram parcelas da compra: senão contariam em dobro
     const idsDaPergunta = new Set(dados.linhas.map((l) => l.idExterno));
     const antigas = contexto.gastos.filter((g) => {
       if (g.formaPagamento !== 'cartao' || g.cartaoId !== dados.cartaoId || !g.descricao) return false;
@@ -136,7 +137,7 @@ export function planejarResposta(
       return (
         marca !== null &&
         marca.total === dados.total &&
-        marca.numero < dados.numero &&
+        marca.numero !== dados.numero &&
         Math.abs(g.valor - dados.valorParcela) <= 2 &&
         semelhanca(limparDescricaoDaParcela(g.descricao), dados.descricao) >= 0.6
       );

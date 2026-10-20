@@ -85,3 +85,20 @@ describe('deduplicar', () => {
     expect(deduplicar(lista, existentes).map((s) => s.tipo)).toEqual(['nova', 'ja_importada']);
   });
 });
+
+describe('parcelas com a data da compra original (C6, Itaú)', () => {
+  it('3/10 e 4/10 da mesma compra têm ids diferentes', () => {
+    const base = { data: '2026-07-20', valor: 19590, descricao: 'MAGAZINE LUIZA' };
+    const [terceira] = idExternoDeLinhas([{ ...base, parcela: { numero: 3, total: 10 } }], 'h:c6');
+    const [quarta] = idExternoDeLinhas([{ ...base, parcela: { numero: 4, total: 10 } }], 'h:c6');
+    expect(terceira).not.toBe(quarta);
+    // linha sem parcela mantém o id de antes
+    expect(idExternoDeLinhas([base], 'h:c6')).toEqual(idExternoDeLinhas([{ ...base, parcela: null }], 'h:c6'));
+  });
+
+  it('parcela diferente nunca é duplicata da anterior', () => {
+    const existente = { id: 'gasto-1', data: '2026-07-20', valor: 19590, descricao: 'MAGAZINE LUIZA 03/10', idExterno: 'outro' };
+    const [r] = deduplicar([transacao({ data: '2026-07-20', valor: 19590, descricao: 'MAGAZINE LUIZA 04/10', idExterno: 'novo' })], [existente]);
+    expect(r).toEqual({ tipo: 'nova' });
+  });
+});

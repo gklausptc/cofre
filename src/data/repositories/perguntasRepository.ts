@@ -2,7 +2,7 @@ import type { PerguntasRepository } from '@/domain/repositories/perguntasReposit
 import type { EfeitosDaImportacao } from '@/domain/repositories/importacoesRepository';
 import type { PlanoDeResposta } from '@/domain/usecases/importacao/responderPergunta';
 import type { LinhaDaPergunta, PerguntaNova } from '@/domain/types/perguntas';
-import { and, desc, eq, inArray, or, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, inArray, ne, or, sql, type SQL } from 'drizzle-orm';
 import { db } from '@/data/db/client';
 import {
   cartoes,
@@ -111,13 +111,25 @@ export async function responder(perguntaId: number, plano: PlanoDeResposta) {
     }
 
     if (plano.transferencia && nasMovimentacoes) {
+      const destino = plano.transferencia.contaDestinoId;
+      // perguntas juntam linhas de contas diferentes: a saída da própria conta escolhida não pode
+      // virar transferência para ela mesma (fica "para fora do app")
       await db
         .update(movimentacoes)
-        .set({ tipo: 'transferencia', contaDestinoId: plano.transferencia.contaDestinoId, categoriaId: null })
-        .where(and(nasMovimentacoes, eq(movimentacoes.tipo, 'saida')));
+        .set({ tipo: 'transferencia', contaDestinoId: destino, categoriaId: null })
+        .where(
+          and(nasMovimentacoes, eq(movimentacoes.tipo, 'saida'), destino !== null ? ne(movimentacoes.contaBancariaId, destino) : undefined)
+        );
+      if (destino !== null) {
+        await db
+          .update(movimentacoes)
+          .set({ tipo: 'transferencia', contaDestinoId: null, categoriaId: null })
+          .where(and(nasMovimentacoes, eq(movimentacoes.tipo, 'saida'), eq(movimentacoes.contaBancariaId, destino)));
+      }
       const origem = plano.transferencia.origemDasEntradas;
       if (origem !== null) {
-        // a entrada vira transferência da outra conta para esta (o SET usa os valores de antes)
+        // a entrada vira transferência da outra conta para esta (o SET usa os valores de antes);
+        // a que entrou na própria conta de origem fica como entrada
         await db
           .update(movimentacoes)
           .set({
@@ -126,7 +138,7 @@ export async function responder(perguntaId: number, plano: PlanoDeResposta) {
             contaBancariaId: origem,
             categoriaId: null,
           })
-          .where(and(nasMovimentacoes, eq(movimentacoes.tipo, 'entrada')));
+          .where(and(nasMovimentacoes, eq(movimentacoes.tipo, 'entrada'), ne(movimentacoes.contaBancariaId, origem)));
       }
     }
 
