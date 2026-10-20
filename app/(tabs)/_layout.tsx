@@ -1,17 +1,22 @@
 import React from 'react';
 import { Pressable, View } from 'react-native';
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
+import { useFolhaDeAcoes } from '@/components/FolhaDeAcoes';
 
-/** Botão (+) do meio: abre a folha de ações em vez de trocar de aba. */
+/**
+ * Botão (+) do meio: abre a folha de ações em vez de trocar de aba. A folha é um Modal do
+ * React Native (a folha nativa "formSheet" abria em branco no iPhone).
+ */
 function BotaoMais() {
   const { colors } = useAppTheme();
-  const router = useRouter();
+  const { abrir, folha } = useFolhaDeAcoes();
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      {folha}
       <Pressable
-        onPress={() => router.push('/acoes')}
+        onPress={abrir}
         accessibilityRole="button"
         accessibilityLabel="Lançar: gasto, entrada, transferência, compra parcelada ou importar extrato"
         style={{

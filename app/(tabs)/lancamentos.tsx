@@ -8,6 +8,7 @@ import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
 import { MonthSelector } from '@/components/MonthSelector';
 import { ChipSelect } from '@/components/ChipSelect';
+import { useFolhaDeAcoes } from '@/components/FolhaDeAcoes';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { useMembrosFamiliaStore } from '@/store/membrosFamiliaStore';
 import { useDadosFinanceiros } from '@/store/useDadosFinanceiros';
@@ -42,6 +43,7 @@ const entra = (l: LancamentoDoPeriodo) => l.natureza === 'receita' || l.natureza
 export default function ExtratoScreen() {
   const { colors } = useAppTheme();
   const router = useRouter();
+  const acoes = useFolhaDeAcoes();
   const { dados, contas, categorias, carregarTudo } = useDadosFinanceiros();
   const { membros, carregar: carregarMembros } = useMembrosFamiliaStore();
   const [mes, setMes] = useState(mesAtualIso());
@@ -116,7 +118,7 @@ export default function ExtratoScreen() {
                 <Feather name="search" size={20} color={colors.brand} />
               </Pressable>
               <Pressable
-                onPress={() => router.push('/acoes')}
+                onPress={acoes.abrir}
                 accessibilityRole="button"
                 accessibilityLabel="Lançar"
                 style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' }}
@@ -275,6 +277,7 @@ export default function ExtratoScreen() {
           );
         }}
       />
+      {acoes.folha}
     </SafeAreaView>
   );
 }
