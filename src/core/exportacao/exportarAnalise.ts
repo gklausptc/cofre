@@ -2,7 +2,8 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { format } from 'date-fns';
 import { gerarBackupAtual } from '@/core/backup/servicoBackup';
-import { planilhaDaAnalise, type AnaliseCompleta } from '@/domain/usecases/analiseCompleta';
+import type { AnaliseCompleta } from '@/domain/usecases/analiseCompleta';
+import { montarPlanilhaDoCofre, type DadosParaPlanilha } from '@/domain/usecases/importacao/planilhaDoCofre';
 
 async function compartilhar(nome: string, conteudo: string, tipo: { mimeType: string; UTI: string }, titulo: string): Promise<void> {
   if (!(await Sharing.isAvailableAsync())) throw new Error('O compartilhamento não está disponível neste aparelho.');
@@ -24,8 +25,11 @@ export async function compartilharAnaliseCompleta(analise: AnaliseCompleta): Pro
   await compartilhar(`cofre-analise-${format(agora, 'yyyy-MM-dd-HHmm')}.json`, conteudo, { mimeType: 'application/json', UTI: 'public.json' }, 'Enviar análise do Cofre');
 }
 
-/** Planilha com todos os lançamentos (abre no Excel em português). */
-export async function compartilharPlanilhaDaAnalise(analise: AnaliseCompleta): Promise<void> {
-  const nome = `cofre-lancamentos-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-  await compartilhar(nome, planilhaDaAnalise(analise), { mimeType: 'text/csv', UTI: 'public.comma-separated-values-text' }, 'Planilha de lançamentos');
+/**
+ * Planilha do Cofre Klaus: todas as contas, cartões e lançamentos num CSV só, que abre no
+ * Excel em português e que o app importa de volta (Importar extrato → escolher o arquivo).
+ */
+export async function compartilharPlanilhaDoCofre(dados: DadosParaPlanilha): Promise<void> {
+  const nome = `cofre-klaus-planilha-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+  await compartilhar(nome, montarPlanilhaDoCofre(dados), { mimeType: 'text/csv', UTI: 'public.comma-separated-values-text' }, 'Planilha do Cofre Klaus');
 }

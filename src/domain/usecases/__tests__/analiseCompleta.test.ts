@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { montarAnaliseCompleta, planilhaDaAnalise } from '@/domain/usecases/analiseCompleta';
+import { montarAnaliseCompleta } from '@/domain/usecases/analiseCompleta';
 import { umCartao, umaCategoria, umaConta, umaMovimentacao, umGasto } from '@/test/fabricas';
 
 const corrente = umaConta({ id: 1, nomeConta: 'BB · Conta corrente', saldoInicial: 10000 });
@@ -54,12 +54,5 @@ describe('montarAnaliseCompleta', () => {
       ['BB · Conta corrente', 10000 + 300000 + 20000 + 5000 - 8000],
       ['BB · Poupança', 50000 - 20000],
     ]);
-  });
-
-  it('planilha com sinal no valor', () => {
-    const csv = planilhaDaAnalise(analise).split('\r\n');
-    expect(csv[0]).toContain('Data;Mês em que pesa;Tipo;Natureza');
-    expect(csv[1]).toBe('05/10/2026;2026-10;Movimentação;Receita;Feito;Salário;3000,00;BB · Conta corrente;;;;;manual');
-    expect(csv[4]).toContain(';Despesa;Feito;Mercado;-80,00;');
   });
 });

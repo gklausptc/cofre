@@ -1,8 +1,6 @@
-import { formatarData } from '@/core/utils/date';
 import { calcularGastosFixosDoMes, type ResumoGastosFixos } from './calcularGastosFixosDoMes';
 import { calcularLivreParaGastar, type LivreParaGastar } from './calcularLivreParaGastar';
 import { calcularSaldoConta } from './calcularSaldoConta';
-import { formatarValorCSV, montarCSV } from './gerarExtratoCSV';
 import { obterLancamentosDoPeriodo, type DadosFinanceiros } from './obterLancamentosDoPeriodo';
 import { numerosDoMes, type NumerosDoMes } from './automacoes/fechamentoDoMes';
 import type { LancamentoDoPeriodo, NaturezaLancamento, StatusLancamento, TipoLancamento } from '@/domain/types/lancamento';
@@ -189,47 +187,4 @@ export function montarAnaliseCompleta(p: ParametrosDaAnalise): AnaliseCompleta {
     meses,
     lancamentos,
   };
-}
-
-const ROTULO_DO_TIPO: Record<TipoLancamento, string> = {
-  movimentacao: 'Movimentação',
-  gasto: 'Gasto',
-  parcela: 'Parcela',
-  conta_fixa: 'Conta fixa',
-  fatura: 'Fatura',
-  aporte_cofrinho: 'Cofrinho',
-  reserva: 'Reserva',
-};
-
-const ROTULO_DA_NATUREZA: Record<NaturezaLancamento, string> = {
-  receita: 'Receita',
-  despesa: 'Despesa',
-  fatura: 'Fatura (soma das compras)',
-  pagamento: 'Pagamento de fatura/conta',
-  transferencia: 'Entre contas suas',
-  guardado: 'Guardado',
-  resgate: 'Resgatado',
-};
-
-const ROTULO_DO_STATUS: Record<StatusLancamento, string> = { pago: 'Feito', previsto: 'Previsto', atrasado: 'Atrasado' };
-
-/** Planilha (CSV para o Excel em português) com todos os lançamentos da análise, com sinal no valor. */
-export function planilhaDaAnalise(analise: Pick<AnaliseCompleta, 'lancamentos'>): string {
-  const cabecalho = ['Data', 'Mês em que pesa', 'Tipo', 'Natureza', 'Situação', 'Descrição', 'Valor', 'Conta', 'Conta destino', 'Cartão', 'Categoria', 'Membro', 'Origem'];
-  const linhas = analise.lancamentos.map((l) => [
-    formatarData(l.data),
-    l.competencia,
-    ROTULO_DO_TIPO[l.tipo],
-    ROTULO_DA_NATUREZA[l.natureza],
-    ROTULO_DO_STATUS[l.status],
-    l.descricao,
-    formatarValorCSV(l.sentido === 'sai' ? -l.valor : l.valor),
-    l.conta ?? '',
-    l.contaDestino ?? '',
-    l.cartao ?? '',
-    l.categoria ?? '',
-    l.membro ?? '',
-    l.origem,
-  ]);
-  return montarCSV([cabecalho, ...linhas]);
 }

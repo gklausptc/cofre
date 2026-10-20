@@ -19,12 +19,12 @@ import { useParcelasStore } from '@/store/parcelasStore';
 import { useComprasParceladasStore } from '@/store/comprasParceladasStore';
 import { useContasFixasStore } from '@/store/contasFixasStore';
 import { useFaturasStore } from '@/store/faturasStore';
-import { gerarExtratoCartaoCSV, gerarExtratoContaCSV } from '@/domain/usecases/gerarExtratoCSV';
+import { gerarExtratoCartaoCSV, gerarExtratoCartaoTudoCSV, gerarExtratoContaCSV } from '@/domain/usecases/gerarExtratoCSV';
 import { formatarMesReferencia, hojeIso, mesAnterior, mesAtualIso, mesSeguinte } from '@/core/utils/date';
 import { useDadosFinanceiros } from '@/store/useDadosFinanceiros';
 import { useMembrosFamiliaStore } from '@/store/membrosFamiliaStore';
 import { montarAnaliseCompleta } from '@/domain/usecases/analiseCompleta';
-import { compartilharAnaliseCompleta, compartilharPlanilhaDaAnalise } from '@/core/exportacao/exportarAnalise';
+import { compartilharAnaliseCompleta, compartilharPlanilhaDoCofre } from '@/core/exportacao/exportarAnalise';
 
 type TipoOrigem = 'conta' | 'cartao';
 type Periodo = 'mes' | 'tudo';
@@ -113,6 +113,12 @@ export default function ExportarExtratoScreen() {
         conteudo: gerarExtratoContaCSV(conta, movimentacoes, categoriasPorId, mesEscolhido, { gastos }),
       };
     }
+    if (tipoOrigem === 'cartao' && cartao && periodo === 'tudo') {
+      return {
+        nome: `faturas-${nomeDeArquivoSeguro(cartao.nome)}-tudo.csv`,
+        conteudo: gerarExtratoCartaoTudoCSV(cartao, gastos, parcelas, compras, contasFixas, categoriasPorId, faturas),
+      };
+    }
     if (tipoOrigem === 'cartao' && cartao) {
       return {
         nome: `fatura-${nomeDeArquivoSeguro(cartao.nome)}-${mes}.csv`,
@@ -154,7 +160,20 @@ export default function ExportarExtratoScreen() {
       const agora = new Date();
       const analise = montarAnaliseCompleta({ dados, contas, categorias, membros, hoje: hojeIso(), geradoEm: agora.toISOString() });
       if (como === 'analise') await compartilharAnaliseCompleta(analise);
-      else await compartilharPlanilhaDaAnalise(analise);
+      else {
+        await compartilharPlanilhaDoCofre({
+          contas,
+          cartoes,
+          categorias,
+          membros,
+          movimentacoes,
+          gastos,
+          parcelas,
+          comprasParceladas: compras,
+          contasFixas,
+          faturas,
+        });
+      }
     } catch (falha) {
       setErroTudo(falha instanceof Error && falha.message ? falha.message : 'Não consegui gerar o arquivo. Tente novamente.');
     } finally {
@@ -167,7 +186,9 @@ export default function ExportarExtratoScreen() {
       ? periodo === 'mes'
         ? `Movimentações de ${formatarMesReferencia(mes)}`
         : 'Todo o histórico da conta'
-      : `Itens da fatura que vence em ${formatarMesReferencia(mes)}`;
+      : periodo === 'mes'
+        ? `Itens da fatura que vence em ${formatarMesReferencia(mes)}`
+        : 'Todas as faturas do cartão, uma depois da outra, com o total de cada uma';
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
@@ -196,7 +217,7 @@ export default function ExportarExtratoScreen() {
           />
           <View style={{ height: 8 }} />
           <Button
-            titulo="Planilha com todos os lançamentos"
+            titulo="Planilha do Cofre (contas e cartões, tudo)"
             variante="secundaria"
             onPress={() => void exportarTudo('planilha')}
             carregando={exportandoTudo === 'planilha'}
@@ -241,19 +262,17 @@ export default function ExportarExtratoScreen() {
               onSelecionar={(v) => (tipoOrigem === 'conta' ? setContaId(Number(v)) : setCartaoId(Number(v)))}
             />
 
-            {tipoOrigem === 'conta' && (
-              <ChipSelect<Periodo>
-                label="Período"
-                opcoes={[
-                  { valor: 'mes', rotulo: 'Um mês' },
-                  { valor: 'tudo', rotulo: 'Tudo' },
-                ]}
-                valor={periodo}
-                onSelecionar={setPeriodo}
-              />
-            )}
+            <ChipSelect<Periodo>
+              label="Período"
+              opcoes={[
+                { valor: 'mes', rotulo: tipoOrigem === 'conta' ? 'Um mês' : 'Uma fatura' },
+                { valor: 'tudo', rotulo: 'Tudo' },
+              ]}
+              valor={periodo}
+              onSelecionar={setPeriodo}
+            />
 
-            {(tipoOrigem === 'cartao' || periodo === 'mes') && (
+            {periodo === 'mes' && (
               <Card style={{ paddingHorizontal: 0, paddingBottom: 0, marginBottom: 16 }}>
                 <Text
                   className="font-body-medium"

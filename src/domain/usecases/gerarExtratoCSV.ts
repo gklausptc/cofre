@@ -165,6 +165,59 @@ export function gerarExtratoCartaoCSV(
   mesFatura: string,
   faturas: Fatura[] = []
 ): string {
+  const itens = itensDaFatura(cartao, gastos, parcelas, compras, contasFixas, categoriasPorId, mesFatura, faturas);
+  const linhas: string[][] = [['data', 'descricao', 'parcela', 'categoria', 'valor', 'status']];
+  for (const item of itens) {
+    linhas.push([formatarData(item.data), item.descricao, item.parcela, item.categoria, formatarValorCSV(item.valor), item.status]);
+  }
+  const total = itens.reduce((soma, item) => soma + item.valor, 0);
+  linhas.push(['', 'TOTAL', '', '', formatarValorCSV(total), '']);
+  return montarCSV(linhas);
+}
+
+/** Todas as faturas do cartão num arquivo só: a coluna "fatura" diz o mês de vencimento, com o total de cada uma. */
+export function gerarExtratoCartaoTudoCSV(
+  cartao: Cartao,
+  gastos: GastoRapido[],
+  parcelas: Parcela[],
+  compras: CompraParcelada[],
+  contasFixas: ContaFixa[],
+  categoriasPorId: CategoriasPorId,
+  faturas: Fatura[] = []
+): string {
+  const cartoesPorId = new Map<number, Cartao>([[cartao.id, cartao]]);
+  const comprasPorId = new Map(compras.map((c) => [c.id, c]));
+  const contasPorId = new Map(contasFixas.map((c) => [c.id, c]));
+  const meses = new Set<string>();
+  for (const g of gastos) if (g.formaPagamento === 'cartao' && g.cartaoId === cartao.id) meses.add(mesDeCobrancaDoGasto(g, cartoesPorId));
+  for (const p of parcelas) {
+    const compra = p.compraParceladaId !== null ? comprasPorId.get(p.compraParceladaId) : undefined;
+    const conta = p.contaFixaId !== null ? contasPorId.get(p.contaFixaId) : undefined;
+    if (compra?.cartaoId === cartao.id || (conta?.formaPagamento === 'cartao' && conta.cartaoId === cartao.id)) {
+      meses.add(mesDeCobrancaDaParcela(p, contasPorId, comprasPorId, cartoesPorId));
+    }
+  }
+  const linhas: string[][] = [['fatura', 'data', 'descricao', 'parcela', 'categoria', 'valor', 'status']];
+  for (const mes of [...meses].sort()) {
+    const itens = itensDaFatura(cartao, gastos, parcelas, compras, contasFixas, categoriasPorId, mes, faturas);
+    for (const item of itens) {
+      linhas.push([mes, formatarData(item.data), item.descricao, item.parcela, item.categoria, formatarValorCSV(item.valor), item.status]);
+    }
+    linhas.push([mes, '', `TOTAL DA FATURA ${mes}`, '', '', formatarValorCSV(itens.reduce((soma, item) => soma + item.valor, 0)), '']);
+  }
+  return montarCSV(linhas);
+}
+
+function itensDaFatura(
+  cartao: Cartao,
+  gastos: GastoRapido[],
+  parcelas: Parcela[],
+  compras: CompraParcelada[],
+  contasFixas: ContaFixa[],
+  categoriasPorId: CategoriasPorId,
+  mesFatura: string,
+  faturas: Fatura[]
+): ItemFatura[] {
   const cartoesPorId = new Map<number, Cartao>([[cartao.id, cartao]]);
   const comprasPorId = new Map(compras.map((c) => [c.id, c]));
   const contasPorId = new Map(contasFixas.map((c) => [c.id, c]));
@@ -217,20 +270,5 @@ export function gerarExtratoCartaoCSV(
   }
 
   itens.sort((a, b) => a.data.localeCompare(b.data) || a.descricao.localeCompare(b.descricao));
-
-  const linhas: string[][] = [['data', 'descricao', 'parcela', 'categoria', 'valor', 'status']];
-  for (const item of itens) {
-    linhas.push([
-      formatarData(item.data),
-      item.descricao,
-      item.parcela,
-      item.categoria,
-      formatarValorCSV(item.valor),
-      item.status,
-    ]);
-  }
-  const total = itens.reduce((soma, item) => soma + item.valor, 0);
-  linhas.push(['', 'TOTAL', '', '', formatarValorCSV(total), '']);
-
-  return montarCSV(linhas);
+  return itens;
 }

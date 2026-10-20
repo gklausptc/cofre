@@ -176,6 +176,7 @@ function RootNavigator() {
         <Stack.Screen name="importar-extrato/resultado" options={{ headerShown: true, title: 'Resultado' }} />
         <Stack.Screen name="importar-extrato/historico" options={{ headerShown: true, title: 'Importações' }} />
         <Stack.Screen name="importar-extrato/lote" options={{ headerShown: true, title: 'Importar vários' }} />
+        <Stack.Screen name="importar-extrato/planilha" options={{ headerShown: true, title: 'Planilha do Cofre' }} />
         <Stack.Screen name="regras/index" options={{ headerShown: true, title: 'Regras aprendidas' }} />
         <Stack.Screen name="categorias/index" options={{ headerShown: true, title: 'Categorias' }} />
         <Stack.Screen name="ajuda/index" options={{ headerShown: true, title: 'Ajuda' }} />

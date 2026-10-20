@@ -17,6 +17,8 @@ export type RegistroDeImportacao = {
   pagamentosDeContaFixa: { parcelaId: number; dataPagamento: string; valor: number }[];
   /** Faturas pagas pelo extrato: baixa nas parcelas, fatura paga e a saída ligada a ela. */
   pagamentosDeFatura: { pagamento: PagamentoFatura; parcelaIds: number[]; saida: DadosMovimentacao }[];
+  /** Faturas pagas sem saída de uma conta do app (pagas com saldo de outra carteira). */
+  faturasPagas?: PagamentoFatura[];
   /** Lançamentos que já estavam no app e mudam (outro lado de transferência, receita prevista). */
   alteracoes: {
     movimentacaoId: number;

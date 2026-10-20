@@ -246,6 +246,10 @@ export default function ImportarExtratoScreen() {
       irParaDestino(leitura.extrato);
       return;
     }
+    if (leitura.motivo === 'planilha_do_cofre') {
+      router.push({ pathname: '/importar-extrato/planilha', params: { uri, nome } });
+      return;
+    }
     if (leitura.motivo === 'precisa_mapear') {
       setTabela({ tabela: leitura.tabela, banco: leitura.banco, origem: leitura.origem });
       setColData(null);

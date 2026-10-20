@@ -129,6 +129,23 @@ export async function registrarImportacao(registro: RegistroDeImportacao): Promi
       await db.insert(movimentacoes).values({ ...saida, faturaId, parcelaId: null, ...ligadas });
     }
 
+    // faturas pagas sem saída de conta do app
+    for (const pagamento of registro.faturasPagas ?? []) {
+      const [existente] = await db
+        .select()
+        .from(faturas)
+        .where(and(eq(faturas.cartaoId, pagamento.cartaoId), eq(faturas.mesReferencia, pagamento.mesReferencia)));
+      const faturaId = await registrarPagamentoFatura(pagamento);
+      if (!efeitos.faturas.some((f) => f.id === faturaId)) {
+        efeitos.faturas.push({
+          id: faturaId,
+          antes: existente
+            ? { status: existente.status, contaBancariaId: existente.contaBancariaId, valorPago: existente.valorPago, dataPagamento: existente.dataPagamento }
+            : null,
+        });
+      }
+    }
+
     // lançamentos que já estavam no app e mudam
     for (const alteracao of registro.alteracoes) {
       const [atual] = await db.select().from(movimentacoes).where(eq(movimentacoes.id, alteracao.movimentacaoId));

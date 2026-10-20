@@ -3,9 +3,29 @@ import { decodificarLatin1, removerBOM, temCaracteresInvalidos } from '@/core/ut
 import { ehPdf, lerTextoDoPdf } from '@/core/utils/pdf/lerPdf';
 import { lerExtrato, type ResultadoLeitura } from '@/domain/usecases/importacao/lerExtrato';
 import { lerExtratoDoPdf } from '@/domain/usecases/importacao/lerPdf';
+import { ehPlanilhaDoCofre } from '@/domain/usecases/importacao/planilhaDoCofre';
 
-/** Leitura de um arquivo de extrato: o mesmo que `lerExtrato`, mais o PDF que pede senha. */
-export type ResultadoDoArquivo = ResultadoLeitura | { ok: false; motivo: 'precisa_senha' | 'senha_errada'; mensagem: string };
+/**
+ * Leitura de um arquivo de extrato: o mesmo que `lerExtrato`, mais o PDF que pede senha e a
+ * planilha do Cofre Klaus (que tem tela própria: importa tudo de uma vez, sem perguntas).
+ */
+export type ResultadoDoArquivo =
+  | ResultadoLeitura
+  | { ok: false; motivo: 'precisa_senha' | 'senha_errada'; mensagem: string }
+  | { ok: false; motivo: 'planilha_do_cofre'; mensagem: string };
+
+/** O texto de um arquivo (UTF-8; se vier com caracteres trocados, Latin-1). */
+export async function lerTextoDoArquivo(uri: string): Promise<string> {
+  const arquivo = new File(uri);
+  let texto: string | null = null;
+  try {
+    texto = await arquivo.text();
+  } catch {
+    texto = null;
+  }
+  if (texto === null || temCaracteresInvalidos(texto)) texto = decodificarLatin1(await arquivo.bytes());
+  return removerBOM(texto);
+}
 
 /** Texto curto do erro, para a mensagem dizer onde parou (ajuda a corrigir o leitor). */
 export function detalheDoErro(erro: unknown): string {
@@ -85,6 +105,9 @@ export async function lerArquivoDeExtrato(uri: string, nome: string, senha = '')
     texto = decodificarLatin1(bytes);
   } else if (texto.startsWith('%PDF-')) {
     return lerPdfDeExtrato(bytes ?? (await arquivo.bytes()), nome, senha);
+  }
+  if (ehPlanilhaDoCofre(texto)) {
+    return { ok: false, motivo: 'planilha_do_cofre', mensagem: 'É uma planilha do Cofre Klaus: importe sozinha, em Importar extrato.' };
   }
   return lerExtrato(removerBOM(texto), nome);
 }
