@@ -1,4 +1,4 @@
-import type { Fatura, Importacao, NovaImportacao, NovaRegraCategorizacao, Parcela } from '@/domain/types/entities';
+import type { Fatura, GastoRapido, Importacao, NovaImportacao, NovaRegraCategorizacao, Parcela } from '@/domain/types/entities';
 import type { PagamentoFatura } from './faturasRepository';
 import type { DadosGastoRapido } from './gastosRapidosRepository';
 import type { DadosMovimentacao } from './movimentacoesRepository';
@@ -39,6 +39,8 @@ export type EfeitosDaImportacao = {
   /** Criadas ao responder perguntas desta importação (desfazer apaga). */
   comprasCriadas?: number[];
   contasFixasCriadas?: number[];
+  /** Gastos de importações antigas que viraram parcelas de uma compra criada (desfazer devolve). */
+  gastosApagados?: GastoRapido[];
 };
 
 export interface ImportacoesRepository {
@@ -49,4 +51,10 @@ export interface ImportacoesRepository {
    * única, guardando os efeitos para desfazer; devolve o id da importação.
    */
   registrarImportacao(registro: RegistroDeImportacao): Promise<number>;
+  /**
+   * Desfaz a importação inteira numa transação: apaga as linhas dela, volta contas fixas,
+   * faturas e lançamentos alterados ao estado de antes, apaga compras e contas fixas criadas
+   * pelas respostas e tira as perguntas dela da fila. As regras aprendidas continuam.
+   */
+  desfazerImportacao(id: number): Promise<void>;
 }

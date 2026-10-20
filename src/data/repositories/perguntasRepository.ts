@@ -135,7 +135,11 @@ export async function responder(perguntaId: number, plano: PlanoDeResposta) {
       if (nosGastos) await db.delete(gastosRapidos).where(nosGastos);
     }
     if (plano.apagarGastos.length > 0) {
+      const apagados = await db.select().from(gastosRapidos).where(inArray(gastosRapidos.id, plano.apagarGastos));
       await db.delete(gastosRapidos).where(inArray(gastosRapidos.id, plano.apagarGastos));
+      await anotarNaImportacao(importacaoId, (e) => {
+        e.gastosApagados = [...(e.gastosApagados ?? []), ...apagados];
+      });
     }
 
     if (plano.regra) {

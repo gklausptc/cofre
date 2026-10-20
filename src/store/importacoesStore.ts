@@ -10,6 +10,8 @@ type ImportacoesState = {
   carregar: () => Promise<void>;
   /** Grava a importação e as linhas numa transação; devolve o id da importação. */
   importar: (registro: RegistroDeImportacao) => Promise<number>;
+  /** Desfaz a importação inteira (ver ImportacoesRepository.desfazerImportacao). */
+  desfazer: (id: number) => Promise<void>;
 };
 
 export const useImportacoesStore = create<ImportacoesState>((set, get) => ({
@@ -23,5 +25,10 @@ export const useImportacoesStore = create<ImportacoesState>((set, get) => ({
     const id = await repo().registrarImportacao(registro);
     await get().carregar();
     return id;
+  },
+
+  desfazer: async (id) => {
+    await repo().desfazerImportacao(id);
+    await get().carregar();
   },
 }));

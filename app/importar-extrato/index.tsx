@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
@@ -382,7 +382,7 @@ export default function ImportarExtratoScreen() {
           return existente ? { descricao: existente.descricao, data: existente.data, valor: Math.abs(existente.valor) } : null;
         },
       });
-      await importar(registro);
+      const importacaoId = await importar(registro);
       await Promise.all([
         carregarMovimentacoes(),
         carregarGastos(),
@@ -390,29 +390,7 @@ export default function ImportarExtratoScreen() {
         carregarFaturas(),
         carregarRegras(),
       ]);
-      const partes = [
-        `${selecionadas.length} ${selecionadas.length === 1 ? 'lançamento importado' : 'lançamentos importados'}`,
-        registro.pagamentosDeContaFixa.length > 0
-          ? `${registro.pagamentosDeContaFixa.length} ${registro.pagamentosDeContaFixa.length === 1 ? 'conta fixa paga' : 'contas fixas pagas'}`
-          : null,
-        registro.pagamentosDeFatura.length > 0
-          ? `${registro.pagamentosDeFatura.length} ${registro.pagamentosDeFatura.length === 1 ? 'fatura paga' : 'faturas pagas'}`
-          : null,
-        regrasNovas.length > 0 ? `${regrasNovas.length} ${regrasNovas.length === 1 ? 'regra nova' : 'regras novas'}` : null,
-      ].filter(Boolean);
-      const perguntas = registro.perguntas.length;
-      if (perguntas > 0) {
-        Alert.alert(
-          'Extrato importado',
-          `${partes.join(' · ')}. ${perguntas} ${perguntas === 1 ? 'pergunta ficou' : 'perguntas ficaram'} para você responder.`,
-          [
-            { text: 'Depois', style: 'cancel', onPress: () => router.back() },
-            { text: 'Responder agora', onPress: () => router.replace('/revisao') },
-          ]
-        );
-      } else {
-        Alert.alert('Extrato importado', `${partes.join(' · ')}.`, [{ text: 'OK', onPress: () => router.back() }]);
-      }
+      router.replace({ pathname: '/importar-extrato/resultado', params: { id: String(importacaoId) } });
     } catch {
       setErro('Não consegui importar. Nada foi gravado; tente de novo.');
     } finally {
@@ -448,6 +426,9 @@ export default function ImportarExtratoScreen() {
             </Text>
             <Button titulo="Selecionar arquivo" onPress={handleEscolherArquivo} />
             <GuiaDosBancos />
+            <View style={{ marginTop: 12 }}>
+              <Button titulo="Importações anteriores" variante="secundaria" onPress={() => router.push('/importar-extrato/historico')} />
+            </View>
           </>
         )}
 

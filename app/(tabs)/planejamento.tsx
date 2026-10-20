@@ -5,6 +5,7 @@ import { useFocusEffect } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
+import { GraficoProjecao } from '@/components/GraficoProjecao';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { useParcelasStore } from '@/store/parcelasStore';
 import { useContasFixasStore } from '@/store/contasFixasStore';
@@ -15,6 +16,8 @@ import { useMovimentacoesStore } from '@/store/movimentacoesStore';
 import { projetarFluxoCaixa } from '@/domain/usecases/projetarFluxoCaixa';
 import { formatarMoeda } from '@/core/utils/currency';
 import { formatarMesReferencia } from '@/core/utils/date';
+
+const MESES_DA_PROJECAO = 6;
 
 export default function PlanejamentoScreen() {
   const { colors } = useAppTheme();
@@ -44,7 +47,7 @@ export default function PlanejamentoScreen() {
   );
 
   const projecao = useMemo(
-    () => projetarFluxoCaixa(3, parcelas, movimentacoes, gastos, contasFixas, compras, cartoes),
+    () => projetarFluxoCaixa(MESES_DA_PROJECAO, parcelas, movimentacoes, gastos, contasFixas, compras, cartoes),
     [parcelas, movimentacoes, gastos, contasFixas, compras, cartoes]
   );
 
@@ -53,7 +56,7 @@ export default function PlanejamentoScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        <ScreenHeader title="Planejamento" subtitle="Projeção dos próximos 3 meses" />
+        <ScreenHeader title="Planejamento" subtitle={`Projeção dos próximos ${MESES_DA_PROJECAO} meses`} />
 
         {!temDados ? (
           <EmptyState
@@ -63,6 +66,12 @@ export default function PlanejamentoScreen() {
           />
         ) : (
           <View style={{ paddingHorizontal: 20, gap: 12 }}>
+            <Card>
+              <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15, marginBottom: 8 }}>
+                Receita, despesa e saldo previstos
+              </Text>
+              <GraficoProjecao projecao={projecao} />
+            </Card>
             {projecao.map((item) => {
               const positivo = item.saldoPrevisto >= 0;
               return (
