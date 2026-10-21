@@ -160,20 +160,7 @@ export default function ExportarExtratoScreen() {
       const agora = new Date();
       const analise = montarAnaliseCompleta({ dados, contas, categorias, membros, hoje: hojeIso(), geradoEm: agora.toISOString() });
       if (como === 'analise') await compartilharAnaliseCompleta(analise);
-      else {
-        await compartilharPlanilhaDoCofre({
-          contas,
-          cartoes,
-          categorias,
-          membros,
-          movimentacoes,
-          gastos,
-          parcelas,
-          comprasParceladas: compras,
-          contasFixas,
-          faturas,
-        });
-      }
+      else await compartilharPlanilhaDoCofre();
     } catch (falha) {
       setErroTudo(falha instanceof Error && falha.message ? falha.message : 'Não consegui gerar o arquivo. Tente novamente.');
     } finally {

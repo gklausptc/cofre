@@ -8,6 +8,10 @@ export async function listarContasFixas() {
   return db.select().from(contasFixas).where(eq(contasFixas.ativo, true));
 }
 
+export async function listarTodasContasFixas() {
+  return db.select().from(contasFixas);
+}
+
 export async function buscarContaFixa(id: number) {
   const [conta] = await db.select().from(contasFixas).where(eq(contasFixas.id, id));
   return conta ?? null;
@@ -29,6 +33,7 @@ export async function desativarContaFixa(id: number) {
 
 export const contasFixasRepositorySqlite: ContasFixasRepository = {
   listarContasFixas,
+  listarTodasContasFixas,
   buscarContaFixa,
   criarContaFixa,
   atualizarContaFixa,

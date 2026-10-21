@@ -25,6 +25,9 @@ import { useMovimentacoesStore } from '@/store/movimentacoesStore';
 import { useGastosRapidosStore } from '@/store/gastosRapidosStore';
 import { useImportacoesStore } from '@/store/importacoesStore';
 import { useDadosFinanceiros } from '@/store/useDadosFinanceiros';
+import { useContasFixasStore } from '@/store/contasFixasStore';
+import { useComprasParceladasStore } from '@/store/comprasParceladasStore';
+import { useFaturasStore } from '@/store/faturasStore';
 
 /**
  * Importa a planilha do Cofre Klaus inteira: cria as contas, os cartões e as categorias que
@@ -38,8 +41,9 @@ export default function ImportarPlanilhaScreen() {
   const { cartoes, carregar: carregarCartoes, criar: criarCartao } = useCartoesStore();
   const { categorias, carregar: carregarCategorias, criar: criarCategoria } = useCategoriasStore();
   const { membros, carregar: carregarMembros } = useMembrosFamiliaStore();
-  const { carregar: carregarMovimentacoes } = useMovimentacoesStore();
-  const { carregar: carregarGastos } = useGastosRapidosStore();
+  const { movimentacoes, carregar: carregarMovimentacoes } = useMovimentacoesStore();
+  const { gastos, carregar: carregarGastos } = useGastosRapidosStore();
+  const lancamentosNoApp = movimentacoes.length + gastos.length;
   const { importar } = useImportacoesStore();
   const { carregarTudo } = useDadosFinanceiros();
 
@@ -86,11 +90,20 @@ export default function ImportarPlanilhaScreen() {
       for (const [i, nova] of plano.categoriasNovas.entries()) {
         await criarCategoria({ nome: nova.nome, tipo: nova.tipo, cor: CORES_DE_CATEGORIA[i % CORES_DE_CATEGORIA.length], icone: 'tag', isPadrao: false });
       }
-      await Promise.all([carregarContas(), carregarCartoes(), carregarCategorias(), carregarMovimentacoes(), carregarGastos()]);
+      await Promise.all([
+        carregarContas(),
+        carregarCartoes(),
+        carregarCategorias(),
+        carregarMovimentacoes(),
+        carregarGastos(),
+        useContasFixasStore.getState().carregar(),
+        useComprasParceladasStore.getState().carregar(),
+        useFaturasStore.getState().carregar(),
+      ]);
       const idsExternos = new Set(
         [...useMovimentacoesStore.getState().movimentacoes, ...useGastosRapidosStore.getState().gastos]
           .map((l) => l.idExterno)
-          .filter((id): id is string => typeof id === 'string' && id.startsWith('cofre:'))
+          .filter((id): id is string => typeof id === 'string' && id !== '')
       );
       const registro = montarRegistroDaPlanilha(
         linhas,
@@ -100,6 +113,11 @@ export default function ImportarPlanilhaScreen() {
           categorias: useCategoriasStore.getState().categorias,
           membros,
           idsExternos,
+          movimentacoes: useMovimentacoesStore.getState().movimentacoes,
+          gastos: useGastosRapidosStore.getState().gastos,
+          contasFixas: useContasFixasStore.getState().contas,
+          comprasParceladas: useComprasParceladasStore.getState().compras,
+          faturas: useFaturasStore.getState().faturas,
         },
         { arquivo: params.nome ?? 'planilha.csv', criadaEm: new Date().toISOString() }
       );
@@ -174,7 +192,12 @@ export default function ImportarPlanilhaScreen() {
                   {linha('Transferências entre as contas', formatarMoeda(plano.totais.transferencias))}
                 </Card>
 
-                {(plano.contasNovas.length > 0 || plano.cartoesNovos.length > 0 || plano.categoriasNovas.length > 0 || plano.saldosIniciais.length > 0) && (
+                {(plano.contasNovas.length > 0 ||
+                  plano.cartoesNovos.length > 0 ||
+                  plano.categoriasNovas.length > 0 ||
+                  plano.saldosIniciais.length > 0 ||
+                  plano.contasFixas.length > 0 ||
+                  plano.comprasParceladas > 0) && (
                   <Card>
                     <Text className="font-heading-medium" style={{ color: colors.text, fontSize: 15, marginBottom: 6 }}>
                       Vai criar
@@ -182,6 +205,10 @@ export default function ImportarPlanilhaScreen() {
                     {plano.contasNovas.map((c) => linha(`Conta ${c.nome}`, `saldo inicial ${formatarMoeda(c.saldoInicial)}`))}
                     {plano.saldosIniciais.map((s) => linha(`Conta ${s.nome} (já existe)`, `saldo inicial passa a ${formatarMoeda(s.saldoInicial)}`))}
                     {plano.cartoesNovos.map((c) => linha(`Cartão ${c.nome}`, `fecha ${c.diaFechamento} · vence ${c.diaVencimento}`))}
+                    {plano.contasFixas.map((c) =>
+                      linha(`Conta fixa ${c.nome}`, `${formatarMoeda(c.valor)} todo dia ${c.dia}${c.vezes ? ` · ${c.vezes}x` : ''}`)
+                    )}
+                    {plano.comprasParceladas > 0 && linha('Compras parceladas no cartão', String(plano.comprasParceladas))}
                     {plano.categoriasNovas.length > 0 && (
                       <Text className="font-body" style={{ color: colors.textMuted, fontSize: 13, marginTop: 4 }}>
                         Categorias: {plano.categoriasNovas.map((c) => c.nome).join(', ')}
@@ -190,11 +217,18 @@ export default function ImportarPlanilhaScreen() {
                   </Card>
                 )}
 
-                {(plano.avisos.length > 0 || erros.length > 0) && (
+                {(plano.avisos.length > 0 || erros.length > 0 || lancamentosNoApp > 0) && (
                   <Card>
                     <Text className="font-heading-medium" style={{ color: colors.warning, fontSize: 15, marginBottom: 6 }}>
                       Atenção
                     </Text>
+                    {lancamentosNoApp > 0 && (
+                      <Text className="font-body" style={{ color: colors.text, fontSize: 13, marginBottom: 4 }}>
+                        O app já tem {lancamentosNoApp} lançamentos. O que veio de uma planilha ou de uma exportação deste
+                        aparelho não entra de novo, mas o que foi lançado à mão pode ficar duplicado. Para começar do zero, use
+                        antes Configurações → Limpar todos os dados.
+                      </Text>
+                    )}
                     {plano.avisos.map((aviso) => (
                       <Text key={aviso} className="font-body" style={{ color: colors.text, fontSize: 13, marginBottom: 4 }}>
                         {aviso}
@@ -217,7 +251,7 @@ export default function ImportarPlanilhaScreen() {
                   Tudo entra como está na planilha, sem perguntas. Lançamentos que já vieram desta planilha antes não entram de
                   novo. Para começar do zero, use antes Configurações → Limpar todos os dados.
                 </Text>
-                <Button titulo="Importar tudo" onPress={() => void importarTudo()} carregando={importando} disabled={plano.lancamentos === 0} />
+                <Button titulo="Importar tudo" onPress={() => void importarTudo()} carregando={importando} disabled={plano.lancamentos === 0 && plano.contasFixas.length === 0} />
               </>
             )
           )}

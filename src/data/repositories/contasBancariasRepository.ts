@@ -8,6 +8,10 @@ export async function listarContasBancarias() {
   return db.select().from(contasBancarias).where(eq(contasBancarias.ativo, true));
 }
 
+export async function listarTodasContasBancarias() {
+  return db.select().from(contasBancarias);
+}
+
 export async function buscarContaBancaria(id: number) {
   const [conta] = await db.select().from(contasBancarias).where(eq(contasBancarias.id, id));
   return conta ?? null;
@@ -33,6 +37,7 @@ export async function desativarContaBancaria(id: number) {
 
 export const contasBancariasRepositorySqlite: ContasBancariasRepository = {
   listarContasBancarias,
+  listarTodasContasBancarias,
   buscarContaBancaria,
   criarContaBancaria,
   atualizarContaBancaria,

@@ -86,3 +86,19 @@ export function gerarRecorrencia(
 
   return novas;
 }
+
+/**
+ * Todas as ocorrências de uma conta fixa nova, do início até 3 meses depois de `hoje` (a que
+ * começou no passado ganha as dos meses que já passaram, como atrasadas).
+ */
+export function gerarRecorrenciaDesdeOInicio(contaFixa: ContaFixa, hoje: Date = new Date()): Omit<NovaParcela, 'id'>[] {
+  const todas: Omit<NovaParcela, 'id'>[] = [];
+  const comoParcelas = () => todas.map((p, i) => ({ ...p, id: -1 - i }) as Parcela);
+  let cursor = parseISO(contaFixa.dataInicio);
+  while (cursor < hoje) {
+    todas.push(...gerarRecorrencia([contaFixa], comoParcelas(), cursor));
+    cursor = addMonths(cursor, 3);
+  }
+  todas.push(...gerarRecorrencia([contaFixa], comoParcelas(), hoje));
+  return todas;
+}

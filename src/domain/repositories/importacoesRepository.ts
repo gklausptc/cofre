@@ -1,5 +1,6 @@
-import type { Fatura, GastoRapido, Importacao, NovaImportacao, NovaRegraCategorizacao, Parcela } from '@/domain/types/entities';
+import type { Fatura, GastoRapido, Importacao, NovaCompraParcelada, NovaImportacao, NovaRegraCategorizacao, Parcela } from '@/domain/types/entities';
 import type { PagamentoFatura } from './faturasRepository';
+import type { DadosContaFixa } from './contasFixasRepository';
 import type { DadosGastoRapido } from './gastosRapidosRepository';
 import type { DadosMovimentacao } from './movimentacoesRepository';
 import type { PerguntaNova } from '@/domain/types/perguntas';
@@ -19,6 +20,18 @@ export type RegistroDeImportacao = {
   pagamentosDeFatura: { pagamento: PagamentoFatura; parcelaIds: number[]; saida: DadosMovimentacao }[];
   /** Faturas pagas sem saída de uma conta do app (pagas com saldo de outra carteira). */
   faturasPagas?: PagamentoFatura[];
+  /**
+   * Compras parceladas criadas pela importação (planilha do Cofre): `valores` é o de cada
+   * parcela (o banco arredonda diferente), `pagas` as que já foram cobradas em fatura paga.
+   */
+  comprasParceladas?: {
+    dados: Omit<NovaCompraParcelada, 'id'>;
+    mesPrimeiraParcela: string;
+    valores: number[];
+    pagas: { numero: number; dataPagamento: string }[];
+  }[];
+  /** Contas fixas criadas pela importação (com as próximas ocorrências). */
+  contasFixas?: DadosContaFixa[];
   /** Lançamentos que já estavam no app e mudam (outro lado de transferência, receita prevista). */
   alteracoes: {
     movimentacaoId: number;

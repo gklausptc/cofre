@@ -48,7 +48,9 @@ export default function HistoricoDeImportacoesScreen() {
               const destino =
                 imp.contaBancariaId !== null
                   ? contas.find((c) => c.id === imp.contaBancariaId)?.nomeConta
-                  : cartoes.find((c) => c.id === imp.cartaoId)?.nome;
+                  : imp.cartaoId !== null
+                    ? cartoes.find((c) => c.id === imp.cartaoId)?.nome
+                    : 'Planilha do Cofre (várias contas)';
               const banco = imp.banco && imp.banco in NOMES_DOS_BANCOS ? NOMES_DOS_BANCOS[imp.banco as BancoId] : null;
               return (
                 <Pressable

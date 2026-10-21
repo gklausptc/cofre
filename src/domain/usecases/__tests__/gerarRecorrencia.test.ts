@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { gerarRecorrencia } from '@/domain/usecases/gerarRecorrencia';
+import { gerarRecorrencia, gerarRecorrenciaDesdeOInicio } from '@/domain/usecases/gerarRecorrencia';
 import { umaContaFixa, umaParcela } from '@/test/fabricas';
 
 const hoje = new Date(2026, 2, 15); // 15/03/2026 → janela de março a maio
@@ -69,5 +69,13 @@ describe('gerarRecorrencia', () => {
   it('mensal com fim (financiamento) numera pela sequência de meses desde o início', () => {
     const financiamento = umaContaFixa({ id: 1, dataInicio: '2026-01-10', dataFim: '2029-12-10' });
     expect(gerarRecorrencia([financiamento], [], hoje).map((p) => p.numero)).toEqual([3, 4, 5]);
+  });
+});
+
+describe('gerarRecorrenciaDesdeOInicio', () => {
+  it('a conta fixa que começou meses atrás ganha as ocorrências desde o início, sem repetir', () => {
+    const conta = umaContaFixa({ id: 1, recorrencia: 'mensal', dataInicio: '2026-06-10', dataFim: null, ativo: true });
+    const meses = gerarRecorrenciaDesdeOInicio(conta, new Date('2026-10-20T12:00:00')).map((p) => p.mesReferencia);
+    expect(meses).toEqual(['2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12']);
   });
 });

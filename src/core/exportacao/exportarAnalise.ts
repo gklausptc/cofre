@@ -2,8 +2,9 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { format } from 'date-fns';
 import { gerarBackupAtual } from '@/core/backup/servicoBackup';
+import { repositorios } from '@/domain/repositories';
 import type { AnaliseCompleta } from '@/domain/usecases/analiseCompleta';
-import { montarPlanilhaDoCofre, type DadosParaPlanilha } from '@/domain/usecases/importacao/planilhaDoCofre';
+import { montarPlanilhaDoCofre } from '@/domain/usecases/importacao/planilhaDoCofre';
 
 async function compartilhar(nome: string, conteudo: string, tipo: { mimeType: string; UTI: string }, titulo: string): Promise<void> {
   if (!(await Sharing.isAvailableAsync())) throw new Error('O compartilhamento não está disponível neste aparelho.');
@@ -29,7 +30,22 @@ export async function compartilharAnaliseCompleta(analise: AnaliseCompleta): Pro
  * Planilha do Cofre Klaus: todas as contas, cartões e lançamentos num CSV só, que abre no
  * Excel em português e que o app importa de volta (Importar extrato → escolher o arquivo).
  */
-export async function compartilharPlanilhaDoCofre(dados: DadosParaPlanilha): Promise<void> {
+export async function compartilharPlanilhaDoCofre(): Promise<void> {
+  const r = repositorios();
+  // tudo, também as contas, cartões e contas fixas desativados (os lançamentos deles voltam junto)
+  const [contas, cartoes, categorias, membros, movimentacoes, gastos, parcelas, comprasParceladas, contasFixas, faturas] = await Promise.all([
+    r.contasBancarias.listarTodasContasBancarias(),
+    r.cartoes.listarTodosCartoes(),
+    r.categorias.listarCategorias(),
+    r.membrosFamilia.listarMembrosFamilia(),
+    r.movimentacoes.listarMovimentacoes(),
+    r.gastosRapidos.listarGastosRapidos(),
+    r.parcelas.listarParcelas(),
+    r.comprasParceladas.listarComprasParceladas(),
+    r.contasFixas.listarTodasContasFixas(),
+    r.faturas.listarFaturas(),
+  ]);
+  const csv = montarPlanilhaDoCofre({ contas, cartoes, categorias, membros, movimentacoes, gastos, parcelas, comprasParceladas, contasFixas, faturas });
   const nome = `cofre-klaus-planilha-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-  await compartilhar(nome, montarPlanilhaDoCofre(dados), { mimeType: 'text/csv', UTI: 'public.comma-separated-values-text' }, 'Planilha do Cofre Klaus');
+  await compartilhar(nome, csv, { mimeType: 'text/csv', UTI: 'public.comma-separated-values-text' }, 'Planilha do Cofre Klaus');
 }

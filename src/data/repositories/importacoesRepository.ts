@@ -7,6 +7,7 @@ import type { DadosMovimentacao } from '@/domain/repositories/movimentacoesRepos
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/data/db/client';
 import {
+  cartoes,
   comprasParceladas,
   contasFixas,
   faturas,
@@ -19,6 +20,8 @@ import {
 } from '@/data/db/schema';
 import type { DadosDaPergunta } from '@/domain/types/perguntas';
 import { emTransacao } from '@/data/db/transacao';
+import { gerarParcelas } from '@/domain/usecases/gerarParcelas';
+import { gerarRecorrenciaDesdeOInicio } from '@/domain/usecases/gerarRecorrencia';
 import { registrarPagamentoFatura } from './faturasRepository';
 import { gravarPerguntasDaImportacao } from './perguntasRepository';
 
@@ -144,6 +147,31 @@ export async function registrarImportacao(registro: RegistroDeImportacao): Promi
             : null,
         });
       }
+    }
+
+    // compras parceladas (planilha do Cofre): cada parcela com o valor do banco, as já cobradas pagas
+    for (const nova of registro.comprasParceladas ?? []) {
+      const [cartao] = await db.select().from(cartoes).where(eq(cartoes.id, nova.dados.cartaoId));
+      if (!cartao) continue;
+      const [compra] = await db.insert(comprasParceladas).values(nova.dados).returning();
+      const geradas = gerarParcelas(compra, cartao, nova.mesPrimeiraParcela).map((p) => {
+        const paga = nova.pagas.find((x) => x.numero === p.numero);
+        return {
+          ...p,
+          valor: nova.valores[p.numero - 1] ?? p.valor,
+          ...(paga ? { status: 'paga' as const, dataPagamento: paga.dataPagamento } : {}),
+        };
+      });
+      if (geradas.length > 0) await db.insert(parcelas).values(geradas);
+      efeitos.comprasCriadas = [...(efeitos.comprasCriadas ?? []), compra.id];
+    }
+
+    // contas fixas (planilha do Cofre), com as ocorrências desde o início até os próximos meses
+    for (const dados of registro.contasFixas ?? []) {
+      const [conta] = await db.insert(contasFixas).values(dados).returning();
+      const ocorrencias = gerarRecorrenciaDesdeOInicio(conta);
+      if (ocorrencias.length > 0) await db.insert(parcelas).values(ocorrencias);
+      efeitos.contasFixasCriadas = [...(efeitos.contasFixasCriadas ?? []), conta.id];
     }
 
     // lançamentos que já estavam no app e mudam

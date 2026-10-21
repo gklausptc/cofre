@@ -8,6 +8,10 @@ export async function listarCartoes() {
   return db.select().from(cartoes).where(eq(cartoes.ativo, true));
 }
 
+export async function listarTodosCartoes() {
+  return db.select().from(cartoes);
+}
+
 export async function buscarCartao(id: number) {
   const [cartao] = await db.select().from(cartoes).where(eq(cartoes.id, id));
   return cartao ?? null;
@@ -29,6 +33,7 @@ export async function desativarCartao(id: number) {
 
 export const cartoesRepositorySqlite: CartoesRepository = {
   listarCartoes,
+  listarTodosCartoes,
   buscarCartao,
   criarCartao,
   atualizarCartao,
