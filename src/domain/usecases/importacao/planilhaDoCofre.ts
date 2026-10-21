@@ -148,12 +148,33 @@ export function ehPlanilhaDoCofre(texto: string): boolean {
   return colunas.includes('data') && colunas.includes('conta ou cartao') && colunas.includes('tipo') && colunas.includes('valor');
 }
 
-function lerMes(texto: string): string | null {
-  const t = texto.trim();
-  const iso = t.match(/^(\d{4})-(\d{1,2})$/);
-  if (iso) return `${iso[1]}-${iso[2].padStart(2, '0')}`;
+const MESES_ABREVIADOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+/**
+ * Mês da fatura: "2026-10", "10/2026" e o que o Excel grava quando entende o valor como data
+ * ao salvar ("out/26", "out-2026", "01/10/2026", "2026-10-01").
+ */
+export function lerMes(texto: string): string | null {
+  const t = semAcentos(texto).toLowerCase().trim();
+  const mes = (m: number, ano: number) => (m >= 1 && m <= 12 ? `${ano < 100 ? 2000 + ano : ano}-${String(m).padStart(2, '0')}` : null);
+  const iso = t.match(/^(\d{4})-(\d{1,2})(?:-\d{1,2})?$/);
+  if (iso) return mes(Number(iso[2]), Number(iso[1]));
+  const data = t.match(/^\d{1,2}\/(\d{1,2})\/(\d{2,4})$/);
+  if (data) return mes(Number(data[1]), Number(data[2]));
   const br = t.match(/^(\d{1,2})\/(\d{4})$/);
-  if (br) return `${br[2]}-${br[1].padStart(2, '0')}`;
+  if (br) return mes(Number(br[1]), Number(br[2]));
+  const porNome = t.match(/^([a-z]{3})[a-z]*\.?(?:\s*de\s*|[\/\-\s])(\d{2,4})$/);
+  if (porNome && MESES_ABREVIADOS.includes(porNome[1])) return mes(MESES_ABREVIADOS.indexOf(porNome[1]) + 1, Number(porNome[2]));
+  return null;
+}
+
+/** Parcela: "3/10", "3 de 10" e o "03/abr" que o Excel grava quando entende "3/4" como data. */
+export function lerParcela(texto: string): { numero: number; total: number } | null {
+  const t = semAcentos(texto).toLowerCase().trim();
+  const simples = t.match(/^(\d{1,3})\s*(?:\/|de)\s*(\d{1,3})$/);
+  if (simples) return { numero: Number(simples[1]), total: Number(simples[2]) };
+  const comoData = t.match(/^(\d{1,2})[\/\-]([a-z]{3})[a-z]*\.?$/);
+  if (comoData && MESES_ABREVIADOS.includes(comoData[2])) return { numero: Number(comoData[1]), total: MESES_ABREVIADOS.indexOf(comoData[2]) + 1 };
   return null;
 }
 
@@ -207,7 +228,7 @@ export function lerPlanilhaDoCofre(texto: string): { linhas: LinhaDaPlanilha[]; 
       erros.push({ numero, motivo: 'Diga de que fatura é (coluna Fatura, aaaa-mm)' });
       return;
     }
-    const parcelaTexto = campo('Parcela').match(/^(\d{1,3})\s*\/\s*(\d{1,3})$/);
+    const parcela = campo('Parcela') ? lerParcela(campo('Parcela')) : null;
     linhas.push({
       numero,
       data,
@@ -218,7 +239,7 @@ export function lerPlanilhaDoCofre(texto: string): { linhas: LinhaDaPlanilha[]; 
       valor: declaracao && tipo === 'conta' ? valor : Math.abs(valor),
       destino,
       fatura,
-      parcela: parcelaTexto ? { numero: Number(parcelaTexto[1]), total: Number(parcelaTexto[2]) } : null,
+      parcela,
       membro: campo('Membro') || null,
       observacao: campo('Observação') || null,
     });

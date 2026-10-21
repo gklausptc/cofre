@@ -1,6 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
 import {
   ehPlanilhaDoCofre,
+  lerMes,
+  lerParcela,
   lerPlanilhaDoCofre,
   montarPlanilhaDoCofre,
   montarRegistroDaPlanilha,
@@ -144,5 +146,14 @@ describe('montarPlanilhaDoCofre (exportar e importar de volta)', () => {
     expect(planejarPlanilha(linhas, { contas: [], cartoes: [], categorias: [], membros: [] }).cartoesNovos).toEqual([
       { nome: 'Cartão X', limite: 50000, diaFechamento: 1, diaVencimento: 10 },
     ]);
+  });
+});
+
+describe('o que o Excel grava de volta', () => {
+  it('mês da fatura e parcela que viraram data', () => {
+    expect(['2026-10', '10/2026', 'out/26', 'out-2026', 'outubro de 2026', '01/10/2026', '2026-10-01', 'Out/26'].map(lerMes)).toEqual(Array(8).fill('2026-10'));
+    expect(lerMes('13/2026')).toBeNull();
+    expect(['3/4', '3 de 4', '03/abr', '3-abr'].map(lerParcela)).toEqual(Array(4).fill({ numero: 3, total: 4 }));
+    expect(lerParcela('três')).toBeNull();
   });
 });

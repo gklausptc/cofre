@@ -43,3 +43,6 @@ _ngrok_tmp.js
 
 # extratos e comprovantes do usuário (dados pessoais): nunca versionar
 extrato/
+
+# conferências locais com dados reais (nunca versionar)
+src/tmpverif/
