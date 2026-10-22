@@ -38,7 +38,7 @@ import { calcularResumoMensal } from '@/domain/usecases/calcularResumoMensal';
 import { calcularGastosPorCategoria } from '@/domain/usecases/calcularGastosPorCategoria';
 import { calcularGastosFixosDoMes } from '@/domain/usecases/calcularGastosFixosDoMes';
 import { obterLancamentosDoPeriodo } from '@/domain/usecases/obterLancamentosDoPeriodo';
-import { calcularLivreParaGastar } from '@/domain/usecases/calcularLivreParaGastar';
+import { calcularLivreParaGastar, calcularSobraDoMesAnterior } from '@/domain/usecases/calcularLivreParaGastar';
 import { calcularPagamentosDoMes } from '@/domain/usecases/calcularPagamentosDoMes';
 import { projetarFluxoCaixa } from '@/domain/usecases/projetarFluxoCaixa';
 import { dataNoMes } from '@/domain/usecases/mesDaFatura';
@@ -164,10 +164,14 @@ export default function DashboardScreen() {
   }, [parcelas, membroSelecionadoId, contasFixasFiltradas, comprasFiltradas]);
 
   // Livre para gastar: calculado da lista unificada de lançamentos (do mês passado até o
-  // fim deste, porque entrada reservada no mês anterior pesa neste). Com filtro de membro,
-  // só entram os lançamentos dele; cofrinhos e reserva são da casa toda.
+  // fim deste, porque entrada reservada no mês anterior pesa neste), mais o que sobrou nas
+  // contas no fim do mês passado. Com filtro de membro, só entram os lançamentos dele (sem a
+  // sobra: as contas são da casa toda, como cofrinhos e reserva).
   const livre = useMemo(() => {
     const semFiltro = membroSelecionadoId === null;
+    const sobra = semFiltro
+      ? calcularSobraDoMesAnterior(MES_ATUAL, { contas, movimentacoes, gastos, aportesCofrinho: aportes, movimentacoesReserva: historicoReserva })
+      : 0;
     const lancamentos = obterLancamentosDoPeriodo(
       `${mesAnterior(MES_ATUAL)}-01`,
       dataNoMes(MES_ATUAL, 31),
@@ -185,9 +189,12 @@ export default function DashboardScreen() {
       },
       hojeIso()
     );
-    return calcularLivreParaGastar(lancamentos, MES_ATUAL, hojeIso());
+    return calcularLivreParaGastar(lancamentos, MES_ATUAL, hojeIso(), sobra);
   }, [
     membroSelecionadoId,
+    contas,
+    movimentacoes,
+    gastos,
     movimentacoesFiltradas,
     gastosFiltrados,
     parcelasFiltradas,
@@ -416,7 +423,7 @@ export default function DashboardScreen() {
                 {livre.porDia > 0
                   ? `≈ ${formatarMoeda(livre.porDia)} por dia nos próximos ${livre.diasRestantes} ${livre.diasRestantes === 1 ? 'dia' : 'dias'}`
                   : livre.livre < 0
-                    ? 'As saídas previstas do mês já passam das entradas.'
+                    ? 'As saídas previstas do mês passam do que sobrou e do que entra.'
                     : 'Nada livre até o fim do mês.'}
               </Text>
               {ritmo && (
@@ -450,6 +457,15 @@ export default function DashboardScreen() {
               {verConta && (
                 <View style={{ marginTop: 12, gap: 4, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border }}>
                   {[
+                    ...(membroSelecionadoId === null
+                      ? [
+                          {
+                            rotulo: `Sobra de ${formatarData(`${mesAnterior(MES_ATUAL)}-01`, 'MMMM')}`,
+                            valor: Math.abs(livre.sobra),
+                            sinal: livre.sobra < 0 ? '−' : '+',
+                          },
+                        ]
+                      : []),
                     { rotulo: 'Entradas do mês', valor: livre.receitas, sinal: '+' },
                     { rotulo: 'Contas fixas', valor: livre.contasFixas, sinal: '−' },
                     { rotulo: 'Faturas de cartão', valor: livre.faturas, sinal: '−' },

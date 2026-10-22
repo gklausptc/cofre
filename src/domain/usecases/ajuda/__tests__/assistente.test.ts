@@ -38,7 +38,7 @@ const ctx: ContextoDoAssistente = {
     { id: 2, nome: 'C6 conta', saldo: 50000 },
   ],
   cartoes: [{ id: 9, nome: 'C6 Carbon' }],
-  livre: { mes: '2026-10', receitas: 500000, contasFixas: 100000, faturas: 80000, gastos: 50000, guardado: 0, livre: 270000, diasRestantes: 12, porDia: 22500 },
+  livre: { mes: '2026-10', sobra: 0, receitas: 500000, contasFixas: 100000, faturas: 80000, gastos: 50000, guardado: 0, livre: 270000, diasRestantes: 12, porDia: 22500 },
   lancamentos: [
     lanc({ categoriaId: 1, valor: 30000, descricao: 'SONDA SUPERMERCADOS' }),
     lanc({ categoriaId: 1, valor: 12000, descricao: 'MERCADINHO', data: '2026-10-15' }),

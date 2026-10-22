@@ -13,7 +13,7 @@ import { useDadosFinanceiros } from '@/store/useDadosFinanceiros';
 import { useOrcamentosStore } from '@/store/orcamentosStore';
 import { usePreferenciasStore } from '@/store/preferenciasStore';
 import { obterLancamentosDoPeriodo } from '@/domain/usecases/obterLancamentosDoPeriodo';
-import { calcularLivreParaGastar } from '@/domain/usecases/calcularLivreParaGastar';
+import { calcularLivreParaGastar, calcularSobraDoMesAnterior } from '@/domain/usecases/calcularLivreParaGastar';
 import { calcularSaldoConta } from '@/domain/usecases/calcularSaldoConta';
 import { progressoDosOrcamentos } from '@/domain/usecases/automacoes/orcamento';
 import { detectarAssinaturas } from '@/domain/usecases/automacoes/assinaturas';
@@ -122,7 +122,14 @@ export function AutomacoesDoInicio({ onAvisar }: Props) {
         const meses = c.dataMeta ? Math.max(1, (Number(c.dataMeta.slice(0, 4)) - Number(hoje.slice(0, 4))) * 12 + Number(c.dataMeta.slice(5, 7)) - Number(hoje.slice(5, 7))) : null;
         return { id: c.id, nome: c.nome, falta, aporteSugerido: meses ? Math.ceil(falta / meses) : null };
       });
-    const livre = calcularLivreParaGastar(lancamentos, mes, hoje).livre;
+    const sobra = calcularSobraDoMesAnterior(mes, {
+      contas,
+      movimentacoes: dados.movimentacoes ?? [],
+      gastos: dados.gastos ?? [],
+      aportesCofrinho: dados.aportesCofrinho,
+      movimentacoesReserva: dados.movimentacoesReserva,
+    });
+    const livre = calcularLivreParaGastar(lancamentos, mes, hoje, sobra).livre;
     const sugestao = sugerirDivisao({
       salario: salario.valor,
       config: lerDivisao(preferencias.divisaoSalario),
@@ -131,7 +138,7 @@ export function AutomacoesDoInicio({ onAvisar }: Props) {
       livreParaGastar: livre,
     });
     return sugestao ? { salario, sugestao, livreDepois: livre - sugestao.total } : null;
-  }, [preferencias, dados, categorias, hoje, reserva, lancamentos, mes]);
+  }, [preferencias, dados, contas, categorias, hoje, reserva, lancamentos, mes]);
 
   async function marcarSalario(id: number) {
     const ids = lerIds(preferencias?.salariosDivididos ?? null);

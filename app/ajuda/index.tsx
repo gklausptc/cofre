@@ -10,7 +10,7 @@ import { useDadosFinanceiros } from '@/store/useDadosFinanceiros';
 import { usePreferenciasStore } from '@/store/preferenciasStore';
 import { obterLancamentosDoPeriodo } from '@/domain/usecases/obterLancamentosDoPeriodo';
 import { calcularSaldoConta } from '@/domain/usecases/calcularSaldoConta';
-import { calcularLivreParaGastar } from '@/domain/usecases/calcularLivreParaGastar';
+import { calcularLivreParaGastar, calcularSobraDoMesAnterior } from '@/domain/usecases/calcularLivreParaGastar';
 import { responderNoAssistente, type AcaoDoAssistente } from '@/domain/usecases/ajuda/assistente';
 import { SUGESTOES_DO_ASSISTENTE } from '@/domain/dados/ajuda';
 
@@ -56,7 +56,18 @@ export default function AjudaScreen() {
       contas: contas
         .filter((c) => c.ativo !== false)
         .map((c) => ({ id: c.id, nome: c.nomeConta, saldo: calcularSaldoConta(c, dados.movimentacoes ?? [], dados.gastos ?? []) })),
-      livre: calcularLivreParaGastar(lancamentos, mesAtualIso(), hoje),
+      livre: calcularLivreParaGastar(
+        lancamentos,
+        mesAtualIso(),
+        hoje,
+        calcularSobraDoMesAnterior(mesAtualIso(), {
+          contas: contas.filter((c) => c.ativo !== false),
+          movimentacoes: dados.movimentacoes ?? [],
+          gastos: dados.gastos ?? [],
+          aportesCofrinho: dados.aportesCofrinho,
+          movimentacoesReserva: dados.movimentacoesReserva,
+        })
+      ),
     };
   }, [dados, contas, categorias]);
 

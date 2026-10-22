@@ -11,7 +11,7 @@ import { GraficoProjecao } from '@/components/GraficoProjecao';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { useCategoriasStore } from '@/store/categoriasStore';
 import { formatarMoeda } from '@/core/utils/currency';
-import { formatarMesReferencia, hojeIso, mesAnterior } from '@/core/utils/date';
+import { formatarMesReferencia, hojeIso, mesAnterior, mesSeguinte } from '@/core/utils/date';
 import { Button } from '@/components/Button';
 import { ChipSelect } from '@/components/ChipSelect';
 import { SwitchRow } from '@/components/SwitchRow';
@@ -106,7 +106,9 @@ export default function RelatoriosScreen() {
   }
 
   function mudarMes(delta: number) {
-    setMesReferencia((atual) => format(addMonths(new Date(`${atual}-01`), delta), 'yyyy-MM'));
+    // mesAnterior/mesSeguinte leem o mês no fuso do aparelho: `new Date('2026-10-01')` é meia-noite
+    // em UTC (30/09 às 21h no Brasil), e voltar um mês caía em agosto
+    setMesReferencia((atual) => (delta < 0 ? mesAnterior(atual) : mesSeguinte(atual)));
   }
 
   return (

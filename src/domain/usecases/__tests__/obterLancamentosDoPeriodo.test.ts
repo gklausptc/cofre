@@ -1,8 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
 import { obterLancamentosDoPeriodo, type DadosFinanceiros } from '@/domain/usecases/obterLancamentosDoPeriodo';
-import { calcularLivreParaGastar } from '@/domain/usecases/calcularLivreParaGastar';
+import { calcularLivreParaGastar, calcularSobraDoMesAnterior } from '@/domain/usecases/calcularLivreParaGastar';
 import {
   umAporte,
+  umaConta,
   umaCompra,
   umaContaFixa,
   umaFatura,
@@ -156,5 +157,61 @@ describe('calcularLivreParaGastar', () => {
     );
     expect(apertado.livre).toBe(-1000);
     expect(apertado.porDia).toBe(0);
+  });
+});
+
+describe('calcularSobraDoMesAnterior', () => {
+  const HOJE_OUT = '2026-10-21';
+  const corrente = umaConta({ id: 1, saldoInicial: 0 });
+  const poupanca = umaConta({ id: 2, saldoInicial: 2000 });
+  // salário no último dia de setembro; parte gasta no mesmo dia, o resto em outubro
+  const movimentacoes = [
+    umaMovimentacao({ contaBancariaId: 1, tipo: 'entrada', valor: 700000, data: '2026-09-30' }),
+    umaMovimentacao({ contaBancariaId: 1, tipo: 'saida', valor: 302000, data: '2026-09-30' }),
+    umaMovimentacao({ contaBancariaId: 2, tipo: 'transferencia', contaDestinoId: 1, valor: 2000, data: '2026-09-15' }),
+    umaMovimentacao({ contaBancariaId: 2, tipo: 'entrada', valor: 240000, data: '2026-10-09' }),
+    umaMovimentacao({ contaBancariaId: 1, tipo: 'saida', valor: 400000, data: '2026-10-02' }),
+    umaMovimentacao({ contaBancariaId: 2, tipo: 'saida', valor: 240000, data: '2026-10-09' }),
+  ];
+  const dadosOut = { contas: [corrente, poupanca], movimentacoes, gastos: [] };
+
+  it('é o saldo das contas no último dia do mês anterior', () => {
+    expect(calcularSobraDoMesAnterior('2026-10', dadosOut)).toBe(400000);
+  });
+
+  it('salário do fim do mês passado gasto neste: contas zeradas não deixam o livre negativo', () => {
+    const lista = obterLancamentosDoPeriodo('2026-09-01', '2026-10-31', { movimentacoes }, HOJE_OUT);
+    expect(calcularLivreParaGastar(lista, '2026-10', HOJE_OUT).livre).toBe(-400000);
+    const livre = calcularLivreParaGastar(lista, '2026-10', HOJE_OUT, calcularSobraDoMesAnterior('2026-10', dadosOut));
+    expect(livre.sobra).toBe(400000);
+    expect(livre.livre).toBe(0);
+  });
+
+  it('entrada reservada para este mês não conta duas vezes (sai da sobra, entra nas receitas)', () => {
+    const reservada = movimentacoes.map((m, i) => (i === 0 ? { ...m, reservarProximoMes: true } : m));
+    const dadosReservada = { ...dadosOut, movimentacoes: reservada };
+    expect(calcularSobraDoMesAnterior('2026-10', dadosReservada)).toBe(400000 - 700000);
+    const lista = obterLancamentosDoPeriodo('2026-09-01', '2026-10-31', { movimentacoes: reservada }, HOJE_OUT);
+    expect(calcularLivreParaGastar(lista, '2026-10', HOJE_OUT, calcularSobraDoMesAnterior('2026-10', dadosReservada)).livre).toBe(0);
+  });
+
+  it('o guardado sai da sobra, mas só até o que havia nas contas', () => {
+    expect(calcularSobraDoMesAnterior('2026-10', { ...dadosOut, aportesCofrinho: [umAporte({ valor: 50000, data: '2026-08-10' })] })).toBe(350000);
+    expect(
+      calcularSobraDoMesAnterior('2026-10', {
+        ...dadosOut,
+        movimentacoesReserva: [
+          { tipo: 'aporte', valor: 1000000, data: '2026-05-01' },
+          { tipo: 'retirada', valor: 100000, data: '2026-06-01' },
+        ],
+      })
+    ).toBe(0);
+    // aporte deste mês fica no "guardado" do mês, não na sobra
+    expect(calcularSobraDoMesAnterior('2026-10', { ...dadosOut, aportesCofrinho: [umAporte({ valor: 50000, data: '2026-10-05' })] })).toBe(400000);
+  });
+
+  it('conta no negativo passa negativa', () => {
+    const noVermelho = [umaMovimentacao({ contaBancariaId: 1, tipo: 'saida', valor: 15000, data: '2026-09-20' })];
+    expect(calcularSobraDoMesAnterior('2026-10', { contas: [corrente], movimentacoes: noVermelho, gastos: [], aportesCofrinho: [umAporte({ valor: 5000, data: '2026-09-01' })] })).toBe(-15000);
   });
 });

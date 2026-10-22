@@ -137,6 +137,7 @@ export function responderNoAssistente(pergunta: string, ctx: ContextoDoAssistent
   if (/POSSO GASTAR|LIVRE|SOBRA|NEGATIV|NAO FECHA/.test(texto)) {
     const l = ctx.livre;
     const partes = [
+      l.sobra !== 0 ? `Sobra do mês passado: ${formatarMoeda(l.sobra)}` : null,
       `Entra no mês: ${formatarMoeda(l.receitas)}`,
       `Contas fixas: ${formatarMoeda(l.contasFixas)}`,
       `Faturas: ${formatarMoeda(l.faturas)}`,
@@ -146,7 +147,7 @@ export function responderNoAssistente(pergunta: string, ctx: ContextoDoAssistent
     const fim =
       l.livre >= 0
         ? `Livre para gastar: ${formatarMoeda(l.livre)}${l.porDia > 0 ? ` (${formatarMoeda(l.porDia)} por dia até o fim do mês)` : ''}.`
-        : `Está ${formatarMoeda(-l.livre)} no negativo: saiu (ou vai sair) mais do que entra no mês. Se importou extratos, veja na Agenda se algum pagamento de fatura está contando em dobro.`;
+        : `Está ${formatarMoeda(-l.livre)} no negativo: saiu (ou vai sair) mais do que sobrou do mês passado e do que entra neste. Se importou extratos, veja na Agenda se algum pagamento de fatura está contando em dobro.`;
     return { texto: `${partes.join('\n')}\n${fim}`, acoes: [{ rotulo: 'Agenda', href: '/agenda' }] };
   }
 

@@ -1,5 +1,5 @@
 import { calcularGastosFixosDoMes, type ResumoGastosFixos } from './calcularGastosFixosDoMes';
-import { calcularLivreParaGastar, type LivreParaGastar } from './calcularLivreParaGastar';
+import { calcularLivreParaGastar, calcularSobraDoMesAnterior, type LivreParaGastar } from './calcularLivreParaGastar';
 import { calcularSaldoConta } from './calcularSaldoConta';
 import { obterLancamentosDoPeriodo, type DadosFinanceiros } from './obterLancamentosDoPeriodo';
 import { numerosDoMes, type NumerosDoMes } from './automacoes/fechamentoDoMes';
@@ -97,6 +97,13 @@ export function montarAnaliseCompleta(p: ParametrosDaAnalise): AnaliseCompleta {
   const gastoPorId = new Map(gastos.map((g) => [`gasto-${g.id}`, g]));
 
   const todos = obterLancamentosDoPeriodo('0000-01-01', '9999-12-31', dados, hoje);
+  const paraASobra = {
+    contas: p.contas.filter((c) => c.ativo !== false),
+    movimentacoes,
+    gastos,
+    aportesCofrinho: dados.aportesCofrinho,
+    movimentacoesReserva: dados.movimentacoesReserva,
+  };
 
   const sentidoDe = (l: LancamentoDoPeriodo): SentidoDoLancamento => {
     if (l.natureza !== 'transferencia') return SINAL_DA_NATUREZA[l.natureza];
@@ -146,7 +153,7 @@ export function montarAnaliseCompleta(p: ParametrosDaAnalise): AnaliseCompleta {
       },
       faturas: somar((l) => l.natureza === 'fatura'),
       pagamentosDeCompromisso: somar((l) => l.natureza === 'pagamento'),
-      livreParaGastar: calcularLivreParaGastar(todos, mes, hoje),
+      livreParaGastar: calcularLivreParaGastar(todos, mes, hoje, calcularSobraDoMesAnterior(mes, paraASobra)),
       compromissos: {
         total: compromissos.total,
         totalPago: compromissos.totalPago,
