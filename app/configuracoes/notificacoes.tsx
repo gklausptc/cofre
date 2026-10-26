@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Linking, ScrollView, Text, View } from 'react-native';
+import { Linking, Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -85,7 +85,11 @@ export default function NotificacoesScreen() {
 
   async function testar() {
     await notificarImediatamente('Notificação de teste', 'É assim que os lembretes do Cofre aparecem.');
-    setAviso('Enviada. Se não apareceu, confira as notificações do Expo Go nos Ajustes do iPhone.');
+    setAviso(
+      Platform.OS === 'android'
+        ? 'Enviada. Se não apareceu, confira as notificações do Cofre Klaus nas Configurações do Android.'
+        : 'Enviada. Se não apareceu, confira as notificações do Expo Go nos Ajustes do iPhone.'
+    );
   }
 
   return (

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Pressable, type View } from 'react-native';
+import { Pressable, type ViewInstance } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/core/theme/ThemeProvider';
@@ -13,7 +13,7 @@ type FabButtonProps = {
 export function FabButton({ tourId }: FabButtonProps) {
   const { colors } = useAppTheme();
   const router = useRouter();
-  const ref = useRef<View>(null);
+  const ref = useRef<ViewInstance>(null);
   const registrarAlvo = useTourStore((s) => s.registrarAlvo);
 
   useEffect(() => {

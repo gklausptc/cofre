@@ -7,8 +7,8 @@ import type { NotificacaoPlanejada } from '@/domain/usecases/notificacoes/planej
  * A partir do SDK 53 o Expo Go removeu do binário Android o módulo nativo usado
  * por expo-notifications — até um simples `import` estático do pacote derruba o
  * app. Por isso o carregamento é dinâmico e só acontece fora desse cenário; o app
- * precisa rodar sem notificações no Expo Go/Android até existir um development
- * build (EAS Build) — ver seção 3 do CLAUDE.md. No iPhone (Expo Go) funcionam.
+ * precisa rodar sem notificações no Expo Go/Android. No APK do Android (`npm run apk`) e no
+ * iPhone (Expo Go) funcionam.
  */
 export const notificacoesIndisponiveis = isRunningInExpoGo() && Platform.OS === 'android';
 
@@ -104,7 +104,8 @@ export async function notificarImediatamente(titulo: string, corpo: string, url?
 
   await Notifications.scheduleNotificationAsync({
     content: { title: titulo, body: corpo, data: url ? { url } : {} },
-    trigger: null,
+    // no Android, sem canal ela iria para o canal genérico, que o sistema mostra com prioridade baixa
+    trigger: Platform.OS === 'android' ? { channelId: CANAL } : null,
   });
 }
 

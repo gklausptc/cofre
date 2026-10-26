@@ -1,3 +1,5 @@
+/// <reference types="node" />
+// (o Buffer vinha junto com os tipos do Jest 29; no Jest 30 precisa da referência)
 import { describe, expect, it } from '@jest/globals';
 import { lerTextoDoPdf } from '@/core/utils/pdf/lerPdf';
 

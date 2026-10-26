@@ -10,7 +10,7 @@ async function compartilhar(nome: string, conteudo: string, tipo: { mimeType: st
   if (!(await Sharing.isAvailableAsync())) throw new Error('O compartilhamento não está disponível neste aparelho.');
   const arquivo = new File(Paths.cache, nome);
   arquivo.create({ overwrite: true, intermediates: true });
-  arquivo.write(conteudo);
+  arquivo.writeSync(conteudo);
   await Sharing.shareAsync(arquivo.uri, { ...tipo, dialogTitle: titulo });
 }
 

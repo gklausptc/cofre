@@ -1,0 +1,19 @@
+{
+  "cli": {
+    "version": ">= 26.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "env": {
+        "COFRE_PUBLICAR": "1"
+      },
+      "android": {
+        "buildType": "apk",
+        "autoIncrement": true
+      }
+    }
+  }
+}

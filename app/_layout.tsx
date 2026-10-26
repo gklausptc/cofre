@@ -142,6 +142,9 @@ function RootNavigator() {
       <Stack
         screenOptions={{
           headerShown: false,
+          // SDK 58: no iOS 26+ o cabeçalho passou a ser transparente (Liquid Glass) e o conteúdo
+          // corria por baixo dele; opaco, as telas ficam como eram
+          headerTransparent: false,
           contentStyle: { backgroundColor: colors.background },
         }}
       >

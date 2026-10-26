@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, type StyleProp, type ViewStyle } from 'react-native';
+import { View, type StyleProp, type ViewInstance, type ViewStyle } from 'react-native';
 import { useTourStore } from '@/store/tourStore';
 
 type TourTargetProps = {
@@ -15,7 +15,7 @@ type TourTargetProps = {
  * árvore nativa (o que quebraria a medição).
  */
 export function TourTarget({ id, children, style }: TourTargetProps) {
-  const ref = useRef<View>(null);
+  const ref = useRef<ViewInstance>(null);
   const registrarAlvo = useTourStore((s) => s.registrarAlvo);
 
   useEffect(() => {

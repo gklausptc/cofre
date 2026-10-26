@@ -62,14 +62,14 @@ export default function TabsLayout() {
         name="dashboard"
         options={{
           title: 'Início',
-          tabBarIcon: ({ color, size }) => <Feather name="home" size={size} color={color} />,
+          tabBarIcon: ({ focused, size }) => <Feather name="home" size={size} color={focused ? colors.brand : colors.textMuted} />,
         }}
       />
       <Tabs.Screen
         name="lancamentos"
         options={{
           title: 'Extrato',
-          tabBarIcon: ({ color, size }) => <Feather name="list" size={size} color={color} />,
+          tabBarIcon: ({ focused, size }) => <Feather name="list" size={size} color={focused ? colors.brand : colors.textMuted} />,
         }}
       />
       <Tabs.Screen
@@ -83,14 +83,14 @@ export default function TabsLayout() {
         name="agenda"
         options={{
           title: 'Agenda',
-          tabBarIcon: ({ color, size }) => <Feather name="calendar" size={size} color={color} />,
+          tabBarIcon: ({ focused, size }) => <Feather name="calendar" size={size} color={focused ? colors.brand : colors.textMuted} />,
         }}
       />
       <Tabs.Screen
         name="metas"
         options={{
           title: 'Metas',
-          tabBarIcon: ({ color, size }) => <Feather name="target" size={size} color={color} />,
+          tabBarIcon: ({ focused, size }) => <Feather name="target" size={size} color={focused ? colors.brand : colors.textMuted} />,
         }}
       />
       <Tabs.Screen name="pagamentos" options={{ href: null }} />

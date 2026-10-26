@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, View, type ScrollViewInstance } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -45,7 +45,7 @@ export default function BackupScreen() {
   const [previa, setPrevia] = useState<BackupEmPrevia | null>(null);
   const [ocupado, setOcupado] = useState<Ocupado>(null);
   const [erro, setErro] = useState<string | null>(null);
-  const rolagem = useRef<ScrollView>(null);
+  const rolagem = useRef<ScrollViewInstance>(null);
 
   const recarregarAutomaticos = useCallback(() => {
     try {

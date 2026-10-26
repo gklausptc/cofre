@@ -57,10 +57,11 @@ npm run publicar
 ```
 
 Leva de 1 a 3 minutos. Quem usa o app publicado recebe a versão nova na próxima abertura.
-O endereço do app publicado não muda:
+O endereço do app publicado só muda quando o SDK do Expo muda (o `runtime-version`); no SDK 58
+(QR em `docs/cofre-preview-qr.png`):
 
 ```
-exp://u.expo.dev/49f1fb65-45d0-4995-abe6-36c885597210?channel-name=preview&runtime-version=exposdk:57.0.0
+exp://u.expo.dev/49f1fb65-45d0-4995-abe6-36c885597210?channel-name=preview&runtime-version=exposdk:58.0.0
 ```
 
 Só publica quem está logado na conta `gregory.ks` (dona da organização `cofre-familia`).
@@ -71,10 +72,41 @@ Só publica quem está logado na conta `gregory.ks` (dona da organização `cofr
 |---|---|---|
 | iPhone com Expo Go logado como `gregory.ks` | Aparece em "Development servers" na tela inicial do Expo Go; basta tocar. Também fica em "Recently opened". | Ícone de pessoa > selecionar `cofre-familia` > PROJECTS > Cofre > preview > Open. |
 | iPhone com outra conta ou sem conta | Não abre. Regra do Expo Go desde o SDK 57. | Só se a conta for membro da organização `cofre-familia` (convite em expo.dev > cofre-familia > Settings > Members). |
-| Android, qualquer conta ou sem conta | Expo Go > "Scan QR code" no QR da janela do servidor (ou em `docs/cofre-servidor-qr.png`), ou "Enter URL manually" > `exp://wy6bd5q-gregoryks-8081.exp.direct`. | Não abre: o Expo Go do Android no SDK 57 dá "Failed to download remote update" em qualquer app publicado (defeito do Expo Go, expo/expo#50139). Use o servidor. |
+| Android, qualquer conta ou sem conta | Use o APK (seção 5.1). Pelo Expo Go: "Scan QR code" no QR da janela do servidor (ou em `docs/cofre-servidor-qr.png`), ou "Enter URL manually" > `exp://wy6bd5q-gregoryks-8081.exp.direct` — precisa do Expo Go do SDK 58 (em 26/10/2026 a Google Play ainda tinha o do SDK 57, que não abre o app). | Use o APK (seção 5.1). O Expo Go do Android no SDK 57 dava "Failed to download remote update" em qualquer app publicado (defeito do Expo Go, expo/expo#50139). |
 
 O Expo Go de iPhone não tem campo para digitar endereço nem leitor de QR. A câmera do iPhone
 lê QR com endereço `exp://` e abre o Expo Go.
+
+### 5.1 Android: o APK (sem Expo Go)
+
+No Android o Cofre é um app instalado de verdade (um APK), feito no EAS Build. Ele recebe as
+versões novas do `npm run publicar` sozinho, como o app publicado do iPhone, e tem as
+notificações ligadas (no Expo Go do Android elas não funcionam). O iPhone não muda nada.
+
+Gerar (no computador, logado como `gregory.ks`):
+
+```powershell
+npm run apk
+```
+
+Na primeira vez o EAS pergunta se pode criar a chave de assinatura do Android ("Generate a new
+Android Keystore?"): responda **Y**. A chave fica guardada no EAS; os próximos APKs saem
+assinados com ela e instalam por cima do anterior sem perder dados. O build roda na nuvem
+(10 a 20 minutos na fila gratuita) e termina com um link e um QR code.
+
+Instalar no celular Android:
+
+1. Abra o link (ou leia o QR com a câmera) no próprio celular e toque em **Install**/baixar.
+2. Abra o arquivo `.apk` baixado. Na primeira vez o Android pede para permitir instalar apps
+   desta fonte (Chrome ou Arquivos): permita e volte.
+3. Se aparecer o Play Protect avisando de app desconhecido, toque em "Mais detalhes" >
+   "Instalar mesmo assim".
+4. Abra o Cofre Klaus. Ele começa vazio (ver seção 6): restaure um backup em Mais > Backup.
+5. Em Mais > Configurações > Notificações, ative as notificações.
+
+Quando gerar outro APK: só quando o SDK do Expo mudar ou entrar um pacote com código nativo
+(o APK só aceita updates do mesmo `runtime-version`, hoje `exposdk:58.0.0`). Mudança só de
+código JS vai pelo `npm run publicar`, sem APK novo.
 
 ## 6. Onde ficam os dados
 
@@ -88,6 +120,8 @@ separado para cada "identidade" do app:
   o mesmo `uuid` (o de `scripts/prepararServidor.js`), então qualquer computador abre os mesmos
   dados; o `state.json` anterior fica guardado em `state.json.antes-do-cofre`.
 - **App publicado**: identidade `@cofre-familia/cofre`. Banco próprio, começa vazio.
+- **APK do Android**: é um app separado do Expo Go (`com.cofre.app`), com banco próprio que
+  começa vazio. Instalar um APK novo por cima mantém os dados; desinstalar apaga.
 
 Importante: nunca coloque `extra.eas.projectId` ou `updates` no `app.json`. Isso faz o servidor
 assinar o manifesto e muda a identidade para `@cofre-familia/cofre`, o que faz o app abrir vazio

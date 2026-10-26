@@ -140,7 +140,7 @@ export default function ExportarExtratoScreen() {
       }
       const arquivo = new File(Paths.cache, csv.nome);
       arquivo.create({ overwrite: true, intermediates: true });
-      arquivo.write(csv.conteudo);
+      arquivo.writeSync(csv.conteudo);
       await Sharing.shareAsync(arquivo.uri, {
         mimeType: 'text/csv',
         dialogTitle: tipoOrigem === 'conta' ? 'Exportar extrato da conta' : 'Exportar fatura do cartão',

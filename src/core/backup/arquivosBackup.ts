@@ -24,7 +24,7 @@ export function salvarBackupAutomatico(backup: BackupCofre, motivo: MotivoBackup
   const pasta = pastaBackups();
   const arquivo = new File(pasta, nomeBackupAutomatico(agora, motivo));
   arquivo.create({ overwrite: true, intermediates: true });
-  arquivo.write(JSON.stringify(backup));
+  arquivo.writeSync(JSON.stringify(backup));
 
   const nomes = pasta.list().filter((item) => item instanceof File).map((item) => item.name);
   for (const nome of backupsAutomaticosParaApagar(nomes)) {
@@ -48,7 +48,7 @@ export function listarBackupsAutomaticos(): BackupAutomaticoNoAparelho[] {
 export function salvarParaCompartilhar(nome: string, backup: BackupCofre): string {
   const arquivo = new File(Paths.cache, nome);
   arquivo.create({ overwrite: true, intermediates: true });
-  arquivo.write(JSON.stringify(backup));
+  arquivo.writeSync(JSON.stringify(backup));
   return arquivo.uri;
 }
 

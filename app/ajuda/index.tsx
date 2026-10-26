@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View, type ScrollViewInstance } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -32,7 +32,7 @@ export default function AjudaScreen() {
   const { atualizar: atualizarPreferencias } = usePreferenciasStore();
   const [mensagens, setMensagens] = useState<Mensagem[]>([BOAS_VINDAS]);
   const [texto, setTexto] = useState('');
-  const rolagem = useRef<ScrollView>(null);
+  const rolagem = useRef<ScrollViewInstance>(null);
 
   useFocusEffect(
     useCallback(() => {
